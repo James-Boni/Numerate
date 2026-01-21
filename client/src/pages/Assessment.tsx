@@ -1,24 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { motion } from 'framer-motion';
+import { motion, useSpring, useTransform, animate } from 'framer-motion';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { SessionScreen } from '@/components/game/SessionScreen';
 import { useStore, SessionStats } from '@/lib/store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ClipboardCheck, Zap, Target, TrendingUp } from 'lucide-react';
+import { AudioManager } from '@/lib/audio';
+import { clsx } from 'clsx';
+
+function CountUp({ value, duration = 1, delay = 0, onTick, prefix = '', suffix = '' }: { 
+  value: number, 
+  duration?: number, 
+  delay?: number, 
+  onTick?: () => void,
+  prefix?: string,
+  suffix?: string
+}) {
+  const [displayValue, setDisplayValue] = useState(0);
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+
+    const timer = setTimeout(() => {
+      const controls = animate(0, value, {
+        duration,
+        ease: "easeOut",
+        onUpdate: (latest) => {
+          const rounded = Math.round(latest);
+          if (rounded !== displayValue) {
+            setDisplayValue(rounded);
+            onTick?.();
+          }
+        }
+      });
+      return () => controls.stop();
+    }, delay * 1000);
+
+    return () => clearTimeout(timer);
+  }, [value, duration, delay]);
+
+  return <span>{prefix}{displayValue}{suffix}</span>;
+}
 
 export default function Assessment() {
   const [step, setStep] = useState<'intro' | 'active' | 'results'>('intro');
   const [results, setResults] = useState<SessionStats | null>(null);
   const [_, setLocation] = useLocation();
   const completeAssessment = useStore(s => s.completeAssessment);
+  const settings = useStore(s => s.settings);
 
   const handleComplete = (stats: SessionStats) => {
     setResults(stats);
     setStep('results');
     
-    // Updated tier assignment to be more realistic
     let tier = 0;
     if (stats.accuracy > 0.85 && stats.avgResponseTimeMs < 1800) tier = 8;
     else if (stats.accuracy > 0.7) tier = 5;
@@ -27,6 +65,20 @@ export default function Assessment() {
     
     completeAssessment(tier, stats);
   };
+
+  useEffect(() => {
+    if (step === 'results' && results && settings.soundOn) {
+      // Start XP tally sound
+      AudioManager.playEnergyRise(0.9);
+      
+      // Delay for accuracy bell if high enough
+      if (results.accuracy >= 0.95) {
+        setTimeout(() => {
+          AudioManager.playSuccessBell();
+        }, 1200);
+      }
+    }
+  }, [step, results, settings.soundOn]);
 
   const getEncouragingMessage = (tier: number) => {
     if (tier >= 8) return "You have a clear talent for mental arithmetic. We'll provide the challenges to help you reach elite fluency.";
@@ -97,21 +149,42 @@ export default function Assessment() {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm">
-            <span className="text-2xl font-bold">{results?.correctQuestions || 0}</span>
-            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Correct Answers</span>
+          <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm rounded-3xl">
+            <span className="text-2xl font-bold">
+              <CountUp 
+                value={results?.correctQuestions || 0} 
+                duration={0.7} 
+                delay={0.2} 
+                onTick={() => settings.soundOn && AudioManager.playTallyTick()}
+              />
+            </span>
+            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider text-center">Correct Answers</span>
           </Card>
-          <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm">
-            <span className="text-2xl font-bold">{Math.round((results?.accuracy || 0) * 100)}%</span>
-            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Accuracy</span>
+          <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm rounded-3xl">
+            <span className={clsx(
+              "text-2xl font-bold transition-colors duration-300",
+              (results?.accuracy || 0) >= 0.95 ? "text-primary" : "text-slate-900"
+            )}>
+              <CountUp 
+                value={Math.round((results?.accuracy || 0) * 100)} 
+                duration={0.7} 
+                delay={0.3} 
+                onTick={() => settings.soundOn && AudioManager.playTallyTick()}
+                suffix="%"
+              />
+            </span>
+            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider text-center">Accuracy</span>
           </Card>
         </div>
 
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 text-center space-y-6 shadow-sm">
+        <div className="bg-white border border-slate-100 rounded-3xl p-6 text-center space-y-6 shadow-sm">
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recommended Starting Level</span>
-            <div className="text-6xl font-black text-slate-900 mt-2">
-              {currentTier + 1}
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assessment XP Earned</span>
+            <div className="text-6xl font-black text-primary mt-2">
+              <CountUp 
+                value={results?.xpEarned || 0} 
+                duration={0.9} 
+              />
             </div>
           </div>
           <p className="text-slate-600 leading-relaxed text-sm">

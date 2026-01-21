@@ -21,7 +21,7 @@ export class AudioManager {
     window.addEventListener('touchstart', unlock);
   }
 
-  private static playSynth(freq: number, type: OscillatorType, duration: number, volume: number = 0.3, sweep: boolean = false) {
+  private static playSynth(freq: number, type: OscillatorType, duration: number, volume: number = 0.3, sweep: boolean = false, sweepEndFreq?: number) {
     if (!this.context) return;
     if (this.context.state === 'suspended') this.context.resume();
 
@@ -30,8 +30,8 @@ export class AudioManager {
 
     osc.type = type;
     osc.frequency.setValueAtTime(freq, this.context.currentTime);
-    if (sweep) {
-      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, this.context.currentTime + duration);
+    if (sweep && sweepEndFreq) {
+      osc.frequency.exponentialRampToValueAtTime(sweepEndFreq, this.context.currentTime + duration);
     }
     
     gain.gain.setValueAtTime(0, this.context.currentTime);
@@ -46,22 +46,33 @@ export class AudioManager {
   }
 
   static playCorrect() {
-    // Satisfying high chime: 880Hz -> 1320Hz sweep, 120ms
-    this.playSynth(880, 'sine', 0.12, 0.2, true);
+    this.playSynth(880, 'sine', 0.12, 0.2, true, 1320);
   }
 
   static playWrong() {
-    // Muted thud: 110Hz triangle, 140ms
     this.playSynth(110, 'triangle', 0.14, 0.4);
   }
 
   static playTick() {
-    // Short sharp click: 1500Hz square, 40ms
     this.playSynth(1500, 'square', 0.04, 0.05);
   }
 
   static playTap() {
-    // Soft tap: 440Hz sine, 50ms
     this.playSynth(440, 'sine', 0.05, 0.15);
+  }
+
+  static playEnergyRise(duration: number) {
+    // Energy rise for XP tally: 440Hz -> 880Hz sweep
+    this.playSynth(440, 'sine', duration, 0.2, true, 880);
+  }
+
+  static playTallyTick() {
+    // Precise digital counting tick
+    this.playSynth(1200, 'square', 0.02, 0.05);
+  }
+
+  static playSuccessBell() {
+    // Clean, magical success bell for high accuracy
+    this.playSynth(1500, 'sine', 0.25, 0.3, true, 1800);
   }
 }

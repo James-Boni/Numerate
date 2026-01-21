@@ -1,0 +1,63 @@
+This screen needs to feel significantly more rewarding and data-driven after completing the 3-minute Daily Training. Please implement a polished result-reveal sequence with animation + sound. This is NOT a redesign of layout, only behavior and feedback.
+
+1) XP Count-Up Animation (Primary Reward)
+- When the screen loads, XP should start at 0.
+- Animate rapidly upward to the final XP value the user earned.
+- Duration: ~600–900ms (fast, energetic, not slow).
+- Use smooth, non-bouncy easing (easeOut or linear).
+- XP number should feel like it is “tallying” results.
+
+Sound:
+- Play a short, magical-but-clean “energy rise” sound during the count-up.
+- Sound should:
+  - be modern, subtle, and fast
+  - communicate accumulation/progress
+  - NOT be a jingle or melody
+- Sound should stop exactly when the XP count finishes.
+
+2) Accuracy & Speed Count-Up (Secondary Rewards)
+- Accuracy (%) and Speed (seconds) should also animate from 0 to their final values.
+- Animation should begin slightly AFTER XP starts (staggered by ~100–200ms).
+- Duration: ~500–700ms each.
+
+Sound:
+- Use a “computer-like / analytical” ticking or digital counting sound.
+- Think: financial dashboard / numbers updating / money going up on a screen.
+- Sound must be:
+  - short
+  - precise
+  - non-musical
+  - quiet enough for repetition
+- Sound should stop cleanly when the number reaches its final value.
+
+3) Exceptional Performance Highlight (Accuracy ≥ 95%)
+If accuracy is 95% or higher:
+- Accuracy number should:
+  - transition to the same green used by the Accuracy target icon
+  - become slightly emboldened (not oversized)
+- Trigger a single, short, satisfying bell/chime sound.
+  - Duration ≤ 250ms
+  - Clean, magical, but restrained
+  - No sparkle, no flourish
+- This sound must play AFTER the accuracy count-up completes.
+
+4) Timing & Flow (CRITICAL)
+- All sounds must be tightly synchronized to their animations.
+- No sound should continue after the animation finishes.
+- No overlapping sounds unless intentional (XP vs stats should not clash).
+- The entire reveal sequence should complete in ~1.2–1.5 seconds total.
+- The screen must feel responsive immediately (no lag before animations start).
+
+5) Visual Philosophy
+- No confetti, fireworks, or celebratory explosions.
+- This should feel like “performance feedback”, not a game win screen.
+- Clean, confident, adult, satisfying.
+
+6) Accessibility & Settings
+- Respect sound toggle: if sound is off, animations still play silently.
+- Ensure color contrast remains accessible when accuracy turns green.
+
+Please confirm:
+- Which sounds were used/replaced
+- How animations are sequenced
+- That the result was tested on a real iPhone
