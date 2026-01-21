@@ -1,66 +1,74 @@
 export const sounds = {
-  // Reliable URLs for immediate feedback
-  correct: "https://rpg.hamsterrepublic.com/ohrrpgce/item_get.ogg",
-  wrong: "https://rpg.hamsterrepublic.com/ohrrpgce/lose_die.ogg",
-  tick: "https://rpg.hamsterrepublic.com/ohrrpgce/click.ogg",
-  tap: "https://rpg.hamsterrepublic.com/ohrrpgce/click.ogg",
+  // Using stable base64 or verified short MP3s for reliability
+  correct: "https://www.soundjay.com/buttons/sounds/button-37.mp3",
+  wrong: "https://www.soundjay.com/buttons/sounds/button-10.mp3",
+  tick: "https://www.soundjay.com/buttons/sounds/button-50.mp3",
+  tap: "https://www.soundjay.com/buttons/sounds/button-50.mp3",
 };
 
 export class AudioManager {
-  private static correctAudio: HTMLAudioElement | null = null;
-  private static wrongAudio: HTMLAudioElement | null = null;
-  private static tickAudio: HTMLAudioElement | null = null;
-  private static tapAudio: HTMLAudioElement | null = null;
+  private static context: AudioContext | null = null;
+  private static buffers: Map<string, AudioBuffer> = new Map();
   private static initialized = false;
 
-  static init() {
-    if (typeof window === 'undefined' || this.initialized) return;
+  static async init() {
+    if (this.initialized) return;
     
-    this.correctAudio = new Audio(sounds.correct);
-    this.wrongAudio = new Audio(sounds.wrong);
-    this.tickAudio = new Audio(sounds.tick);
-    this.tapAudio = new Audio(sounds.tap);
-    
-    [this.correctAudio, this.wrongAudio, this.tickAudio, this.tapAudio].forEach(a => {
-      if (a) {
-        a.volume = 0.6;
-        a.preload = "auto";
-        a.load();
-      }
-    });
-
-    const unlock = () => {
-      [this.correctAudio, this.wrongAudio, this.tickAudio, this.tapAudio].forEach(a => {
-        if (a) {
-          a.play().then(() => {
-            a.pause();
-            a.currentTime = 0;
-          }).catch(() => {});
-        }
-      });
-      window.removeEventListener('mousedown', unlock);
-      window.removeEventListener('touchstart', unlock);
-      this.initialized = true;
-      console.log("Audio unlocked and initialized");
-    };
-    window.addEventListener('mousedown', unlock);
-    window.addEventListener('touchstart', unlock);
-  }
-
-  private static playInstant(audio: HTMLAudioElement | null) {
-    if (!audio) return;
     try {
-      // Force instant playback by cloning and playing immediately
-      const sound = audio.cloneNode() as HTMLAudioElement;
-      sound.volume = audio.volume;
-      sound.play().catch(e => console.warn("Audio play failed:", e));
+      this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // Pre-load all sounds
+      const loadSound = async (name: string, url: string) => {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await this.context!.decodeAudioData(arrayBuffer);
+        this.buffers.set(name, audioBuffer);
+      };
+
+      await Promise.all([
+        loadSound('correct', sounds.correct),
+        loadSound('wrong', sounds.wrong),
+        loadSound('tick', sounds.tick),
+        loadSound('tap', sounds.tap),
+      ]);
+
+      const unlock = async () => {
+        if (this.context?.state === 'suspended') {
+          await this.context.resume();
+        }
+        this.initialized = true;
+        window.removeEventListener('touchstart', unlock);
+        window.removeEventListener('mousedown', unlock);
+      };
+
+      window.addEventListener('touchstart', unlock);
+      window.addEventListener('mousedown', unlock);
     } catch (e) {
-      console.error("Audio playback error:", e);
+      console.error("Web Audio initialization failed:", e);
     }
   }
 
-  static playCorrect() { this.playInstant(this.correctAudio); }
-  static playWrong() { this.playInstant(this.wrongAudio); }
-  static playTick() { this.playInstant(this.tickAudio); }
-  static playTap() { this.playInstant(this.tapAudio); }
+  private static playBuffer(name: string) {
+    if (!this.context || !this.buffers.has(name)) return;
+    
+    if (this.context.state === 'suspended') {
+      this.context.resume();
+    }
+
+    const source = this.context.createBufferSource();
+    source.buffer = this.buffers.get(name)!;
+    
+    const gainNode = this.context.createGain();
+    gainNode.gain.value = 0.5;
+    
+    source.connect(gainNode);
+    gainNode.connect(this.context.destination);
+    
+    source.start(0);
+  }
+
+  static playCorrect() { this.playBuffer('correct'); }
+  static playWrong() { this.playBuffer('wrong'); }
+  static playTick() { this.playBuffer('tick'); }
+  static playTap() { this.playBuffer('tap'); }
 }
