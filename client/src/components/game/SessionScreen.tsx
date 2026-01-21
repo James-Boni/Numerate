@@ -8,9 +8,42 @@ import { generateQuestion, calculateXP, Question, TIERS } from '@/lib/game-logic
 import { generateQuestionForProgression } from '@/lib/logic/generator_adapter';
 import { useStore, SessionStats } from '@/lib/store';
 
-// ... other imports ...
+import { AudioManager } from '@/lib/audio';
+import { computeFluencyComponents, computeFluencyScore, computeSessionXP } from '@/lib/logic/progression';
+import { PROGRESSION_CONFIG as CFG } from '@/config/progression';
+import { DebugOverlay } from './DebugOverlay';
 
-// ... inside SessionScreen component ...
+interface SessionScreenProps {
+  mode: 'assessment' | 'training';
+  durationSeconds: number | 'unlimited';
+  initialTier: number;
+  onComplete: (stats: SessionStats) => void;
+  onExit: () => void;
+}
+
+export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, onExit }: SessionScreenProps) {
+  const [tier, setTier] = useState(initialTier);
+  const [question, setQuestion] = useState<Question | null>(null);
+  const [input, setInput] = useState('');
+  const [timeLeft, setTimeLeft] = useState<number>(typeof durationSeconds === 'number' ? durationSeconds : 0);
+  const [isActive, setIsActive] = useState(false);
+  
+  const [score, setScore] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  
+  const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
+  const [shake, setShake] = useState(false);
+  const [flash, setFlash] = useState<'correct' | 'wrong' | null>(null);
+
+  const startTimeRef = useRef<number>(Date.now());
+  const questionStartTimeRef = useRef<number>(Date.now());
+  const responseTimesRef = useRef<number[]>([]);
+  
+  const settings = useStore(s => s.settings);
+  const recordAnswer = useStore(s => s.recordAnswer);
 
   const progression = useStore(s => s.progression);
   const currentQuestionMetaRef = useRef({ targetTimeMs: 3000, dp: 1, id: '' });

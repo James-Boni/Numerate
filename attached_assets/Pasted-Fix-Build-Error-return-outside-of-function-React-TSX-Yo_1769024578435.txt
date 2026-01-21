@@ -1,0 +1,247 @@
+Fix Build Error — return outside of function (React / TSX)
+
+You introduced a syntax error in
+client/src/components/game/SessionScreen.tsx:
+
+'return' outside of function (150:2)
+
+
+This means JSX is being returned outside of a React component body due to a missing / extra brace, premature function closure, or code inserted at module scope.
+
+Your task
+
+Fix this error without changing intended behavior.
+
+Step-by-step instructions (must follow)
+1. Locate the structural error
+
+Open SessionScreen.tsx
+
+Identify the React component function (likely SessionScreen)
+
+Verify:
+
+The component function opens with {
+
+The return ( JSX block is inside that function
+
+All hooks, helper functions, and effects are inside the component, not closing it early
+
+This error is almost always caused by:
+
+An extra } before return
+
+A helper function accidentally closed at the wrong level
+
+DebugOverlay or new logic added outside the component body
+
+2. Fix the component structure
+
+Ensure the structure follows this exact pattern:
+
+export function SessionScreen() {
+  // hooks
+  // handlers
+  // effects
+  // helper functions (defined inline or with const = () => {})
+
+  return (
+    <MobileLayout>
+      {/* JSX */}
+    </MobileLayout>
+  );
+}
+
+
+There must be no executable code at module scope except imports, types, and exports.
+
+3. Pay special attention to recently added code
+
+Specifically inspect:
+
+DebugOverlay integration
+
+Progression / difficulty logic
+
+Any new helper functions or effects added during the last prompts
+
+Common mistake:
+
+const helper = () => {
+  ...
+};   // ← correct
+
+};   // ← ❌ extra brace that closes the component early
+
+4. Self-check before finishing (mandatory)
+
+Before marking the task complete, you must:
+
+Visually count braces
+
+Ensure every { has a matching }
+
+Ensure the component function encloses the return
+
+Confirm file structure
+
+Only imports / types at top-level
+
+Only React components exported at top-level
+
+No stray return, JSX, or logic at module scope
+
+Run the dev server
+
+Confirm Vite no longer reports:
+
+'return' outside of function
+
+
+App must compile successfully
+
+Confirm no behavior regression
+
+SessionScreen renders
+
+DebugOverlay (if present) still renders correctly
+
+No logic was deleted—only moved/re-scoped if needed
+
+5. Report back clearly
+
+After fixing, reply with:
+
+What caused the error (e.g. “extra closing brace before return”)
+
+Exactly what was changed (e.g. “moved helper X inside component”)
+
+Confirmation that the dev server runs without errors
+
+Do not say “fixed” unless all checks above are complete.
+
+Important constraints
+
+Do NOT refactor unrelated logic
+
+Do NOT remove progression/difficulty code
+
+Do NOT disable Vite overlay
+
+Do NOT introduce new abstractions
+
+This is a structural fix only
+
+If you follow this exactly, the error will be resolved cleanly and safely.
+
+dont tell me, make it a prompt so I can give it to replit.
+
+Here is the clean, copy-paste prompt to give to Replit.
+It contains only instructions, no explanation to you, and it forces the agent to self-check before finishing.
+
+🔧 Fix build error — return outside of function (React / TSX)
+
+There is a syntax error in:
+
+client/src/components/game/SessionScreen.tsx
+
+Error:
+
+'return' outside of function (150:2)
+
+
+This means JSX is being returned at module scope due to a structural issue (misplaced brace, prematurely closed component, or code inserted outside the React component).
+
+Your task
+
+Fix the file so that:
+
+The return ( JSX block is inside the SessionScreen React component
+
+No logic or JSX exists at module scope (outside a function)
+
+The app compiles with no Vite/Babel errors
+
+No intended behavior is changed
+
+Required steps (must follow in order)
+1. Inspect component structure
+
+Open SessionScreen.tsx
+
+Identify the SessionScreen React component
+
+Ensure:
+
+The component function opens with {
+
+All hooks, helpers, and effects are inside the component
+
+The return ( block is enclosed by the component function
+
+2. Fix structural issues
+
+Correct any of the following if present:
+
+Extra or missing }
+
+A helper function that accidentally closes the component early
+
+Debug/progression code placed outside the component
+
+JSX placed at top-level scope
+
+The file must follow this pattern:
+
+export function SessionScreen() {
+  // hooks
+  // effects
+  // helpers
+
+  return (
+    <MobileLayout>
+      {/* JSX */}
+    </MobileLayout>
+  );
+}
+
+
+No executable code is allowed outside the component.
+
+3. Preserve all logic
+
+Do NOT remove progression or debug logic
+
+Only move or re-scope code if necessary
+
+Do NOT refactor unrelated parts
+
+Mandatory self-verification (do not skip)
+
+Before marking complete:
+
+Manually verify brace matching ({})
+
+Confirm the return ( JSX is inside SessionScreen
+
+Confirm no JSX or return exists at module scope
+
+Run the dev server and confirm:
+
+No 'return' outside of function error
+
+Vite compiles successfully
+
+Confirm SessionScreen renders and DebugOverlay (if present) still works
+
+Required final response
+
+After fixing, respond with:
+
+The exact cause of the error
+
+What was changed to fix it
+
+Confirmation that the dev server runs without errors
+
+Do not respond “fixed” unless all checks pass.
