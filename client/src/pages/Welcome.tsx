@@ -43,7 +43,7 @@ export default function Welcome() {
 
         <div className="space-y-4 max-w-[280px]">
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-                Maths Trainer
+                Numerate
             </h1>
             <p className="text-slate-500 text-lg leading-relaxed">
                 Build arithmetic fluency with daily focused practice.
