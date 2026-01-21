@@ -7,6 +7,7 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { KeypadModern } from '@/components/game/Keypad';
 import { generateQuestion, calculateXP, Question, TIERS } from '@/lib/game-logic';
 import { useStore, SessionStats } from '@/lib/store';
+import { AudioManager } from '@/lib/audio';
 
 interface SessionScreenProps {
   mode: 'assessment' | 'training';
@@ -114,7 +115,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     if (!question || feedback) return;
     
     const val = parseFloat(input);
-    const isCorrect = Math.abs(val - question.answer) < 0.001; // Float tolerance
+    const isCorrect = Math.abs(val - (question?.answer ?? 0)) < 0.001;
     const timeTaken = Date.now() - questionStartTimeRef.current;
     
     setTotalCount(prev => prev + 1);
@@ -122,6 +123,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
 
     if (isCorrect) {
       // Correct
+      AudioManager.playCorrect();
       const xp = calculateXP(true, timeTaken, streak);
       setScore(prev => prev + xp);
       setCorrectCount(prev => prev + 1);
@@ -148,6 +150,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
 
     } else {
       // Wrong
+      AudioManager.playWrong();
       setStreak(0);
       setFeedback('wrong');
       setShake(true);
@@ -162,7 +165,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       }, 900);
       
       if (mode === 'assessment' && tier > 0) {
-          setTier(t => t - 1);
+          setTier(t => Math.max(0, t - 1));
       }
     }
   };
