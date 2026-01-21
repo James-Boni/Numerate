@@ -1,5 +1,5 @@
 // --- Constants ---
-export const TIERS = 7;
+export const TIERS = 10;
 
 export interface Question {
   id: string;

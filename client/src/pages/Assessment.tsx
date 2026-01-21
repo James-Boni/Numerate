@@ -18,24 +18,30 @@ export default function Assessment() {
     setResults(stats);
     setStep('results');
     
-    // Logic for assigning tier
     let tier = 0;
-    if (stats.accuracy > 0.9 && stats.avgResponseTimeMs < 1500) tier = 4;
-    else if (stats.accuracy > 0.8) tier = 3;
-    else if (stats.accuracy > 0.6) tier = 2;
-    else if (stats.accuracy > 0.4) tier = 1;
+    if (stats.accuracy > 0.9 && stats.avgResponseTimeMs < 1500) tier = 9;
+    else if (stats.accuracy > 0.8) tier = 7;
+    else if (stats.accuracy > 0.6) tier = 5;
+    else if (stats.accuracy > 0.4) tier = 3;
     
     completeAssessment(tier, stats);
+  };
+
+  const getEncouragingMessage = (tier: number) => {
+    if (tier >= 8) return "Incredible! You have a natural mathematical mind. Let's push those boundaries even further!";
+    if (tier >= 5) return "Fantastic start! Your foundations are solid. Get ready to supercharge your mental agility!";
+    if (tier >= 3) return "Great work! You've got the basics down. Time to sharpen those skills and feel the growth!";
+    return "Excellent first step! We're going to build your confidence and make maths feel like a superpower!";
   };
 
   if (step === 'intro') {
     return (
       <MobileLayout className="bg-white">
         <div className="flex-1 flex flex-col p-8 space-y-8 justify-center">
-          <div className="space-y-4">
-            <h1 className="text-3xl font-bold tracking-tight">Initial Assessment</h1>
-            <p className="text-slate-500">
-              3 minutes to set your starting difficulty. Solve as many as you can!
+          <div className="space-y-4 text-center">
+            <h1 className="text-4xl font-bold tracking-tight text-slate-900">Initial Assessment</h1>
+            <p className="text-slate-500 text-lg">
+              3 minutes to discover your power level. Show us what you can do!
             </p>
           </div>
 
@@ -76,6 +82,8 @@ export default function Assessment() {
     );
   }
 
+  const currentTier = useStore.getState().currentTier;
+
   return (
     <MobileLayout className="bg-slate-50">
       <div className="flex-1 p-8 space-y-8 flex flex-col justify-center">
@@ -89,20 +97,25 @@ export default function Assessment() {
 
         <div className="grid grid-cols-2 gap-4">
           <Card className="p-4 flex flex-col items-center justify-center space-y-1">
-            <span className="text-2xl font-bold">{(results?.accuracy || 0 * 100).toFixed(0)}%</span>
-            <span className="text-xs text-slate-400 uppercase font-semibold">Accuracy</span>
+            <span className="text-2xl font-bold">{results?.correctQuestions || 0}</span>
+            <span className="text-xs text-slate-400 uppercase font-semibold">Score</span>
           </Card>
           <Card className="p-4 flex flex-col items-center justify-center space-y-1">
-            <span className="text-2xl font-bold">{(results?.avgResponseTimeMs || 0 / 1000).toFixed(1)}s</span>
-            <span className="text-xs text-slate-400 uppercase font-semibold">Avg Speed</span>
+            <span className="text-2xl font-bold">{Math.round((results?.accuracy || 0) * 100)}%</span>
+            <span className="text-xs text-slate-400 uppercase font-semibold">Accuracy</span>
           </Card>
         </div>
 
-        <div className="bg-primary/5 border border-primary/10 rounded-2xl p-6 text-center">
-          <span className="text-xs font-bold text-primary uppercase tracking-widest">Starting Tier</span>
-          <div className="text-5xl font-black text-primary mt-2">
-            Tier {useStore.getState().currentTier}
+        <div className="bg-primary/5 border border-primary/10 rounded-2xl p-6 text-center space-y-4">
+          <div>
+            <span className="text-xs font-bold text-primary uppercase tracking-widest">Calculated Skill Level</span>
+            <div className="text-6xl font-black text-primary mt-2">
+              Level {currentTier + 1}
+            </div>
           </div>
+          <p className="text-slate-700 font-medium italic">
+            "{getEncouragingMessage(currentTier)}"
+          </p>
         </div>
 
         <Button 

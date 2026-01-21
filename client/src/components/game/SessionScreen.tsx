@@ -24,16 +24,15 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   const [timeLeft, setTimeLeft] = useState<number>(typeof durationSeconds === 'number' ? durationSeconds : 0);
   const [isActive, setIsActive] = useState(false);
   
-  // Stats
   const [score, setScore] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   
-  // Feedback State
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [shake, setShake] = useState(false);
+  const [flash, setFlash] = useState<'correct' | 'wrong' | null>(null);
 
   const startTimeRef = useRef<number>(Date.now());
   const questionStartTimeRef = useRef<number>(Date.now());
@@ -41,14 +40,12 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   
   const settings = useStore(s => s.settings);
 
-  // Init
   useEffect(() => {
     nextQuestion();
     setIsActive(true);
     startTimeRef.current = Date.now();
   }, []);
 
-  // Timer
   useEffect(() => {
     if (!isActive || durationSeconds === 'unlimited') return;
     
@@ -69,52 +66,33 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     setQuestion(generateQuestion(tier));
     setInput('');
     setFeedback(null);
+    setFlash(null);
     questionStartTimeRef.current = Date.now();
   };
 
   const endSession = () => {
     setIsActive(false);
-    const endTime = Date.now();
-    const duration = (endTime - startTimeRef.current) / 1000;
-    
-    // Calculate stats
-    const avgTime = responseTimesRef.current.length > 0 
-      ? responseTimesRef.current.reduce((a, b) => a + b, 0) / responseTimesRef.current.length 
-      : 0;
-
     const stats: SessionStats = {
       id: Math.random().toString(36),
       date: new Date().toISOString(),
       durationMode: durationSeconds === 'unlimited' ? 'unlimited' : (durationSeconds as any),
-      durationSecondsActual: duration,
+      durationSecondsActual: (Date.now() - startTimeRef.current) / 1000,
       totalQuestions: totalCount,
       correctQuestions: correctCount,
       accuracy: totalCount > 0 ? correctCount / totalCount : 0,
       xpEarned: score,
       bestStreak: bestStreak,
-      avgResponseTimeMs: avgTime
+      avgResponseTimeMs: responseTimesRef.current.length > 0 ? responseTimesRef.current.reduce((a, b) => a + b, 0) / responseTimesRef.current.length : 0
     };
-    
     onComplete(stats);
   };
 
-  const handlePress = (key: string) => {
-    if (feedback) return; // Block input during feedback
-    if (key === '.') {
-        if (!input.includes('.')) setInput(prev => prev + key);
-    } else {
-        if (input.length < 6) setInput(prev => prev + key);
-    }
-  };
-
-  const handleDelete = () => {
-    setInput(prev => prev.slice(0, -1));
-  };
-
-  const handleSubmit = () => {
+  const handleSubmit = (overrideInput?: string) => {
     if (!question || feedback) return;
+    const currentInput = overrideInput !== undefined ? overrideInput : input;
+    if (!currentInput) return;
     
-    const val = parseFloat(input);
+    const val = parseFloat(currentInput);
     const isCorrect = Math.abs(val - (question?.answer ?? 0)) < 0.001;
     const timeTaken = Date.now() - questionStartTimeRef.current;
     
@@ -122,66 +100,56 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     responseTimesRef.current.push(timeTaken);
 
     if (isCorrect) {
-      // Correct
       AudioManager.playCorrect();
       const xp = calculateXP(true, timeTaken, streak);
       setScore(prev => prev + xp);
       setCorrectCount(prev => prev + 1);
-      
       const newStreak = streak + 1;
       setStreak(newStreak);
       if (newStreak > bestStreak) setBestStreak(newStreak);
-      
       setFeedback('correct');
-      // Play sound (mock)
-      if (settings.soundOn) { /* play correct sound */ }
+      setFlash('correct');
       if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(10);
-
-      // Instant transition for correct
-      setTimeout(() => {
-        nextQuestion();
-      }, 400); // Short delay to see checkmark
-
-      // Adaptive Tier Logic (Simple)
-      // Every 5 correct in a row -> tier up?
-      if (mode === 'assessment' && newStreak % 3 === 0 && tier < TIERS - 1) {
-          setTier(t => t + 1);
-      }
-
+      setTimeout(nextQuestion, 400);
+      if (mode === 'assessment' && newStreak % 3 === 0 && tier < TIERS - 1) setTier(t => t + 1);
     } else {
-      // Wrong
       AudioManager.playWrong();
       setStreak(0);
       setFeedback('wrong');
+      setFlash('wrong');
       setShake(true);
-      if (settings.soundOn) { /* play wrong sound */ }
       if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(50);
-      
-      // Delay to show correct answer or just shake?
-      // Spec: "gentle shake animation + Correct: X shown briefly (600–900ms)"
       setTimeout(() => {
         setShake(false);
         nextQuestion();
       }, 900);
-      
-      if (mode === 'assessment' && tier > 0) {
-          setTier(t => Math.max(0, t - 1));
-      }
+      if (mode === 'assessment' && tier > 0) setTier(t => Math.max(0, t - 1));
     }
   };
 
   return (
-    <MobileLayout className="bg-zinc-50">
-      {/* Header */}
+    <MobileLayout className={clsx(
+      "transition-colors duration-300",
+      flash === 'correct' ? "bg-emerald-500/20" : 
+      flash === 'wrong' ? "bg-rose-500/20" : 
+      "bg-zinc-50"
+    )}>
       <div className="flex justify-between items-center px-6 py-4 safe-top">
         <button onClick={onExit} className="p-2 -ml-2 text-zinc-400 hover:text-zinc-600">
             <X size={24} />
         </button>
         
         {durationSeconds !== 'unlimited' && (
-            <div className="font-mono text-xl font-bold text-zinc-400 tabular-nums">
+            <motion.div 
+              animate={timeLeft <= 10 ? { scale: [1, 1.1, 1], color: ['#ef4444', '#f87171', '#ef4444'] } : {}}
+              transition={{ repeat: Infinity, duration: 1 }}
+              className={clsx(
+                "font-mono text-xl font-bold tabular-nums",
+                timeLeft <= 10 ? "text-rose-500" : "text-zinc-400"
+              )}
+            >
                 {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-            </div>
+            </motion.div>
         )}
         
         <div className="flex items-center gap-1">
@@ -189,7 +157,6 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
         </div>
       </div>
 
-      {/* Progress Bar */}
       <div className="h-1 w-full bg-zinc-200">
         <motion.div 
             className="h-full bg-primary"
@@ -198,7 +165,6 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
         />
       </div>
 
-      {/* Game Area */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
         <AnimatePresence mode="wait">
             {question && (
@@ -213,12 +179,15 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
                         {question.text}
                     </h2>
                     
-                    <div className={clsx(
-                        "h-20 min-w-[180px] px-6 rounded-2xl flex items-center justify-center text-4xl font-mono font-medium transition-colors border-2",
+                    <button 
+                      onClick={() => handleSubmit()}
+                      className={clsx(
+                        "h-20 min-w-[180px] px-6 rounded-2xl flex items-center justify-center text-4xl font-mono font-medium transition-all border-2 active:scale-95",
                         feedback === 'correct' ? "bg-emerald-50 border-emerald-200 text-emerald-600" :
                         feedback === 'wrong' ? "bg-rose-50 border-rose-200 text-rose-600" :
-                        "bg-white border-zinc-200 text-foreground shadow-sm"
-                    )}>
+                        "bg-white border-zinc-200 text-foreground shadow-sm hover:border-primary/50"
+                      )}
+                    >
                         {feedback === 'wrong' ? (
                             <span className="text-rose-500 text-xl">Ans: {question.answer}</span>
                         ) : (
@@ -226,36 +195,20 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
                         )}
                         
                         {feedback === 'correct' && (
-                            <motion.div 
-                                initial={{ scale: 0 }} 
-                                animate={{ scale: 1 }}
-                                className="absolute -right-8"
-                            >
+                            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute -right-8">
                                 <Check className="text-emerald-500 w-8 h-8" strokeWidth={3} />
                             </motion.div>
                         )}
-                    </div>
+                    </button>
                 </motion.div>
             )}
         </AnimatePresence>
-        
-        {/* Streak Indicator */}
-        {streak > 2 && (
-             <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="absolute top-10 flex items-center gap-1 bg-orange-100 text-orange-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider"
-             >
-                🔥 Streak {streak}
-             </motion.div>
-        )}
       </div>
 
-      {/* Keypad */}
       <KeypadModern 
-        onPress={handlePress}
-        onDelete={handleDelete}
-        onSubmit={handleSubmit}
+        onPress={(k) => setInput(prev => prev + k)}
+        onDelete={() => setInput(prev => prev.slice(0, -1))}
+        onSubmit={() => handleSubmit()}
         submitDisabled={input.length === 0}
         disabled={feedback !== null}
       />
