@@ -1,15 +1,20 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { useStore } from '@/lib/store';
-import { Button } from '@/components/ui/button'; // Need to make sure this exists or use html button
+import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
+import { AudioManager } from '@/lib/audio';
 
 export default function Welcome() {
   const [_, setLocation] = useLocation();
   const login = useStore(s => s.login);
   const isAuthenticated = useStore(s => s.isAuthenticated);
+
+  useEffect(() => {
+    AudioManager.init();
+  }, []);
 
   const handleStart = () => {
     if (!isAuthenticated) {

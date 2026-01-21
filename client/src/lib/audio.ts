@@ -1,9 +1,9 @@
 export const sounds = {
-  // Gentle, high-quality UI sounds - Using reliable URLs
-  correct: "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3",
-  wrong: "https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3",
-  tick: "https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3",
-  tap: "https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3",
+  // Reliable URLs for immediate feedback
+  correct: "https://rpg.hamsterrepublic.com/ohrrpgce/item_get.ogg",
+  wrong: "https://rpg.hamsterrepublic.com/ohrrpgce/lose_die.ogg",
+  tick: "https://rpg.hamsterrepublic.com/ohrrpgce/click.ogg",
+  tap: "https://rpg.hamsterrepublic.com/ohrrpgce/click.ogg",
 };
 
 export class AudioManager {
@@ -23,23 +23,39 @@ export class AudioManager {
     
     [this.correctAudio, this.wrongAudio, this.tickAudio, this.tapAudio].forEach(a => {
       if (a) {
-        a.volume = 0.4;
+        a.volume = 0.6;
         a.preload = "auto";
         a.load();
       }
     });
-    this.initialized = true;
+
+    const unlock = () => {
+      [this.correctAudio, this.wrongAudio, this.tickAudio, this.tapAudio].forEach(a => {
+        if (a) {
+          a.play().then(() => {
+            a.pause();
+            a.currentTime = 0;
+          }).catch(() => {});
+        }
+      });
+      window.removeEventListener('mousedown', unlock);
+      window.removeEventListener('touchstart', unlock);
+      this.initialized = true;
+      console.log("Audio unlocked and initialized");
+    };
+    window.addEventListener('mousedown', unlock);
+    window.addEventListener('touchstart', unlock);
   }
 
   private static playInstant(audio: HTMLAudioElement | null) {
     if (!audio) return;
     try {
-      // The key to instant playback: create a clone and play it immediately
+      // Force instant playback by cloning and playing immediately
       const sound = audio.cloneNode() as HTMLAudioElement;
       sound.volume = audio.volume;
-      sound.play().catch(e => console.warn("Audio play blocked", e));
+      sound.play().catch(e => console.warn("Audio play failed:", e));
     } catch (e) {
-      console.error("Audio playback failed", e);
+      console.error("Audio playback error:", e);
     }
   }
 
