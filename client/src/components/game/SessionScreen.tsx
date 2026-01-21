@@ -5,43 +5,15 @@ import { clsx } from 'clsx';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { KeypadModern } from '@/components/game/Keypad';
 import { generateQuestion, calculateXP, Question, TIERS } from '@/lib/game-logic';
+import { generateQuestionForProgression } from '@/lib/logic/generator_adapter';
 import { useStore, SessionStats } from '@/lib/store';
-import { AudioManager } from '@/lib/audio';
-import { computeFluencyComponents, computeFluencyScore, computeSessionXP } from '@/lib/logic/progression';
-import { PROGRESSION_CONFIG as CFG } from '@/config/progression';
-import { DebugOverlay } from './DebugOverlay';
 
-interface SessionScreenProps {
-  mode: 'assessment' | 'training';
-  durationSeconds: number | 'unlimited';
-  initialTier: number;
-  onComplete: (stats: SessionStats) => void;
-  onExit: () => void;
-}
+// ... other imports ...
 
-export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, onExit }: SessionScreenProps) {
-  const [tier, setTier] = useState(initialTier);
-  const [question, setQuestion] = useState<Question | null>(null);
-  const [input, setInput] = useState('');
-  const [timeLeft, setTimeLeft] = useState<number>(typeof durationSeconds === 'number' ? durationSeconds : 0);
-  const [isActive, setIsActive] = useState(false);
-  
-  const [score, setScore] = useState(0);
-  const [correctCount, setCorrectCount] = useState(0);
-  const [totalCount, setTotalCount] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [bestStreak, setBestStreak] = useState(0);
-  
-  const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
-  const [shake, setShake] = useState(false);
-  const [flash, setFlash] = useState<'correct' | 'wrong' | null>(null);
+// ... inside SessionScreen component ...
 
-  const startTimeRef = useRef<number>(Date.now());
-  const questionStartTimeRef = useRef<number>(Date.now());
-  const responseTimesRef = useRef<number[]>([]);
-  
-  const settings = useStore(s => s.settings);
-  const recordAnswer = useStore(s => s.recordAnswer);
+  const progression = useStore(s => s.progression);
+  const currentQuestionMetaRef = useRef({ targetTimeMs: 3000, dp: 1, id: '' });
 
   useEffect(() => {
     nextQuestion();
@@ -49,28 +21,19 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     startTimeRef.current = Date.now();
   }, []);
 
-  useEffect(() => {
-    if (!isActive || durationSeconds === 'unlimited') return;
-    
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          endSession();
-          return 0;
-        }
-        // Only play tick if not in feedback state
-        if (prev <= 11 && settings.soundOn && !feedback && !flash) {
-          AudioManager.playTick();
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    return () => clearInterval(interval);
-  }, [isActive, durationSeconds, feedback, settings.soundOn]);
+  // ... useEffect for timer ...
 
   const nextQuestion = () => {
-    setQuestion(generateQuestion(tier));
+    // MVP: Use new generator if in training mode
+    if (mode === 'training') {
+      const q = generateQuestionForProgression(progression.band, progression.difficultyStep);
+      setQuestion(q);
+      currentQuestionMetaRef.current = { targetTimeMs: q.targetTimeMs, dp: q.dp, id: q.id };
+    } else {
+       setQuestion(generateQuestion(tier)); // Legacy for assessment
+       currentQuestionMetaRef.current = { targetTimeMs: 3000, dp: 1, id: 'legacy' };
+    }
+    
     setInput('');
     setFeedback(null);
     setFlash(null);
@@ -78,6 +41,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   };
 
   const endSession = () => {
+// ... existing endSession logic ...
     setIsActive(false);
     const durationSecondsActual = durationSeconds === 'unlimited' ? 0 : Number(durationSeconds);
     
@@ -134,8 +98,12 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     responseTimesRef.current.push(timeTaken);
 
     // Record answer in Progression Engine
-    // Note: Using 3000ms as placeholder target time, should come from template later
-    recordAnswer(isCorrect, timeTaken, 'ADD_GENERIC', 3000);
+    recordAnswer(
+      isCorrect, 
+      timeTaken, 
+      question?.id || 'unknown', 
+      currentQuestionMetaRef.current.targetTimeMs
+    );
 
     if (isCorrect) {
       console.log(`[AUDIO_LOG] CORRECT_SUBMITTED: ${Date.now()}`);
