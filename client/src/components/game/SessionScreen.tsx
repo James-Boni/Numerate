@@ -54,7 +54,6 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
           endSession();
           return 0;
         }
-        // Subtle tick for last 10 seconds, only if no feedback active
         if (prev <= 11 && settings.soundOn && !feedback) {
           AudioManager.playTick();
         }
@@ -92,12 +91,11 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     onComplete(stats);
   };
 
-  const handleSubmit = (overrideInput?: string) => {
+  const handleSubmit = (e?: React.MouseEvent | React.TouchEvent) => {
     if (!question || feedback) return;
-    const currentInput = overrideInput !== undefined ? overrideInput : input;
-    if (!currentInput) return;
+    if (!input) return;
     
-    const val = parseFloat(currentInput);
+    const val = parseFloat(input);
     const isCorrect = Math.abs(val - (question?.answer ?? 0)) < 0.001;
     const timeTaken = Date.now() - questionStartTimeRef.current;
     
@@ -114,15 +112,14 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       if (newStreak > bestStreak) setBestStreak(newStreak);
       setFeedback('correct');
       setFlash('correct');
-      if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(5); // Even softer haptic
+      if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(5);
       
-      setTimeout(nextQuestion, 120); // Brief feedback ≤120ms flash duration essentially
+      setTimeout(nextQuestion, 120);
     } else {
       if (settings.soundOn) AudioManager.playWrong();
       setStreak(0);
       setFeedback('wrong');
       setFlash('wrong');
-      // No aggressive shake per requirements
       if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(20);
       setTimeout(nextQuestion, 900);
     }
@@ -133,77 +130,99 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     }
   };
 
+  const handleKeyPress = (k: string) => {
+    if (feedback) return;
+    if (settings.soundOn) AudioManager.playTap();
+    if (input.length < 6) setInput(prev => prev + k);
+  };
+
   return (
-    <MobileLayout className={clsx(
-      "transition-colors duration-100", // Faster transition
-      flash === 'correct' ? "bg-emerald-500/10" : // Lower opacity
-      flash === 'wrong' ? "bg-rose-500/10" : 
-      "bg-zinc-50"
-    )}>
-      <div className="flex justify-between items-center px-6 py-4 safe-top">
-        <button onClick={onExit} className="p-2 -ml-2 text-zinc-400 hover:text-zinc-600">
-            <X size={24} />
-        </button>
-        
-        {durationSeconds !== 'unlimited' && (
-            <motion.div 
-              animate={timeLeft <= 10 ? { scale: [1, 1.06, 1], color: ['#ef4444', '#f87171', '#ef4444'] } : {}}
-              transition={{ repeat: Infinity, duration: 1 }}
-              className={clsx(
-                "font-mono text-xl font-bold tabular-nums",
-                timeLeft <= 10 ? "text-rose-500" : "text-zinc-400"
-              )}
-            >
-                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-            </motion.div>
+    <MobileLayout className="bg-zinc-50 overflow-hidden">
+      {/* Background Flash Layer - Entire area except keypad */}
+      <div 
+        className={clsx(
+          "absolute inset-x-0 top-0 bottom-[320px] z-0 transition-colors duration-100",
+          flash === 'correct' ? "bg-emerald-500/20" : 
+          flash === 'wrong' ? "bg-rose-500/20" : 
+          "bg-transparent"
         )}
-        
-        <div className="text-sm font-bold text-primary">XP {score}</div>
-      </div>
-
-      <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
-        <AnimatePresence mode="wait">
-            {question && (
-                <motion.div
-                    key={question.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="flex flex-col items-center gap-8"
-                >
-                    <h2 className="text-6xl font-bold tracking-tight text-foreground/90">
-                        {question.text}
-                    </h2>
-                    
-                    <button 
-                      onClick={() => handleSubmit()}
-                      className={clsx(
-                        "h-24 min-w-[200px] px-8 rounded-3xl flex items-center justify-center text-5xl font-mono font-medium transition-all border-2 active:scale-95",
-                        feedback === 'correct' ? "bg-emerald-50 border-emerald-100 text-emerald-600" :
-                        feedback === 'wrong' ? "bg-rose-50 border-rose-100 text-rose-600" :
-                        "bg-white border-zinc-100 text-foreground shadow-sm hover:border-primary/30"
-                      )}
-                    >
-                        {feedback === 'wrong' ? (
-                            <span className="text-rose-500 text-2xl">Ans: {question.answer}</span>
-                        ) : (
-                            input || <span className="opacity-10">?</span>
-                        )}
-                    </button>
-                </motion.div>
-            )}
-        </AnimatePresence>
-      </div>
-
-      <KeypadModern 
-        onPress={(k) => {
-            if (input.length < 6) setInput(prev => prev + k);
-        }}
-        onDelete={() => setInput(prev => prev.slice(0, -1))}
-        onSubmit={() => handleSubmit()}
-        submitDisabled={input.length === 0}
-        disabled={feedback !== null}
       />
+
+      {/* Touchable Submission Layer - Entire top area */}
+      <div 
+        className="absolute inset-x-0 top-0 bottom-[320px] z-10 cursor-pointer"
+        onClick={() => handleSubmit()}
+      />
+
+      <div className="relative z-20 flex flex-col h-full pointer-events-none">
+        {/* Header */}
+        <div className="flex justify-between items-center px-6 py-4 safe-top pointer-events-auto">
+          <button onClick={onExit} className="p-2 -ml-2 text-zinc-400 hover:text-zinc-600">
+              <X size={24} />
+          </button>
+          
+          {durationSeconds !== 'unlimited' && (
+              <motion.div 
+                animate={timeLeft <= 10 ? { scale: [1, 1.06, 1], color: ['#ef4444', '#f87171', '#ef4444'] } : {}}
+                transition={{ repeat: Infinity, duration: 1 }}
+                className={clsx(
+                  "font-mono text-xl font-bold tabular-nums",
+                  timeLeft <= 10 ? "text-rose-500" : "text-zinc-400"
+                )}
+              >
+                  {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+              </motion.div>
+          )}
+          
+          <div className="text-sm font-bold text-primary">XP {score}</div>
+        </div>
+
+        {/* Game Area */}
+        <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
+          <AnimatePresence mode="wait">
+              {question && (
+                  <motion.div
+                      key={question.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="flex flex-col items-center gap-12"
+                  >
+                      <h2 className="text-6xl font-bold tracking-tight text-foreground/80">
+                          {question.text}
+                      </h2>
+                      
+                      <div className={clsx(
+                        "h-24 flex items-center justify-center text-7xl font-mono font-medium transition-all",
+                        feedback === 'correct' ? "text-emerald-500" :
+                        feedback === 'wrong' ? "text-rose-500" :
+                        "text-foreground"
+                      )}>
+                          {feedback === 'wrong' ? (
+                              <span className="text-rose-400 text-3xl font-sans font-bold">Ans: {question.answer}</span>
+                          ) : (
+                              input || <span className="opacity-10 font-sans text-5xl">?</span>
+                          )}
+                      </div>
+                  </motion.div>
+              )}
+          </AnimatePresence>
+        </div>
+
+        {/* Keypad */}
+        <div className="pointer-events-auto mt-auto">
+          <KeypadModern 
+            onPress={handleKeyPress}
+            onDelete={() => {
+                if (settings.soundOn) AudioManager.playTap();
+                setInput(prev => prev.slice(0, -1));
+            }}
+            onSubmit={() => handleSubmit()}
+            submitDisabled={input.length === 0}
+            disabled={feedback !== null}
+          />
+        </div>
+      </div>
     </MobileLayout>
   );
 }
