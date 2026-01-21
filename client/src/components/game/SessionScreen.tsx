@@ -34,6 +34,11 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   
+  // Refs to track counts for timer callback (avoids stale closure)
+  const correctCountRef = useRef(0);
+  const totalCountRef = useRef(0);
+  const bestStreakRef = useRef(0);
+  
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [shake, setShake] = useState(false);
   const [flash, setFlash] = useState<'correct' | 'wrong' | null>(null);
@@ -149,21 +154,33 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     setIsActive(false);
     const durationSecondsActual = durationSeconds === 'unlimited' ? 0 : Number(durationSeconds);
     
+    // Use refs to avoid stale closure issue when called from timer
+    const finalCorrectCount = correctCountRef.current;
+    const finalTotalCount = totalCountRef.current;
+    const finalBestStreak = bestStreakRef.current;
+    
+    console.log("[ASSESS_COMPLETE]", {
+      correctCount: finalCorrectCount,
+      totalCount: finalTotalCount,
+      bestStreak: finalBestStreak,
+      responseTimes: responseTimesRef.current.length
+    });
+    
     const components = computeFluencyComponents(
-      correctCount,
-      totalCount,
+      finalCorrectCount,
+      finalTotalCount,
       responseTimesRef.current,
       durationSecondsActual
     );
     
     const fluencyScore = computeFluencyScore(components);
     
-    const isValid = totalCount >= CFG.MIN_QUESTIONS_FOR_VALID_SESSION && 
+    const isValid = finalTotalCount >= CFG.MIN_QUESTIONS_FOR_VALID_SESSION && 
                   durationSecondsActual >= CFG.MIN_DURATION_FOR_VALID_SESSION_SEC;
                   
     const { totalXP, metBonus } = computeSessionXP(
       fluencyScore,
-      totalCount,
+      finalTotalCount,
       components,
       isValid
     );
@@ -173,12 +190,12 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       date: new Date().toISOString(),
       durationMode: durationSeconds === 'unlimited' ? 'unlimited' : (durationSeconds as any),
       durationSecondsActual,
-      totalQuestions: totalCount,
-      correctQuestions: correctCount,
-      accuracy: totalCount > 0 ? correctCount / totalCount : 0,
+      totalQuestions: finalTotalCount,
+      correctQuestions: finalCorrectCount,
+      accuracy: finalTotalCount > 0 ? finalCorrectCount / finalTotalCount : 0,
       xpEarned: totalXP,
-      bestStreak,
-      avgResponseTimeMs: components.medianMs, // Emphasizing median per spec
+      bestStreak: finalBestStreak,
+      avgResponseTimeMs: components.medianMs,
       medianMs: components.medianMs,
       variabilityMs: components.variabilityMs,
       throughputQps: components.qps,
@@ -198,7 +215,9 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     const isCorrect = Math.abs(val - (question?.answer ?? 0)) < 0.001;
     const timeTaken = Date.now() - questionStartTimeRef.current;
     
-    setTotalCount(prev => prev + 1);
+    // Update refs FIRST (synchronous) before state
+    totalCountRef.current += 1;
+    setTotalCount(totalCountRef.current);
     responseTimesRef.current.push(timeTaken);
 
     // Record answer in Progression Engine
@@ -209,16 +228,26 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       currentQuestionMetaRef.current.targetTimeMs
     );
 
+    console.log("[ANSWER_RECORDED]", { 
+      isCorrect, 
+      totalCount: totalCountRef.current, 
+      correctCount: correctCountRef.current 
+    });
+
     if (isCorrect) {
       console.log(`[AUDIO_LOG] CORRECT_SUBMITTED: ${Date.now()}`);
       if (settings.soundOn) AudioManager.playCorrect();
       
       const xp = calculateXP(true, timeTaken, streak);
       setScore(prev => prev + xp);
-      setCorrectCount(prev => prev + 1);
+      correctCountRef.current += 1;
+      setCorrectCount(correctCountRef.current);
       const newStreak = streak + 1;
       setStreak(newStreak);
-      if (newStreak > bestStreak) setBestStreak(newStreak);
+      if (newStreak > bestStreak) {
+        bestStreakRef.current = newStreak;
+        setBestStreak(newStreak);
+      }
       setFeedback('correct');
       setFlash('correct');
       if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(5);

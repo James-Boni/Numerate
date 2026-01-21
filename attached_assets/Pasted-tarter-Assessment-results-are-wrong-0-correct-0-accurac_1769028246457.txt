@@ -1,0 +1,157 @@
+tarter Assessment results are wrong (0 correct / 0% accuracy / XP = 10)
+
+After completing the starter assessment, the results screen incorrectly shows:
+
+0 Correct Answers
+
+0% Accuracy
+
+Assessment XP Earned = 10
+
+This is wrong: the user answered many questions correctly and earned hundreds of XP.
+
+You must diagnose and fix the scoring/aggregation pipeline. Do not change UI text or “tune” difficulty; this is a correctness bug.
+
+A) Diagnose the root cause (mandatory)
+A1) Identify the canonical source of truth for assessment results
+
+Find exactly where assessment results are computed and stored:
+
+Is it computed from answers[]?
+
+From sessionStats?
+
+From a persisted store?
+
+From a “progressionState” snapshot?
+
+List the variables used to render:
+
+Correct count
+
+Accuracy
+
+XP earned
+
+A2) Add logging at the key points (do not guess)
+
+Add logs at:
+
+When each question is answered
+
+When the assessment ends
+
+When the results screen renders
+
+Log:
+
+console.log("[ASSESS_ANSWER]", { correct, timeMs, xpAwarded, totalXpSoFar, idx });
+
+
+At completion:
+
+console.log("[ASSESS_COMPLETE]", {
+  answersLen: answers?.length,
+  correctCount,
+  totalQuestions,
+  accuracy,
+  xpTotal,
+  sessionId,
+});
+
+
+At results render:
+
+console.log("[ASSESS_RESULTS_RENDER]", {
+  correctDisplayed,
+  accuracyDisplayed,
+  xpDisplayed,
+  rawState: /* the store slice used */,
+});
+
+B) Likely failure modes to check (must confirm which one)
+
+Results screen reads from the wrong store slice
+(e.g., reads from daily focus session stats instead of assessment stats)
+
+Assessment state resets before navigation
+(e.g., resetSession() runs before navigate("/results"), wiping counts)
+
+Aggregation uses stale closure / wrong dependencies
+(e.g., useMemo missing deps, or end handler captures initial values)
+
+XP calculation changed but UI still uses old field
+(e.g., XP now stored per-answer but results uses assessmentXpEarned default 10)
+
+Answers are never recorded
+(e.g., handler not pushing into answers[], or mutation not persisted)
+
+You must identify which is occurring using logs, then fix precisely.
+
+C) Fix requirements (must satisfy)
+C1) Correctness
+
+Correct answers must equal the number of correct responses recorded during the assessment
+
+Accuracy must be correctCount / totalQuestions * 100 (rounded consistently)
+
+XP earned must equal the sum of XP awarded per question (or the canonical formula), not a default constant
+
+C2) No premature reset
+
+Do not clear assessment stats until AFTER results have been rendered or persisted
+
+If you need cleanup, do it when starting a new session, not when completing the current one
+
+C3) Single source of truth
+
+Pick ONE canonical structure for assessment results, e.g.:
+
+assessmentResults = {
+  totalQuestions,
+  correctCount,
+  accuracy,
+  xpEarned,
+  answers: [...]
+}
+
+
+Persist it in the store and have the results UI read only from it.
+
+D) Mandatory verification (do not skip)
+
+After fixing:
+
+Run an assessment with known outcomes:
+
+Answer 10 questions, intentionally miss 2
+
+Confirm results show:
+
+8 correct
+
+80% accuracy
+
+XP equals expected sum
+
+Provide console log snippets showing:
+
+[ASSESS_ANSWER] accumulating xp/correct
+
+[ASSESS_COMPLETE] with non-zero values
+
+[ASSESS_RESULTS_RENDER] matching completion values
+
+E) Required final response format
+
+Return:
+
+Root cause (exactly what was wrong)
+
+Fix (exact change)
+
+Files changed
+
+Proof (log excerpts + quick manual test results)
+
+Do not claim “fixed” without proof.
