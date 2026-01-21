@@ -1,0 +1,453 @@
+Prompt for Replit — Difficulty, Progression, and Answer Validation (Authoritative Spec)
+
+You are implementing the difficulty + progression system for a math practice game. This spec is authoritative. Build the system so users feel it’s a proper use of their time: never trivial, never discouraging, always “just hard enough” that getting it right feels good. Levels are unbounded; the game can get infinitely hard.
+
+0) Non-negotiable experience outcomes
+
+Never trivial
+Past early onboarding, the user should almost never see questions they can answer without thinking (e.g., 1+2, 9−3, 6÷3). Easy items may appear only as intentional confidence checks and must still pass the “not trivial” filter for the user’s level.
+
+Smooth progression with intentional plateaus
+Difficulty increases forever, but not as a constant slope. It advances in steps, then holds (plateau) while the user builds fluency. During plateaus, difficulty still ramps within the same template family (ranges, carry/borrow frequency, awkwardness, time target).
+
+Predictable in structure, adaptive in detail
+“Types of problems” unlock by curriculum/level gates. “Hardness within those types” adapts via performance.
+
+Satisfying challenge band
+Target experience is roughly 70–85% correctness, with enough bite that correct answers feel rewarding.
+
+1) Two-layer system: Curriculum Gates + Adaptive Tuning
+A) Curriculum Gates (Level)
+
+Level controls what templates are allowed:
+
+operations available
+
+digits/ranges allowed
+
+carry/borrow allowed
+
+multiplication/division operand structure
+
+when fractions/decimals/percents/negatives/missing-value/algebra appear
+
+when multi-step expressions appear
+
+This is where plateaus come from.
+
+B) Adaptive Tuning (Skill Ratings)
+
+Within allowed templates, adapt:
+
+operand ranges
+
+carry/borrow probability
+
+awkwardness (near-boundary numbers, complements, non-round values)
+
+time targets
+
+frequency of “challenge” vs “relief” questions
+
+2) Track skill with per-domain ratings (recommended)
+
+Maintain Skill Ratings (SR) 0–100 for:
+
+SR_add, SR_sub, SR_mul, SR_div
+
+SR_frac, SR_dec, SR_pct, SR_neg, SR_alg
+
+SR_expr (mixed multi-step expressions)
+
+(If you must start simpler, implement one SR but keep the architecture to split.)
+
+3) Performance scoring and SR update
+
+For each answered question record:
+
+correct (bool)
+
+response time (ms)
+
+expected answer canonical form
+
+user input normalized form
+
+templateId + variantIndex + features (digits, carry/borrow, etc.)
+
+Define:
+
+accuracy = 1 if correct else 0
+
+speedScore = clamp(1.2 - timeMs / targetTimeMs, 0, 1)
+
+PS = accuracy * (0.65 + 0.35 * speedScore) (correctness dominates, speed refines)
+
+Target expected performance:
+
+expected = 0.75
+
+Update:
+
+K = 6 + difficultyTier (difficultyTier increases slowly with level bands / template variant)
+
+SR = clamp(SR + K * (PS - expected), 0, 100)
+
+Stability:
+
+Use EWMA (exponentially weighted moving average) for time to avoid one slow attempt overreacting.
+
+Do not allow “variantIndex” to jump more than ±1 inside 3 questions (see Anti-whiplash).
+
+4) Define difficulty as features (Difficulty Points)
+
+Each question has Difficulty Points (DP) used for mixing and preventing boredom/spikes.
+
+Base DP by operation:
+
+add: 1
+
+sub: 2
+
+mul: 3
+
+div: 4
+
+fractions/decimals/percents/negatives/missing-value/expression add feature DP
+
+Add feature points:
+
++1 per extra digit beyond 1-digit per operand
+
++1 if carry (add) / borrow (sub) is required
+
++1 if multiplication uses a 2-digit factor (or larger)
+
++1 if division uses 2+ digit divisor
+
++1 if fraction operations require common denominator or simplification
+
++1 if percent requires conversion (e.g., 12% of 350)
+
++1 if negatives require sign reasoning (not just “-3 + -2”)
+
++2 for missing-value/algebra (solve for □ / x)
+
++2 for multi-step expressions (mixed ops / parentheses)
+
++1–2 for “awkwardness” (non-round numbers, near-threshold complements, etc.)
+
+DP drives distribution:
+
+Most questions near target DP; small controlled tails easier/harder.
+
+5) Anti-whiplash + anti-boredom rules
+A) Variant stepping within a plateau
+
+Inside a template family there are variantIndex = 0..4:
+
+increase variantIndex by +1 only after 3 Good in a row
+
+decrease by -1 after 2 Poor in a row
+
+Good:
+
+correct AND timeMs ≤ 1.25 * targetTimeMs
+
+Poor:
+
+incorrect OR timeMs ≥ 2.0 * targetTimeMs
+
+B) Trivial filter (must be strict)
+
+After onboarding:
+
+do not generate operands that make the answer immediate without thought
+
+scale this filter with level (e.g., prohibit any operand ≤3, prohibit single-step “toy” division, etc.)
+
+never allow long streaks of low-DP problems once user is beyond the first bands
+
+C) Controlled variance (no chaos)
+
+Per 20 questions:
+
+~14 questions at targetDP ±1
+
+up to 4 questions at targetDP −2 only if recent accuracy < 80% or recent time is struggling
+
+up to 2 questions at targetDP +2 only if recent accuracy > 85% and time is good
+Never allow >2 consecutive relief questions.
+
+D) Confidence checks (rare, still non-trivial)
+
+~1 per 10 questions
+
+DP = targetDP −2 (min 1)
+
+must still pass trivial filter
+Purpose is morale, not filler.
+
+6) Template families (plateaus are template-limited, difficulty ramps inside)
+
+Implement question generation via template families, each with 5 variants (0–4). Variants control:
+
+operand digit counts and ranges
+
+probability of carry/borrow
+
+awkwardness level
+
+time target
+
+Must implement at least:
+
+Addition
+
+ADD_1D_1D (non-trivial operands)
+
+ADD_2D_2D (carry probability ramp)
+
+ADD_3D_3D
+
+ADD_4D_4D
+
+ADD_ND_ND (unbounded digits after higher levels)
+
+Subtraction
+
+SUB_1D_1D (no trivial repeats)
+
+SUB_2D_1D (borrow off→on)
+
+SUB_2D_2D (borrow common)
+
+SUB_3D_3D
+
+SUB_4D_4D
+
+SUB_ND_ND
+
+Multiplication
+
+MUL_1D_1D (used briefly; avoid dominating later)
+
+MUL_3D_1D
+
+MUL_2D_2D
+
+MUL_3D_2D
+
+MUL_ND_MD
+
+Division
+
+DIV_2D_BY_1D (exact)
+
+DIV_4D_BY_2D (exact but not pattern-trivial)
+
+DIV_5D_BY_2D
+
+DIV_ND_BY_MD
+Division must be generated such that the exact value is representable under the game’s answer format rules (see Answer Rules).
+
+Fractions
+
+FRAC_SAME_DEN (a/b ± c/b)
+
+FRAC_DIFF_DEN (a/b ± c/d requiring common denom)
+
+FRAC_MUL_DIV
+
+FRAC_TO_DEC / DEC_TO_FRAC (optional)
+
+FRAC_SIMPLIFY_REQUIRED
+
+Decimals
+
+DEC_ADD_SUB (fixed decimals)
+
+DEC_MUL (e.g., 3.2×0.4)
+
+DEC_DIV (must obey division answer format rules)
+
+Percentages
+
+PCT_OF_NUMBER (e.g., 12% of 350)
+
+PCT_CHANGE (increase/decrease)
+
+REVERSE_PERCENT (find original)
+
+Negatives
+
+NEG_ADD_SUB (requires sign reasoning)
+
+NEG_MIX (negatives inside expressions)
+
+Missing-value / Algebra-style
+
+ALG_ONE_STEP (□ + a = b)
+
+ALG_TWO_STEP (a□ + b = c, or a(x+b)=c)
+
+FIND_MISSING_FACTOR (□ × 17 = 340)
+
+FIND_MISSING_DIVIDEND (□ ÷ 12 = 48)
+
+Expressions (multi-step)
+
+EXPR_TWO_TERM: (A ÷ b) + (c × d)
+
+EXPR_THREE_TERM: A + (b × c) − d
+
+EXPR_PAREN: (A − B) ÷ c + d×e
+
+7) Level band schedule (1–100 baseline curve, then infinite extension)
+
+Use bands of width 10: Band 0 = 1–10, Band 1 = 11–20, etc.
+
+Bands 0–9 (Levels 1–100) — match this pace
+
+Band 0 (1–10):
+
+Mostly ADD_1D_1D + SUB_1D_1D but non-trivial (avoid tiny operands)
+Band 1 (11–20):
+
+ADD_2D_2D + SUB_2D_1D (carry/borrow ramps)
+Band 2 (21–30):
+
+3-digit add/sub become typical (borrow/carry common)
+Band 3 (31–40):
+
+3-digit × 1-digit introduced meaningfully; add/sub scale
+Band 4 (41–50):
+
+4-digit ÷ 2-digit appears (exact, nontrivial factoring)
+Band 5 (51–60):
+
+4-digit + 4-digit typical
+Band 6 (61–70):
+
+4-digit − 4-digit typical with borrow chains
+Band 7 (71–80):
+
+2–3 digit × 2-digit typical (no pure-recall dominance)
+Band 8 (81–90):
+
+5-digit ÷ 2-digit typical (exact, nontrivial)
+Band 9 (91–100):
+
+introduce EXPR_TWO_TERM gradually (10% → 25% based on SR_expr)
+
+maintain large-number single-step as majority initially
+
+After Level 100 (infinite scaling rules)
+
+Continue forever by applying repeating rules:
+
+Every +2 bands: increase dominant digit counts by +1 in key families (ADD_ND_ND, SUB_ND_ND, MUL_ND_MD, DIV_ND_BY_MD)
+
+Every +3 bands: increase expression frequency and/or expression depth (more terms, more parentheses)
+
+Introduce new domains progressively: fractions → decimals → percents → negatives → missing-value → richer expressions (but keep generation gated and mastery-based)
+
+Keep trivial filter strict forever
+
+8) Exact division + answer format rules (critical)
+
+Division questions must always have an “exact” canonical value (a rational number). User input acceptance must obey:
+
+Allowed division answer formats
+
+Integer (e.g., 4872 ÷ 36 = 135.333… not integer; example for integers: 4800 ÷ 12 = 400)
+
+Terminating decimal: must match exactly to the full terminating decimal (allow optional trailing zeros)
+
+Repeating/non-terminating decimal: user may answer using decimal rounded to exactly 2 decimal places:
+
+Must be rounded using standard rounding (half-up is acceptable; banker's rounding is acceptable if consistent and documented).
+
+Must contain two digits after the decimal point.
+
+Example: 10 ÷ 3 = 3.333… → accepted answer: 3.33
+
+3.3 is NOT allowed
+
+3.333 is allowed only if you decide to accept “≥2dp”; default is strict exactly 2dp for repeating decimals.
+
+Default requirement for repeating decimals:
+
+Accept exactly 2 decimal places (e.g., “3.33”).
+
+Reject “3.3”, reject “3.3333”, unless a separate “higher precision allowed” setting is enabled.
+
+How to decide if it’s repeating/non-terminating
+
+Given reduced fraction p/q:
+
+Decimal terminates iff q has no prime factors other than 2 and 5.
+
+Otherwise it repeats → enforce the 2dp rounded format.
+
+Generation constraints for division
+
+You may generate any division A ÷ B as long as:
+
+B ≠ 0
+
+The canonical rational is well-defined
+
+The answer can be validated under the above rules
+
+Prefer non-trivial divisors (avoid making late-game division mostly /2 /5 /10 patterns).
+
+9) Fractions/decimals/percent/negatives/algebra progression rules
+
+Introduce each domain as a curriculum unlock with plateaus:
+
+When a new domain unlocks, start with the simplest template family variants.
+
+Increase internal variants before expanding digit magnitude too aggressively.
+
+Use mastery checks (recent accuracy/time) to allow higher variants.
+
+Ensure problems remain “think-required”; avoid trivial fractions (like 1/2 + 1/2) dominating.
+
+10) Acceptance tests (must pass)
+
+Beyond onboarding, no long streaks of trivial questions; trivial filter always active and scales with level.
+
+Within a level band, template types remain mostly stable (plateau), but difficulty ramps via variants.
+
+Under strong performance, users see harder variants within the plateau within ~10–20 questions.
+
+Under struggle, relief occurs within ~3–6 questions, without collapsing to baby problems.
+
+Division validation:
+
+10/3 accepts “3.33”
+
+rejects “3.3”
+
+enforces 2 decimal places for repeating-decimal divisions
+
+After level 100, difficulty continues increasing (digits, structure, domains, expression complexity) with no ceiling.
+
+11) Engineering deliverables
+
+Implement:
+
+templates/*: template families, variant rules, DP computation, time target rules, generation constraints
+
+progression/*: SR update, band gating, streak logic, variance mixer, trivial filter
+
+answer_validation/*: canonicalization + strict validation for integers/terminating/repeating decimals; fraction handling; percent handling; algebra missing-value
+
+Debug tooling:
+
+log: level, band, chosen templateId, variantIndex, DP, SRs, targetTimeMs, acceptance rule used
+
+optional debug overlay
+
+If anything conflicts, prioritize: (a) non-triviality, (b) smooth plateaus, (c) infinite scalability, (d) division answer strictness as specified.
