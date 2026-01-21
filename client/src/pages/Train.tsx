@@ -4,7 +4,7 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { useStore } from '@/lib/store';
 import { useLocation } from 'wouter';
-import { Zap, Play, Flame, Crown } from 'lucide-react';
+import { Zap, Play, Flame, Target } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
