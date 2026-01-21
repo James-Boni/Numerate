@@ -1,73 +1,67 @@
-export const sounds = {
-  correct: "https://actions.google.com/sounds/v1/alarms/beep_short.ogg",
-  wrong: "https://actions.google.com/sounds/v1/alarms/bugle_tune.ogg",
-  tick: "https://actions.google.com/sounds/v1/ui/click_tone_small.ogg",
-  tap: "https://actions.google.com/sounds/v1/ui/click_tone_small.ogg",
-};
+// Professional Micro-SFX using Web Audio Synth for zero-latency execution
+// These sounds are curated to be extremely short and adult-UI focused.
 
 export class AudioManager {
   private static context: AudioContext | null = null;
-  private static buffers: Map<string, AudioBuffer> = new Map();
   private static initialized = false;
 
-  static async init() {
+  static init() {
     if (this.initialized) return;
+    this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
     
-    try {
-      this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
-      
-      const loadSound = async (name: string, url: string) => {
-        try {
-          const response = await fetch(url);
-          const arrayBuffer = await response.arrayBuffer();
-          const audioBuffer = await this.context!.decodeAudioData(arrayBuffer);
-          this.buffers.set(name, audioBuffer);
-        } catch (e) {
-          console.error(`DIAGNOSTIC: Error loading ${name}:`, e);
-          if (this.context) {
-            this.buffers.set(name, this.context.createBuffer(1, 4410, 44100));
-          }
-        }
-      };
-
-      await Promise.all([
-        loadSound('correct', sounds.correct),
-        loadSound('wrong', sounds.wrong),
-        loadSound('tick', sounds.tick),
-        loadSound('tap', sounds.tap),
-      ]);
-
-      const unlock = async () => {
-        if (this.context?.state === 'suspended') {
-          await this.context.resume();
-        }
-        this.initialized = true;
-        window.removeEventListener('click', unlock);
-        window.removeEventListener('touchstart', unlock);
-      };
-
-      window.addEventListener('click', unlock);
-      window.addEventListener('touchstart', unlock);
-    } catch (e) {
-      console.error("DIAGNOSTIC: Web Audio Init Fail:", e);
-    }
+    const unlock = () => {
+      if (this.context?.state === 'suspended') {
+        this.context.resume();
+      }
+      this.initialized = true;
+      window.removeEventListener('mousedown', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+    window.addEventListener('mousedown', unlock);
+    window.addEventListener('touchstart', unlock);
   }
 
-  private static playBuffer(name: string) {
-    if (!this.context || !this.buffers.has(name)) return;
+  private static playSynth(freq: number, type: OscillatorType, duration: number, volume: number = 0.3, sweep: boolean = false) {
+    if (!this.context) return;
     if (this.context.state === 'suspended') this.context.resume();
 
-    const source = this.context.createBufferSource();
-    source.buffer = this.buffers.get(name)!;
-    const gainNode = this.context.createGain();
-    gainNode.gain.value = 0.5;
-    source.connect(gainNode);
-    gainNode.connect(this.context.destination);
-    source.start(0);
+    const osc = this.context.createOscillator();
+    const gain = this.context.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, this.context.currentTime);
+    if (sweep) {
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, this.context.currentTime + duration);
+    }
+    
+    gain.gain.setValueAtTime(0, this.context.currentTime);
+    gain.gain.linearRampToValueAtTime(volume, this.context.currentTime + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.01, this.context.currentTime + duration);
+
+    osc.connect(gain);
+    gain.connect(this.context.destination);
+
+    osc.start();
+    osc.stop(this.context.currentTime + duration + 0.05);
   }
 
-  static playCorrect() { this.playBuffer('correct'); }
-  static playWrong() { this.playBuffer('wrong'); }
-  static playTick() { this.playBuffer('tick'); }
-  static playTap() { this.playBuffer('tap'); }
+  static playCorrect() {
+    // Satisfying high chime: 880Hz -> 1320Hz sweep, 120ms
+    this.playSynth(880, 'sine', 0.12, 0.2, true);
+  }
+
+  static playWrong() {
+    // Muted thud: 110Hz triangle, 140ms
+    this.playSynth(110, 'triangle', 0.14, 0.4);
+  }
+
+  static playTick() {
+    // Short sharp click: 1500Hz square, 40ms
+    this.playSynth(1500, 'square', 0.04, 0.05);
+  }
+
+  static playTap() {
+    // Soft tap: 440Hz sine, 50ms
+    this.playSynth(440, 'sine', 0.05, 0.15);
+  }
 }

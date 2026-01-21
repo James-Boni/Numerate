@@ -54,7 +54,8 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
           endSession();
           return 0;
         }
-        if (prev <= 11 && settings.soundOn && !feedback) {
+        // Only play tick if not in feedback state
+        if (prev <= 11 && settings.soundOn && !feedback && !flash) {
           AudioManager.playTick();
         }
         return prev - 1;
@@ -103,8 +104,9 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     responseTimesRef.current.push(timeTaken);
 
     if (isCorrect) {
-      // Play correct sound IMMEDIATELY
+      console.log(`[AUDIO_LOG] CORRECT_SUBMITTED: ${Date.now()}`);
       if (settings.soundOn) AudioManager.playCorrect();
+      
       const xp = calculateXP(true, timeTaken, streak);
       setScore(prev => prev + xp);
       setCorrectCount(prev => prev + 1);
@@ -115,15 +117,19 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       setFlash('correct');
       if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(5);
       
-      setTimeout(nextQuestion, 120);
+      // Advance to next question quickly (80ms)
+      setTimeout(nextQuestion, 80);
     } else {
-      // Play wrong sound IMMEDIATELY
+      console.log(`[AUDIO_LOG] WRONG_SUBMITTED: ${Date.now()}`);
       if (settings.soundOn) AudioManager.playWrong();
+      
       setStreak(0);
       setFeedback('wrong');
       setFlash('wrong');
       if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(20);
-      setTimeout(nextQuestion, 900);
+      
+      // Hold wrong answer state (400ms) to allow sound to finish and user to see error
+      setTimeout(nextQuestion, 400);
     }
 
     if (mode === 'assessment') {

@@ -1,0 +1,65 @@
+Sound is now playing, but the current SFX are totally wrong and playback latency is too slow. I need a focused refactor of sound assets + sound engine timing. Do NOT add new features.
+
+1) Replace the SFX assets with appropriate micro-feedback sounds
+Current issues:
+- “Correct” sounds like a grocery store scanner beep (bad)
+- “Incorrect” is a long trumpet/jingle (very bad; way too long)
+
+Requirements for new sounds:
+- Correct SFX: short, clean, satisfying “tick/click/chime”, NOT a beep; duration 60–140ms
+- Incorrect SFX: short, muted “thud/tock”, NOT a buzzer/jingle; duration 60–160ms
+- Tick SFX (countdown): very short, soft tick; duration 30–80ms
+
+All sounds must:
+- be unobtrusive and not cheesy
+- feel modern/minimal (adult UI feedback, not cartoon)
+- be quiet enough for repetition
+- be bundled locally in src/assets/sounds/
+
+If you cannot source better files automatically, generate or include placeholder micro SFX that match these constraints, and ensure they are SHORT by editing/trimming the files. The wrong sound must not exceed 160ms.
+
+2) Fix sound playback latency (it must be instant)
+Current problem: sounds play late and overlap into the next question. This is unacceptable.
+
+Implement a low-latency sound engine using expo-av:
+- Preload sounds ONCE when the game screen mounts (or app mounts)
+- Reuse Audio.Sound instances (do not create a new Audio.Sound per answer)
+- Ensure playCorrect/playWrong calls are synchronous-feeling:
+  - use setPositionAsync(0) then playAsync()
+  - do not await slow operations inside the answer-confirm path
+- Log timestamps:
+  - at answer submit
+  - at confirmation (correct/wrong)
+  - immediately before calling playAsync
+This should prove latency is minimal.
+
+Also ensure:
+- sounds do not overlap:
+  - stopAsync() (or replay from 0) before playing again
+  - especially the wrong sound (must never bleed into next question)
+
+3) Synchronize UI feedback timing with sounds
+Requirement:
+- Sound must finish before the next question is displayed.
+- If necessary, hold the “wrong answer” feedback on screen slightly longer so the sound can complete.
+
+Specific behavior:
+- Correct answer:
+  - play correct SFX immediately on confirmation
+  - show green flash ≤120ms
+  - advance to next question immediately (or within ≤80ms)
+- Wrong answer:
+  - play wrong SFX immediately on confirmation
+  - show red state + correct answer text for a controlled delay (e.g., 250–400ms)
+  - only then advance to next question
+  - ensure wrong SFX is complete by the time next question renders
+
+4) Prevent countdown tick from interfering with answer sounds
+- If an answer is submitted during the last 10 seconds, suppress the tick sound for that second so answer feedback is dominant.
+- Tick must never overlap the wrong/correct sound.
+
+5) Acceptance criteria (must meet)
+- Correct and wrong sounds are short and match the minimalist aesthetic (no beep, no trumpet/jingle)
+- Sound plays instantly on submit/confirmation (no noticeable delay)
+- Wrong sound never continues into the next question
+- Confirm with on-device testing (iPhone Expo Go/TestFlight) and provide brief notes on what changed (assets replaced, preload implemented, delay timing chosen).
