@@ -13,6 +13,8 @@ import Progress from "@/pages/Progress";
 import Settings from "@/pages/Settings";
 import { motion, AnimatePresence } from 'framer-motion';
 
+import logo from "@assets/14e70c85-398b-4621-bc62-abe9331510f8_1769016302023.png";
+
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
   useEffect(() => {
     const timer = setTimeout(onFinish, 1500);
@@ -25,9 +27,9 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-32 h-32 bg-primary rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-primary/10"
+        className="w-32 h-32 flex items-center justify-center"
       >
-        <span className="text-5xl text-white font-bold">∑</span>
+        <img src={logo} alt="Numerate Logo" className="w-full h-full object-contain drop-shadow-2xl shadow-primary/10" />
       </motion.div>
     </div>
   );
