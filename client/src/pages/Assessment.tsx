@@ -18,20 +18,21 @@ export default function Assessment() {
     setResults(stats);
     setStep('results');
     
+    // Updated tier assignment to be more realistic
     let tier = 0;
-    if (stats.accuracy > 0.9 && stats.avgResponseTimeMs < 1500) tier = 9;
-    else if (stats.accuracy > 0.8) tier = 7;
-    else if (stats.accuracy > 0.6) tier = 5;
-    else if (stats.accuracy > 0.4) tier = 3;
+    if (stats.accuracy > 0.85 && stats.avgResponseTimeMs < 1800) tier = 8;
+    else if (stats.accuracy > 0.7) tier = 5;
+    else if (stats.accuracy > 0.5) tier = 3;
+    else if (stats.accuracy > 0.3) tier = 1;
     
     completeAssessment(tier, stats);
   };
 
   const getEncouragingMessage = (tier: number) => {
-    if (tier >= 8) return "Incredible! You have a natural mathematical mind. Let's push those boundaries even further!";
-    if (tier >= 5) return "Fantastic start! Your foundations are solid. Get ready to supercharge your mental agility!";
-    if (tier >= 3) return "Great work! You've got the basics down. Time to sharpen those skills and feel the growth!";
-    return "Excellent first step! We're going to build your confidence and make maths feel like a superpower!";
+    if (tier >= 8) return "You have a clear talent for mental arithmetic. We'll provide the challenges to help you reach elite fluency.";
+    if (tier >= 5) return "Your foundations are solid and your speed is promising. Focused daily practice will build your confidence quickly.";
+    if (tier >= 3) return "You're off to a strong start. With consistent training, these operations will soon become second nature.";
+    return "Great job completing the assessment. We'll start with the basics to build a rock-solid foundation for your future progress.";
   };
 
   if (step === 'intro') {
@@ -41,15 +42,15 @@ export default function Assessment() {
           <div className="space-y-4 text-center">
             <h1 className="text-4xl font-bold tracking-tight text-slate-900">Initial Assessment</h1>
             <p className="text-slate-500 text-lg">
-              3 minutes to discover your power level. Show us what you can do!
+              3 minutes to determine your starting level. Work at a pace that feels comfortable.
             </p>
           </div>
 
           <div className="space-y-4">
             {[
               { icon: Zap, text: "Mixed operations", color: "text-amber-500" },
-              { icon: Target, text: "Accuracy matters", color: "text-blue-500" },
-              { icon: TrendingUp, text: "Difficulty adjusts", color: "text-emerald-500" },
+              { icon: Target, text: "Focus on accuracy", color: "text-blue-500" },
+              { icon: TrendingUp, text: "Progressive difficulty", color: "text-emerald-500" },
             ].map((item, i) => (
               <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-slate-50">
                 <item.icon className={item.color} size={24} />
@@ -91,36 +92,36 @@ export default function Assessment() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full mb-4">
             <ClipboardCheck size={32} />
           </div>
-          <h1 className="text-3xl font-bold">Great Work!</h1>
-          <p className="text-slate-500">Your starting level is ready.</p>
+          <h1 className="text-3xl font-bold">Assessment Complete</h1>
+          <p className="text-slate-500">Your personalised training plan is ready.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <Card className="p-4 flex flex-col items-center justify-center space-y-1">
+          <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm">
             <span className="text-2xl font-bold">{results?.correctQuestions || 0}</span>
-            <span className="text-xs text-slate-400 uppercase font-semibold">Score</span>
+            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Correct Answers</span>
           </Card>
-          <Card className="p-4 flex flex-col items-center justify-center space-y-1">
+          <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm">
             <span className="text-2xl font-bold">{Math.round((results?.accuracy || 0) * 100)}%</span>
-            <span className="text-xs text-slate-400 uppercase font-semibold">Accuracy</span>
+            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Accuracy</span>
           </Card>
         </div>
 
-        <div className="bg-primary/5 border border-primary/10 rounded-2xl p-6 text-center space-y-4">
+        <div className="bg-white border border-slate-100 rounded-2xl p-6 text-center space-y-6 shadow-sm">
           <div>
-            <span className="text-xs font-bold text-primary uppercase tracking-widest">Calculated Skill Level</span>
-            <div className="text-6xl font-black text-primary mt-2">
-              Level {currentTier + 1}
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recommended Starting Level</span>
+            <div className="text-6xl font-black text-slate-900 mt-2">
+              {currentTier + 1}
             </div>
           </div>
-          <p className="text-slate-700 font-medium italic">
-            "{getEncouragingMessage(currentTier)}"
+          <p className="text-slate-600 leading-relaxed text-sm">
+            {getEncouragingMessage(currentTier)}
           </p>
         </div>
 
         <Button 
           size="lg" 
-          className="w-full h-14 text-lg font-semibold rounded-xl"
+          className="w-full h-14 text-lg font-semibold rounded-xl shadow-lg shadow-primary/20"
           onClick={() => setLocation('/train')}
         >
           Start Daily Training

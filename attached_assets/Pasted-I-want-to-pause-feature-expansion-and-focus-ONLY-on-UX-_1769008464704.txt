@@ -1,0 +1,103 @@
+I want to pause feature expansion and focus ONLY on UX risk mitigation. Please review and adjust the following areas carefully. Do not add new features; only refine behavior, timing, and interaction quality.
+
+1) Correct / Wrong feedback intensity (CRITICAL)
+This app targets users who may feel anxious or insecure about maths.
+
+Requirements:
+- Ensure green/red screen flashes are LOW OPACITY and VERY BRIEF (≤120ms).
+- Red feedback must feel neutral, not punitive.
+- No aggressive shaking, buzzing, or flashing.
+- Visual feedback should confirm the outcome, not dominate attention.
+- If the same user gets several wrong answers in a row, feedback must NOT escalate in intensity.
+
+Goal:
+Users should feel safe to continue, not tense or embarrassed.
+
+2) Sound feedback fatigue check
+Sounds are helpful but dangerous if overused.
+
+Requirements:
+- Correct and wrong sounds must be short (<150ms) and quiet relative to system volume.
+- No sound stacking or overlapping.
+- Sounds must remain tolerable over long sessions (30–50 answers).
+- Respect sound toggle everywhere, including countdown ticking.
+- If multiple events happen at once (e.g., answer + timer tick), prioritize answer feedback and suppress the tick.
+
+Goal:
+Audio should reinforce rhythm, not create stress or annoyance.
+
+3) Countdown urgency (last 10 seconds)
+Urgency should motivate, not induce panic.
+
+Requirements:
+- Timer pulsing must be subtle (scale increase ≤6%).
+- Red timer color should be readable and accessible in both light and dark mode.
+- Countdown ticking should feel like a soft metronome, not a clock bomb.
+- If user submits an answer during the last second, avoid race-condition glitches (no double sounds, no visual overlap).
+
+Goal:
+Create focus and flow, not pressure spikes.
+
+4) Answer submission friction (VERY IMPORTANT)
+Incorrect submission UX will seriously harm retention.
+
+Requirements:
+- Ensure users never accidentally submit incomplete multi-digit answers.
+- Submission methods must be intentional:
+  - Keyboard “Done/Enter” submits
+  - OR tapping a large, clearly indicated submission area (e.g., question card)
+- No tiny targets.
+- No requirement to move focus between input and submit every time.
+- Prevent double-submission or accidental re-submission.
+
+Goal:
+Answering should feel effortless and confident.
+
+5) Assessment result messaging tone
+Messaging here strongly influences whether users continue.
+
+Requirements:
+- Review all competence-level messages (1–10) for tone.
+- Messages must be:
+  - encouraging
+  - specific
+  - realistic
+  - adult (not childish, not hypey)
+- Avoid phrases that imply judgment, failure, or “low ability”.
+- Avoid exaggerated promises (“you’ll be amazing”, “master maths fast”).
+- Emphasize progress, trajectory, and control.
+
+Goal:
+User finishes assessment feeling optimistic and motivated, regardless of score.
+
+6) Visual load and clarity
+Avoid overstimulation.
+
+Requirements:
+- Ensure only ONE primary feedback signal per event (e.g., visual OR sound leads).
+- Avoid simultaneous animations competing for attention.
+- Keep typography large and readable during gameplay.
+- No unnecessary UI elements during question answering.
+
+Goal:
+Maintain cognitive clarity and rhythm.
+
+7) Consistency between Assessment and Training
+Users should not feel like they are learning two different interfaces.
+
+Requirements:
+- Gameplay interaction, feedback timing, and visuals must behave identically in Assessment and Training.
+- Only copy/messaging should differ.
+- No surprise interaction changes post-assessment.
+
+Goal:
+Trust and predictability.
+
+Please audit the current implementation against these points and adjust accordingly.
+If trade-offs are required, prioritize:
+1) Emotional safety
+2) Low friction
+3) Consistency
+4) Performance
+
+Do not add new features or redesign screens. This is a refinement pass only.

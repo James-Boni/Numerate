@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, ArrowRight } from 'lucide-react';
-import { useLocation } from 'wouter';
+import { X, Check } from 'lucide-react';
 import { clsx } from 'clsx';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { KeypadModern } from '@/components/game/Keypad';
@@ -55,12 +54,16 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
           endSession();
           return 0;
         }
+        // Subtle tick for last 10 seconds, only if no feedback active
+        if (prev <= 11 && settings.soundOn && !feedback) {
+          AudioManager.playTick();
+        }
         return prev - 1;
       });
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [isActive, durationSeconds]);
+  }, [isActive, durationSeconds, feedback, settings.soundOn]);
 
   const nextQuestion = () => {
     setQuestion(generateQuestion(tier));
@@ -72,11 +75,13 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
 
   const endSession = () => {
     setIsActive(false);
+    const duration = (Date.now() - startTimeRef.current) / 1000;
+    
     const stats: SessionStats = {
       id: Math.random().toString(36),
       date: new Date().toISOString(),
       durationMode: durationSeconds === 'unlimited' ? 'unlimited' : (durationSeconds as any),
-      durationSecondsActual: (Date.now() - startTimeRef.current) / 1000,
+      durationSecondsActual: duration,
       totalQuestions: totalCount,
       correctQuestions: correctCount,
       accuracy: totalCount > 0 ? correctCount / totalCount : 0,
@@ -100,7 +105,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     responseTimesRef.current.push(timeTaken);
 
     if (isCorrect) {
-      AudioManager.playCorrect();
+      if (settings.soundOn) AudioManager.playCorrect();
       const xp = calculateXP(true, timeTaken, streak);
       setScore(prev => prev + xp);
       setCorrectCount(prev => prev + 1);
@@ -109,29 +114,30 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       if (newStreak > bestStreak) setBestStreak(newStreak);
       setFeedback('correct');
       setFlash('correct');
-      if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(10);
-      setTimeout(nextQuestion, 400);
-      if (mode === 'assessment' && newStreak % 3 === 0 && tier < TIERS - 1) setTier(t => t + 1);
+      if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(5); // Even softer haptic
+      
+      setTimeout(nextQuestion, 120); // Brief feedback ≤120ms flash duration essentially
     } else {
-      AudioManager.playWrong();
+      if (settings.soundOn) AudioManager.playWrong();
       setStreak(0);
       setFeedback('wrong');
       setFlash('wrong');
-      setShake(true);
-      if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(50);
-      setTimeout(() => {
-        setShake(false);
-        nextQuestion();
-      }, 900);
-      if (mode === 'assessment' && tier > 0) setTier(t => Math.max(0, t - 1));
+      // No aggressive shake per requirements
+      if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(20);
+      setTimeout(nextQuestion, 900);
+    }
+
+    if (mode === 'assessment') {
+        if (isCorrect && streak > 0 && streak % 3 === 0 && tier < TIERS - 1) setTier(t => t + 1);
+        if (!isCorrect && tier > 0) setTier(t => Math.max(0, t - 1));
     }
   };
 
   return (
     <MobileLayout className={clsx(
-      "transition-colors duration-300",
-      flash === 'correct' ? "bg-emerald-500/20" : 
-      flash === 'wrong' ? "bg-rose-500/20" : 
+      "transition-colors duration-100", // Faster transition
+      flash === 'correct' ? "bg-emerald-500/10" : // Lower opacity
+      flash === 'wrong' ? "bg-rose-500/10" : 
       "bg-zinc-50"
     )}>
       <div className="flex justify-between items-center px-6 py-4 safe-top">
@@ -141,7 +147,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
         
         {durationSeconds !== 'unlimited' && (
             <motion.div 
-              animate={timeLeft <= 10 ? { scale: [1, 1.1, 1], color: ['#ef4444', '#f87171', '#ef4444'] } : {}}
+              animate={timeLeft <= 10 ? { scale: [1, 1.06, 1], color: ['#ef4444', '#f87171', '#ef4444'] } : {}}
               transition={{ repeat: Infinity, duration: 1 }}
               className={clsx(
                 "font-mono text-xl font-bold tabular-nums",
@@ -152,17 +158,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
             </motion.div>
         )}
         
-        <div className="flex items-center gap-1">
-            <div className="text-sm font-bold text-primary">XP {score}</div>
-        </div>
-      </div>
-
-      <div className="h-1 w-full bg-zinc-200">
-        <motion.div 
-            className="h-full bg-primary"
-            initial={{ width: 0 }}
-            animate={{ width: durationSeconds !== 'unlimited' ? `${((durationSeconds - timeLeft) / durationSeconds) * 100}%` : '100%' }}
-        />
+        <div className="text-sm font-bold text-primary">XP {score}</div>
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
@@ -172,8 +168,8 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
                     key={question.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className={clsx("flex flex-col items-center gap-8", shake && "animate-shake")}
+                    exit={{ opacity: 0 }}
+                    className="flex flex-col items-center gap-8"
                 >
                     <h2 className="text-6xl font-bold tracking-tight text-foreground/90">
                         {question.text}
@@ -182,22 +178,16 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
                     <button 
                       onClick={() => handleSubmit()}
                       className={clsx(
-                        "h-20 min-w-[180px] px-6 rounded-2xl flex items-center justify-center text-4xl font-mono font-medium transition-all border-2 active:scale-95",
-                        feedback === 'correct' ? "bg-emerald-50 border-emerald-200 text-emerald-600" :
-                        feedback === 'wrong' ? "bg-rose-50 border-rose-200 text-rose-600" :
-                        "bg-white border-zinc-200 text-foreground shadow-sm hover:border-primary/50"
+                        "h-24 min-w-[200px] px-8 rounded-3xl flex items-center justify-center text-5xl font-mono font-medium transition-all border-2 active:scale-95",
+                        feedback === 'correct' ? "bg-emerald-50 border-emerald-100 text-emerald-600" :
+                        feedback === 'wrong' ? "bg-rose-50 border-rose-100 text-rose-600" :
+                        "bg-white border-zinc-100 text-foreground shadow-sm hover:border-primary/30"
                       )}
                     >
                         {feedback === 'wrong' ? (
-                            <span className="text-rose-500 text-xl">Ans: {question.answer}</span>
+                            <span className="text-rose-500 text-2xl">Ans: {question.answer}</span>
                         ) : (
-                            input || <span className="opacity-20 animate-pulse">|</span>
-                        )}
-                        
-                        {feedback === 'correct' && (
-                            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute -right-8">
-                                <Check className="text-emerald-500 w-8 h-8" strokeWidth={3} />
-                            </motion.div>
+                            input || <span className="opacity-10">?</span>
                         )}
                     </button>
                 </motion.div>
@@ -206,7 +196,9 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       </div>
 
       <KeypadModern 
-        onPress={(k) => setInput(prev => prev + k)}
+        onPress={(k) => {
+            if (input.length < 6) setInput(prev => prev + k);
+        }}
         onDelete={() => setInput(prev => prev.slice(0, -1))}
         onSubmit={() => handleSubmit()}
         submitDisabled={input.length === 0}
