@@ -220,6 +220,16 @@ export const useStore = create<UserState>()(
     }),
     {
       name: 'maths-trainer-storage',
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // Migration: Sync legacy level to progression level if needed
+          if (state.level > 1 && state.progression.level === 1) {
+            state.progression.level = state.level;
+            state.progression.band = getBandFromLevel(state.level);
+            console.log('[MIGRATION] Synced progression level to:', state.level);
+          }
+        }
+      }
     }
   )
 );

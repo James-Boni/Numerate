@@ -17,14 +17,30 @@ export const getTemplateFamilyForBand = (band: number): TemplateFamily => {
   return ADD_FAMILIES.ADD_2D_2D;
 };
 
-export const generateQuestionForProgression = (band: number, difficultyStep: number): Question & { targetTimeMs: number; dp: number } => {
+export const generateQuestionForProgression = (
+  band: number, 
+  difficultyStep: number,
+  history: { templateId?: string, text?: string }[] = [] // Repetition guard
+): Question & { targetTimeMs: number; dp: number } => {
   const family = getTemplateFamilyForBand(band);
   
   // Select variant based on difficultyStep (clamp to available variants)
   const variantIndex = Math.min(difficultyStep, family.variants.length - 1);
   const variant = family.variants[variantIndex];
   
-  const generated = variant.generate();
+  // Try up to 5 times to generate a non-repeated question
+  let generated: { text: string; answer: number; };
+  let attempts = 0;
+  
+  do {
+    generated = variant.generate();
+    attempts++;
+    
+    // Check against last 3 questions
+    const isRepeated = history.slice(0, 3).some(h => h.text === generated.text);
+    if (!isRepeated) break;
+    
+  } while (attempts < 5);
   
   return {
     id: Math.random().toString(36).substr(2, 9),

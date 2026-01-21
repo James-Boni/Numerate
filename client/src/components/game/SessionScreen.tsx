@@ -46,6 +46,30 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   const recordAnswer = useStore(s => s.recordAnswer);
 
   const progression = useStore(s => s.progression);
+  
+  // DIAGNOSTIC LOGGING
+  useEffect(() => {
+    console.log("[GENERATOR INPUT]", {
+      level: progression.level,
+      band: progression.band,
+      difficultyStep: progression.difficultyStep,
+      SR: progression.srGlobal,
+      mode
+    });
+  }, [progression, mode]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log("[TIMER]", {
+        isActive,
+        timeLeft,
+        now: Date.now()
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isActive, timeLeft]);
+  // END DIAGNOSTICS
+
   const currentQuestionMetaRef = useRef({ targetTimeMs: 3000, dp: 1, id: '' });
 
   useEffect(() => {

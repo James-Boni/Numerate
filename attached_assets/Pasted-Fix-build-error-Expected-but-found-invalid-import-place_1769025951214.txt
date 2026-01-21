@@ -1,0 +1,107 @@
+Fix build error — Expected "(" but found "{" (invalid import placement)
+
+There is a syntax error in:
+
+client/src/lib/store.ts
+
+Error:
+
+ERROR: Expected "(" but found "{"
+221 | import { getBandFromLevel } from './logic/difficulty';
+
+
+This indicates an ES module import statement is placed in an invalid location, most likely inside an object literal, function, or store initializer instead of at the top-level of the module.
+
+Your task
+
+Fix the file so that:
+
+All import statements are at top-level module scope
+
+No import appears inside:
+
+functions
+
+store definitions
+
+callbacks
+
+object literals
+
+The app compiles with no Vite / esbuild errors
+
+No logic or behavior is changed (structural fix only)
+
+Required steps (must follow)
+1. Locate the invalid import
+
+Open client/src/lib/store.ts
+
+Go to line ~221
+
+Identify the import { getBandFromLevel } from './logic/difficulty';
+
+Confirm that it is currently located:
+
+inside a function
+
+or inside a Zustand/Redux store initializer
+
+or inside an object literal
+
+This is invalid JavaScript / TypeScript syntax.
+
+2. Move the import to module scope
+
+Relocate the import to the top of the file, alongside other imports:
+
+import { getBandFromLevel } from './logic/difficulty';
+
+
+Ensure it appears before any executable code
+
+Do NOT wrap it in any function or block
+
+3. Ensure no duplicate or conflicting imports
+
+Check whether getBandFromLevel is already imported elsewhere
+
+Remove duplicates if necessary
+
+Ensure the import path is correct and unchanged
+
+4. Preserve behavior
+
+Do NOT refactor logic
+
+Do NOT change how getBandFromLevel is used
+
+Only move the import so the file is syntactically valid
+
+Mandatory self-verification (do not skip)
+
+Before marking complete:
+
+Confirm all imports in store.ts are at top-level
+
+Confirm there are no import statements after executable code
+
+Run the dev server and confirm:
+
+No Expected "(" but found "{" error
+
+No esbuild / Vite transform errors
+
+Confirm app still starts and store initializes correctly
+
+Required final response
+
+After fixing, respond with:
+
+Why the error occurred (import inside non-top-level scope)
+
+Exactly what was changed (moved import to top-level)
+
+Confirmation that the dev server runs without errors
+
+Do not respond “fixed” unless all checks pass.

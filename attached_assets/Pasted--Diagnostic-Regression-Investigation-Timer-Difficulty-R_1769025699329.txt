@@ -1,0 +1,233 @@
+🚨 Diagnostic & Regression Investigation — Timer + Difficulty Reset
+
+There are critical regressions introduced after recent progression/difficulty changes.
+You must diagnose before fixing. Do NOT guess. Do NOT retune difficulty yet.
+
+Observed failures (must reproduce)
+
+Daily Focus 3-minute mixed-ops timer does not count down
+
+Timer remains stuck at 3:00
+
+Session continues indefinitely
+
+Progression state appears reset or ignored
+
+User should be level 12
+
+App is asking extremely easy questions
+
+Same trivial question repeated (e.g. 4 + 5 asked 3 times)
+
+These two failures strongly suggest broken session state / stale selectors / incorrect source-of-truth, not just “difficulty too low”.
+
+PHASE 1 — Reproduce and inspect (mandatory)
+1. Timer diagnostics
+
+Inspect the Daily Focus session code and verify:
+
+Is the countdown driven by:
+
+setInterval / setTimeout?
+
+requestAnimationFrame?
+
+derived state from startTime?
+
+Check explicitly:
+
+Is the timer state:
+
+initialized correctly?
+
+updated on an interval?
+
+accidentally memoized (useMemo) or frozen?
+
+Was the timer logic moved into a hook that:
+
+no longer runs
+
+has an empty dependency array
+
+depends on a state value that never changes
+
+Log:
+
+console.log("[TIMER]", {
+  now: Date.now(),
+  startTime,
+  elapsedMs,
+  remainingMs,
+});
+
+
+Confirm whether:
+
+elapsed time is changing
+
+remaining time is recalculated
+
+re-renders are happening
+
+2. Session lifecycle verification
+
+Confirm:
+
+Is the Daily Focus session:
+
+mounting once?
+
+remounting every question?
+
+stuck in a paused state?
+
+Check for:
+
+useEffect with incorrect dependencies
+
+early returns blocking logic
+
+session reset happening on each question
+
+PHASE 2 — Progression & difficulty diagnostics (mandatory)
+3. Verify level source of truth
+
+Confirm where level 12 is coming from and where it is being read.
+
+Answer explicitly:
+
+Where is level stored?
+
+localStorage?
+
+global store?
+
+session state?
+
+Which value is the question generator using?
+
+Log at question generation time:
+
+console.log("[GENERATOR INPUT]", {
+  level,
+  band,
+  difficultyStep,
+  SR,
+  mode: sessionMode,
+});
+
+
+If the generator is:
+
+defaulting to level = 0
+
+reading from stale persisted state
+
+ignoring progressionState entirely
+
+→ that is the bug.
+
+4. Repetition bug investigation
+
+The same question (4 + 5) appearing multiple times indicates one of:
+
+RNG seed fixed or recreated every render
+
+Question cache not advancing
+
+Generator called with identical inputs each time
+
+Session state reset between questions
+
+Memoization (useMemo) incorrectly preventing regeneration
+
+Check:
+
+Is question generation wrapped in useMemo?
+
+Is its dependency array missing values?
+
+Is the generator pure but called with constant inputs?
+
+Log:
+
+console.log("[QUESTION GENERATED]", {
+  operands,
+  operation,
+  templateId,
+  seed,
+});
+
+
+Confirm that inputs change between questions.
+
+PHASE 3 — Fixes (only after diagnosis)
+5. Timer fix (if broken)
+
+Fix so that:
+
+Timer is derived from startTime + Date.now()
+
+Or interval updates state every second
+
+Timer logic runs exactly once per session
+
+Timer stops at 0 and ends the session
+
+No polling freezes. No memoization errors.
+
+6. Difficulty fix (if regression confirmed)
+
+Fix so that:
+
+Question generator uses current progressionState
+
+Level → band mapping is respected
+
+Non-trivial filter is applied
+
+Repetition guard prevents same question back-to-back
+
+Add a simple repetition guard:
+
+Do not repeat the same (operation, operands) within last N questions
+
+PHASE 4 — Required verification (do not skip)
+
+Before responding, you must:
+
+Start Daily Focus session
+
+Confirm timer visibly counts down from 3:00 to 0
+
+At level 12:
+
+Confirm questions are not single-digit trivial
+
+Confirm no repeated identical questions
+
+Provide logs/screenshots (or console output snippets) showing:
+
+timer values changing
+
+generator receiving correct level/band
+
+different questions being produced
+
+Required final response format
+
+Respond with four sections:
+
+Root causes found (timer + difficulty)
+
+Files changed
+
+What exactly was wrong
+
+How you verified it is fixed
+
+Do not say “fixed” unless all verification steps passed.
+
+This is a regression diagnosis, not tuning.
+Accuracy and clarity matter more than speed.
