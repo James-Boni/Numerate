@@ -1,0 +1,176 @@
+🧾 XP Earned mismatch — session earned ~800+ XP, summary shows 276
+
+There is a correctness bug in XP aggregation and reporting.
+
+Symptom
+
+During a single session, the in-game XP clearly accumulated to roughly 800+ XP (several hundred XP, well above 500).
+However, the post-session summary reported only 276 XP earned.
+
+This is a large discrepancy, not a rounding issue.
+
+A plausible cause (do not assume): the summary may be counting only bonus / exceptional XP or post-game XP, while excluding base per-question XP earned during play. This must be confirmed via diagnostics.
+
+Goal
+
+Ensure XP is consistent and truthful across:
+
+per-question XP awards
+
+in-session running totals
+
+end-of-session summary
+
+persisted player progress
+
+The XP shown in the summary must equal the canonical XP actually awarded during the session.
+
+Phase 1 — Identify all XP sources (mandatory)
+1) Locate every XP mutation
+
+Search the codebase for:
+
+xp
+
+awardXp
+
+addXp
+
+xpEarned
+
+sessionXp
+
+bonusXp
+
+exceptional
+
+streakXp
+
+perfect
+
+accuracyBonus
+
+Produce a short mapping of:
+
+where base XP is awarded (per question)
+
+where bonus XP is awarded (streaks / exceptional games)
+
+where session XP totals are stored
+
+which value the summary screen currently uses
+
+2) Instrument XP at the source of truth
+
+Add logs at the exact moment XP is awarded per question:
+
+console.log("[XP_AWARD]", {
+  questionId,
+  correct,
+  baseXp,
+  bonusXp,
+  awardedXp,
+  sessionXpBefore,
+  sessionXpAfter,
+});
+
+
+Add logs at session end:
+
+console.log("[XP_SESSION_END]", {
+  xpTotalCanonical,
+  baseXpTotal,
+  bonusXpTotal,
+  answersCount,
+  correctCount,
+});
+
+
+Add logs at summary render:
+
+console.log("[XP_SUMMARY_RENDER]", {
+  xpDisplayed,
+  xpSourceValue,
+  sourceField,
+});
+
+Phase 2 — Confirm the mismatch mechanism (must conclude explicitly)
+
+Determine which of the following is happening (using logs, not assumptions):
+
+Base XP is being awarded but not included in the summary
+
+Summary reads from a bonus-only field
+
+Session XP is reset or overwritten before summary render
+
+Multiple XP fields exist and the wrong one is used
+
+XP aggregation logic is split between session and results screens
+
+You must explicitly identify the exact cause.
+
+Phase 3 — Fix requirements (must satisfy)
+1) Define a single canonical XP total
+
+Ensure there is exactly one authoritative session XP structure, e.g.:
+
+sessionResults = {
+  xpEarnedTotal,
+  xpEarnedBase,
+  xpEarnedBonus,
+}
+
+
+Rules:
+
+xpEarnedTotal = xpEarnedBase + xpEarnedBonus
+
+Every XP award must update the canonical totals
+
+2) Ensure summary displays canonical XP
+
+The summary screen must display xpEarnedTotal.
+
+If bonus XP exists:
+
+keep it
+
+optionally show a breakdown
+
+never exclude base XP from totals
+
+3) Prevent premature resets
+
+Do not clear session XP before the summary reads it.
+If cleanup is needed, do it when starting the next session.
+
+Phase 4 — Mandatory verification
+
+Run a controlled session:
+
+earn several hundred XP (well above 500)
+
+confirm base + bonus XP both contribute
+
+Confirm via logs:
+
+[XP_AWARD] totals sum to xpEarnedTotal
+
+[XP_SESSION_END].xpTotalCanonical ≈ actual in-game XP earned
+
+[XP_SUMMARY_RENDER].xpDisplayed === xpTotalCanonical
+
+Provide log excerpts proving consistency.
+
+Required final response format
+
+Return:
+
+Root cause (exact reason ~800+ XP showed as 276)
+
+Fix applied (files + logic)
+
+Verification evidence (logs + short test)
+
+Do not claim “fixed” unless the summary XP matches the canonical accumulated XP.

@@ -83,6 +83,11 @@ export default function Assessment() {
     if (step === 'results' && results && !revealRun.current) {
       revealRun.current = true;
       console.log(`[SESSION_FLOW] Reveal sequence started: ${Date.now()}`);
+      console.log("[XP_SUMMARY_RENDER]", {
+        xpDisplayed: results.xpEarned,
+        xpSourceValue: results.xpEarned,
+        sourceField: "results.xpEarned",
+      });
       
       if (settings.soundOn) {
         AudioManager.playCompletion();

@@ -38,6 +38,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   const correctCountRef = useRef(0);
   const totalCountRef = useRef(0);
   const bestStreakRef = useRef(0);
+  const scoreRef = useRef(0); // Accumulated per-question XP
   
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [shake, setShake] = useState(false);
@@ -158,13 +159,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     const finalCorrectCount = correctCountRef.current;
     const finalTotalCount = totalCountRef.current;
     const finalBestStreak = bestStreakRef.current;
-    
-    console.log("[ASSESS_COMPLETE]", {
-      correctCount: finalCorrectCount,
-      totalCount: finalTotalCount,
-      bestStreak: finalBestStreak,
-      responseTimes: responseTimesRef.current.length
-    });
+    const finalScore = scoreRef.current; // Canonical accumulated XP
     
     const components = computeFluencyComponents(
       finalCorrectCount,
@@ -177,13 +172,31 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     
     const isValid = finalTotalCount >= CFG.MIN_QUESTIONS_FOR_VALID_SESSION && 
                   durationSecondsActual >= CFG.MIN_DURATION_FOR_VALID_SESSION_SEC;
-                  
-    const { totalXP, metBonus } = computeSessionXP(
+    
+    // Use accumulated per-question XP as canonical XP (what user saw during session)
+    // Apply excellence bonus if met
+    const { metBonus } = computeSessionXP(
       fluencyScore,
       finalTotalCount,
       components,
       isValid
     );
+    
+    // Apply bonus multiplier to accumulated XP if earned
+    let xpEarnedTotal = finalScore;
+    if (metBonus && finalScore > 0) {
+      const { accuracy } = components;
+      const multiplier = accuracy >= 0.95 ? 1.35 : 1.25; // Elite or standard bonus
+      xpEarnedTotal = Math.round(finalScore * multiplier);
+    }
+    
+    console.log("[XP_SESSION_END]", {
+      xpTotalCanonical: xpEarnedTotal,
+      baseXpTotal: finalScore,
+      bonusApplied: metBonus,
+      answersCount: finalTotalCount,
+      correctCount: finalCorrectCount,
+    });
 
     const stats: SessionStats = {
       id: Math.random().toString(36).substring(7),
@@ -193,7 +206,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       totalQuestions: finalTotalCount,
       correctQuestions: finalCorrectCount,
       accuracy: finalTotalCount > 0 ? finalCorrectCount / finalTotalCount : 0,
-      xpEarned: totalXP,
+      xpEarned: xpEarnedTotal,  // Use accumulated XP (consistent with in-game display)
       bestStreak: finalBestStreak,
       avgResponseTimeMs: components.medianMs,
       medianMs: components.medianMs,
@@ -239,7 +252,19 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       if (settings.soundOn) AudioManager.playCorrect();
       
       const xp = calculateXP(true, timeTaken, streak);
-      setScore(prev => prev + xp);
+      scoreRef.current += xp;
+      setScore(scoreRef.current);
+      
+      console.log("[XP_AWARD]", {
+        questionId: question?.id,
+        correct: true,
+        baseXp: xp,
+        bonusXp: 0,
+        awardedXp: xp,
+        sessionXpBefore: scoreRef.current - xp,
+        sessionXpAfter: scoreRef.current,
+      });
+      
       correctCountRef.current += 1;
       setCorrectCount(correctCountRef.current);
       const newStreak = streak + 1;
