@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -71,21 +71,69 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   // END DIAGNOSTICS
 
   const currentQuestionMetaRef = useRef({ targetTimeMs: 3000, dp: 1, id: '' });
-
+  const recentQuestionsRef = useRef<{ templateId?: string, text?: string }[]>([]);
+  const sessionEndedRef = useRef(false);
+  
   useEffect(() => {
     nextQuestion();
     setIsActive(true);
     startTimeRef.current = Date.now();
+    sessionEndedRef.current = false;
   }, []);
 
-  // ... useEffect for timer ...
+  // Timer countdown using startTime as stable source of truth
+  useEffect(() => {
+    if (durationSeconds === 'unlimited') return;
+    
+    const targetDurationMs = typeof durationSeconds === 'number' ? durationSeconds * 1000 : 0;
+    
+    const tick = () => {
+      if (sessionEndedRef.current) return;
+      
+      const elapsed = Date.now() - startTimeRef.current;
+      const remaining = Math.max(0, targetDurationMs - elapsed);
+      const remainingSeconds = Math.ceil(remaining / 1000);
+      
+      console.log("[TIMER_TICK]", { remainingSeconds, elapsed, remaining });
+      
+      setTimeLeft(remainingSeconds);
+      
+      if (remaining <= 0 && !sessionEndedRef.current) {
+        sessionEndedRef.current = true;
+        console.log("[TIMER_END] Session complete - calling endSession");
+        endSession();
+      }
+    };
+    
+    tick();
+    const interval = setInterval(tick, 250);
+    
+    return () => clearInterval(interval);
+  }, [durationSeconds]);
 
   const nextQuestion = () => {
     // MVP: Use new generator if in training mode
     if (mode === 'training') {
-      const q = generateQuestionForProgression(progression.band, progression.difficultyStep);
+      const q = generateQuestionForProgression(
+        progression.band, 
+        progression.difficultyStep,
+        recentQuestionsRef.current
+      );
       setQuestion(q);
       currentQuestionMetaRef.current = { targetTimeMs: q.targetTimeMs, dp: q.dp, id: q.id };
+      
+      // Track recent questions for repetition prevention
+      recentQuestionsRef.current = [
+        { templateId: q.id, text: q.text },
+        ...recentQuestionsRef.current
+      ].slice(0, 10);
+      
+      console.log("[GEN_OUTPUT]", {
+        question: q.text,
+        templateId: q.id,
+        band: progression.band,
+        step: progression.difficultyStep
+      });
     } else {
        setQuestion(generateQuestion(tier)); // Legacy for assessment
        currentQuestionMetaRef.current = { targetTimeMs: 3000, dp: 1, id: 'legacy' };
@@ -98,7 +146,6 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   };
 
   const endSession = () => {
-// ... existing endSession logic ...
     setIsActive(false);
     const durationSecondsActual = durationSeconds === 'unlimited' ? 0 : Number(durationSeconds);
     

@@ -1,4 +1,4 @@
-import { PROGRESSION_CONFIG } from '../config/progression';
+import { PROGRESSION_CONFIG } from '../../config/progression';
 
 export interface ProgressionState {
   level: number;

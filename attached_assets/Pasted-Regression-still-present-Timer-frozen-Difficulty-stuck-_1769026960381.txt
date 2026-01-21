@@ -1,0 +1,190 @@
+Regression still present — Timer frozen + Difficulty stuck easy (must diagnose + prove)
+
+The build now runs, but two core regressions remain:
+
+Daily Focus 3-minute timer does not count down (stays at 3:00)
+
+Questions are still too easy + repetitive (suggests progression state not being used, and repetition guard missing)
+
+You must diagnose with instrumentation first, then fix. Do not “tune” difficulty until wiring is correct.
+
+A) TIMER: Diagnose why remaining time never changes
+A1) Find the timer source of truth
+
+In Daily Focus / mixed ops session, locate the code that displays the 3:00 timer (likely SessionScreen.tsx or a timer component/hook).
+
+Determine which approach is currently used:
+
+setInterval updating remainingMs
+
+requestAnimationFrame
+
+derived remainingMs = DURATION - (Date.now() - startTime)
+
+a store value that should decrement
+
+A2) Add mandatory logging (no guesswork)
+
+Add logs that print once per second while a session is running:
+
+console.log("[TIMER_TICK]", {
+  now: Date.now(),
+  startTime,
+  elapsedMs: startTime ? Date.now() - startTime : null,
+  remainingMs,
+  isRunning,
+});
+
+
+If startTime is missing or resets, log that too:
+
+console.log("[TIMER_STARTTIME]", { startTime, sessionId });
+
+A3) Identify the real failure mode (pick the one that matches logs)
+
+Common causes:
+
+startTime is never set
+
+startTime resets every render / every question
+
+interval never starts (effect dependencies wrong)
+
+interval starts but is cleared immediately (cleanup running due to dependency changes)
+
+timer state is memoized/frozen (useMemo / missing deps)
+
+component remounts every question (key changes)
+
+A4) Fix requirements (must satisfy all)
+
+Timer must count down from 3:00 to 0:00
+
+Timer must be resilient to re-renders
+
+Timer must not reset on each new question
+
+Session must end when remaining reaches 0
+
+Preferred implementation (robust)
+
+Use startTime as stable source of truth:
+
+On session start:
+
+set startTime = Date.now() exactly once per session
+
+Derive:
+
+remainingMs = max(0, DURATION_MS - (Date.now() - startTime))
+
+Use an interval to force re-render:
+
+setTick(t => t + 1) every 250–1000ms
+
+Important: Ensure the effect that sets startTime runs once per session (e.g., on sessionId change), not on every render.
+
+B) DIFFICULTY: Prove generator is using progression + fix easy/repetition
+B1) Add mandatory generation-time logging
+
+At the exact location where a new question is generated/selected, log:
+
+console.log("[GEN_INPUT]", {
+  mode,
+  level,
+  band,
+  difficultyStep,
+  SR,
+  templateIdRequested,
+});
+
+
+And after generation:
+
+console.log("[GEN_OUTPUT]", {
+  question,
+  templateIdUsed,
+  operands: question?.operands,
+  op: question?.op,
+});
+
+B2) Confirm progression state is not being ignored
+
+If logs show any of these, it’s the bug:
+
+level is 0 / 1 when user expects 12
+
+band is undefined or always 0
+
+difficultyStep always 0
+
+generator is not receiving level/band at all
+
+generator reads from stale localStorage key instead of current store
+
+Fix so the generator uses one source of truth:
+
+store progressionState → derived band → generator constraints
+
+B3) Implement a repetition guard (mandatory)
+
+Even with correct difficulty, repeating 4+5 is unacceptable.
+
+Implement:
+
+Keep a recentQuestions queue (last 10) containing a stable signature:
+
+${op}:${a}:${b} (sorted if commutative for +/*)
+
+When generating:
+
+if signature exists in recentQuestions, re-roll up to N attempts (e.g., 20)
+
+if still colliding, expand range slightly or change op within allowed set
+
+Also enforce:
+
+Never repeat the exact same question back-to-back
+
+B4) Enforce non-trivial filter for band >= 1
+
+For band >= 1 (or once user > onboarding), disallow tiny operands:
+
+For addition/sub: avoid both operands ≤ 3; avoid sums/differences that are trivially small
+
+For division: avoid toy facts repeated (6÷3, 10÷2 etc.)
+
+C) Mandatory verification (do not claim success without this)
+C1) Timer verification
+
+Start Daily Focus 3-min session
+
+Observe timer decreasing every second
+
+Confirm it hits 0 and ends session
+
+Provide console log excerpt showing remainingMs decreasing.
+
+C2) Difficulty verification at level 12
+
+Confirm logs show level=12 and correct band
+
+Confirm questions are not single-digit trivial
+
+Confirm no repeated identical question within 10 questions
+
+Provide console log excerpt showing GEN_INPUT and GEN_OUTPUT across ~10 questions.
+
+D) Required final response format
+
+Reply with:
+
+Timer root cause + fix
+
+Difficulty root cause + fix
+
+Files changed
+
+Proof (log snippets showing timer ticks + generator inputs/outputs + no repeats)
+
+Do not say “fixed” unless you have the proof logs.

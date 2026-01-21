@@ -25,6 +25,9 @@ export const api = {
   async getProgress(userId: string): Promise<UserProgress> {
     const response = await fetch(`${API_BASE}/progress/${userId}`);
     if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Progress not found (404)');
+      }
       throw new Error('Failed to fetch progress');
     }
     return response.json();

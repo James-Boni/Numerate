@@ -325,10 +325,27 @@ export const useStore = create<UserState>()(
         try {
           set({ isSyncing: true, lastSyncError: null });
           
-          const [progress, sessions] = await Promise.all([
-            api.getProgress(state.uid),
-            api.getSessions(state.uid)
-          ]);
+          let progress;
+          let sessions;
+          
+          try {
+            [progress, sessions] = await Promise.all([
+              api.getProgress(state.uid),
+              api.getSessions(state.uid)
+            ]);
+          } catch (error: any) {
+            if (error.message?.includes('404') || error.message?.includes('not found')) {
+              console.log('[RECOVERY] User not found in backend, creating new user');
+              const { user, progress: newProgress } = await api.createUser();
+              set({
+                uid: user.id,
+                createdAt: user.createdAt.toString(),
+                isSyncing: false
+              });
+              return;
+            }
+            throw error;
+          }
           
           set({
             hasCompletedAssessment: progress.hasCompletedAssessment,
