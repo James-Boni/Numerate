@@ -1,9 +1,8 @@
 export const sounds = {
-  // Using stable base64 or verified short MP3s for reliability
-  correct: "https://www.soundjay.com/buttons/sounds/button-37.mp3",
-  wrong: "https://www.soundjay.com/buttons/sounds/button-10.mp3",
-  tick: "https://www.soundjay.com/buttons/sounds/button-50.mp3",
-  tap: "https://www.soundjay.com/buttons/sounds/button-50.mp3",
+  correct: "https://actions.google.com/sounds/v1/alarms/beep_short.ogg",
+  wrong: "https://actions.google.com/sounds/v1/alarms/bugle_tune.ogg",
+  tick: "https://actions.google.com/sounds/v1/ui/click_tone_small.ogg",
+  tap: "https://actions.google.com/sounds/v1/ui/click_tone_small.ogg",
 };
 
 export class AudioManager {
@@ -17,12 +16,18 @@ export class AudioManager {
     try {
       this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
       
-      // Pre-load all sounds
       const loadSound = async (name: string, url: string) => {
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await this.context!.decodeAudioData(arrayBuffer);
-        this.buffers.set(name, audioBuffer);
+        try {
+          const response = await fetch(url);
+          const arrayBuffer = await response.arrayBuffer();
+          const audioBuffer = await this.context!.decodeAudioData(arrayBuffer);
+          this.buffers.set(name, audioBuffer);
+        } catch (e) {
+          console.error(`DIAGNOSTIC: Error loading ${name}:`, e);
+          if (this.context) {
+            this.buffers.set(name, this.context.createBuffer(1, 4410, 44100));
+          }
+        }
       };
 
       await Promise.all([
@@ -37,33 +42,27 @@ export class AudioManager {
           await this.context.resume();
         }
         this.initialized = true;
+        window.removeEventListener('click', unlock);
         window.removeEventListener('touchstart', unlock);
-        window.removeEventListener('mousedown', unlock);
       };
 
+      window.addEventListener('click', unlock);
       window.addEventListener('touchstart', unlock);
-      window.addEventListener('mousedown', unlock);
     } catch (e) {
-      console.error("Web Audio initialization failed:", e);
+      console.error("DIAGNOSTIC: Web Audio Init Fail:", e);
     }
   }
 
   private static playBuffer(name: string) {
     if (!this.context || !this.buffers.has(name)) return;
-    
-    if (this.context.state === 'suspended') {
-      this.context.resume();
-    }
+    if (this.context.state === 'suspended') this.context.resume();
 
     const source = this.context.createBufferSource();
     source.buffer = this.buffers.get(name)!;
-    
     const gainNode = this.context.createGain();
     gainNode.gain.value = 0.5;
-    
     source.connect(gainNode);
     gainNode.connect(this.context.destination);
-    
     source.start(0);
   }
 

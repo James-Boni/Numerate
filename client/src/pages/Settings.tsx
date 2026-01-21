@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Volume2, Zap, Shield, LogOut, Trash2, ChevronRight, User } from 'lucide-react';
+import { AudioManager } from '@/lib/audio';
 
 export default function Settings() {
   const { settings, updateSettings, logout, resetProgress, email } = useStore();
@@ -58,6 +59,46 @@ export default function Settings() {
                 checked={settings.hapticsOn} 
                 onCheckedChange={(checked) => updateSettings({ hapticsOn: checked })} 
               />
+            </div>
+          </Card>
+        </div>
+
+        {/* Sound Diagnostic */}
+        <div className="space-y-3">
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sound Diagnostic</h3>
+          <Card className="p-4 border-none shadow-sm space-y-4">
+            <p className="text-xs text-slate-500">Manual test buttons to verify audio engine.</p>
+            <div className="grid grid-cols-1 gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  console.log("DIAGNOSTIC: Manual Test - Correct");
+                  AudioManager.playCorrect();
+                }}
+              >
+                Test Correct Sound
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  console.log("DIAGNOSTIC: Manual Test - Wrong");
+                  AudioManager.playWrong();
+                }}
+              >
+                Test Wrong Sound
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  console.log("DIAGNOSTIC: Manual Test - Tap");
+                  AudioManager.playTap();
+                }}
+              >
+                Test Tap Sound
+              </Button>
             </div>
           </Card>
         </div>

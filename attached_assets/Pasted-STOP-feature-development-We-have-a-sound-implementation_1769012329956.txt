@@ -1,0 +1,155 @@
+STOP feature development. We have a sound implementation failure and I need a full diagnostic, not assumptions.
+
+Goal:
+Identify exactly why sound effects are not playing and fix the root cause. Do NOT say “implemented” unless sound is audibly confirmed on a real device.
+
+You must follow this diagnostic process step by step and log results.
+
+--------------------------------------------------
+STEP 1 — CONFIRM TEST ENVIRONMENT
+--------------------------------------------------
+Explicitly log and display (console + on-screen if needed):
+- Whether the app is running on:
+  - Web browser
+  - iOS Simulator
+  - Real iPhone via Expo Go / TestFlight
+
+If running on web:
+- State clearly that browser audio restrictions may block sound
+- Still continue diagnostics, but prioritize real-device testing
+
+--------------------------------------------------
+STEP 2 — VERIFY SOUND ASSETS EXIST
+--------------------------------------------------
+Check the project file tree and CONFIRM the existence of actual audio files.
+
+Required files (or equivalents):
+- /src/assets/sounds/correct.(mp3|wav)
+- /src/assets/sounds/wrong.(mp3|wav)
+- /src/assets/sounds/tick.(mp3|wav)
+
+If files do NOT exist:
+- Add simple placeholder sound files immediately
+- Use short, neutral UI-style sounds (not music)
+- Log confirmation that files exist and are bundled
+
+--------------------------------------------------
+STEP 3 — VERIFY expo-av INSTALLATION
+--------------------------------------------------
+Confirm:
+- expo-av is installed
+- version is compatible with current Expo SDK
+- Audio.Sound is imported correctly
+
+Log:
+- expo-av version
+- confirmation that Audio.Sound is available at runtime
+
+--------------------------------------------------
+STEP 4 — ADD A SOUND TEST PANEL (MANDATORY)
+--------------------------------------------------
+Add a “Sound Diagnostic” section in Settings with THREE buttons:
+
+1) “Play Correct Sound”
+2) “Play Wrong Sound”
+3) “Play Tick Sound”
+
+Each button MUST:
+- console.log("SOUND_TEST_<TYPE>_PRESSED")
+- log current soundOn setting value
+- attempt to load the audio using STATIC require()
+- attempt to play the sound using async/await
+- catch and console.error ANY error (do not swallow errors)
+
+Example requirements (conceptual, not exact code):
+- Use static require() paths
+- Do NOT use dynamic paths
+- Log before load, after load, before play, after play
+
+If pressing these buttons produces no sound:
+- Identify EXACTLY why before proceeding
+
+--------------------------------------------------
+STEP 5 — AUDIO MODE CONFIGURATION (iOS CRITICAL)
+--------------------------------------------------
+Explicitly configure Expo Audio mode.
+
+You MUST decide and document:
+- Should sounds play even when iOS silent switch is ON?
+
+Default requirement for this app:
+- YES, sounds should play in silent mode (game-like behavior)
+
+Log:
+- Audio mode configuration applied
+- Whether silent switch is overridden
+
+--------------------------------------------------
+STEP 6 — VERIFY SETTINGS ARE NOT MUTING SOUND
+--------------------------------------------------
+Inspect soundOn setting:
+- Confirm default value on first install
+- Confirm toggle actually updates state
+- Confirm sound playback functions do NOT early-return incorrectly
+
+Log soundOn value at every attempted playback.
+
+--------------------------------------------------
+STEP 7 — CONFIRM PLAYBACK WORKS VIA TEST PANEL
+--------------------------------------------------
+At this point:
+- Pressing test buttons MUST produce audible sound on a real device
+
+If NOT:
+- Stop and explain the exact failure point:
+  - missing assets
+  - incorrect path
+  - audio mode issue
+  - environment restriction
+  - expo-av failure
+
+DO NOT proceed until test panel works.
+
+--------------------------------------------------
+STEP 8 — TRACE GAMEPLAY SOUND TRIGGERS
+--------------------------------------------------
+Only AFTER the test panel works:
+
+Add explicit console logs at these exact moments:
+- Number button pressed
+- Answer submission triggered
+- Answer confirmed correct
+- Answer confirmed wrong
+
+At confirmation:
+- Log "CONFIRMED_CORRECT" or "CONFIRMED_WRONG"
+- Immediately call the same sound functions used by test panel
+
+If logs fire but no sound:
+- The issue is sound lifecycle or async handling — fix it
+
+If logs do NOT fire:
+- The issue is event wiring — fix it
+
+--------------------------------------------------
+STEP 9 — PREVENT COMMON FAILURES
+--------------------------------------------------
+Ensure:
+- Sounds are NOT recreated every render
+- Sound objects are properly unloaded when needed
+- No overlapping playback unless intentional
+- No race conditions with timer ticks vs answer sounds
+- Tick sound is suppressed if answer sound fires at same moment
+
+--------------------------------------------------
+FINAL REQUIREMENT
+--------------------------------------------------
+Do NOT say “sound implemented”.
+
+Instead, provide:
+1) Confirmation that sound plays on a REAL iPhone
+2) Which test proved it
+3) Any fixes applied
+4) Remaining limitations (e.g., web restrictions)
+
+If sound still does not play, identify the SINGLE blocking cause clearly.
