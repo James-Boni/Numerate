@@ -1,0 +1,309 @@
+You are Replit Agent. Build an MVP iOS-first maths training app using React Native with Expo (TypeScript). It must run well on iPhone and also be web-compatible via Expo. This is a focused arithmetic fluency trainer for adults who feel weak at maths.
+
+PRIMARY GOAL
+Ship a reliable V1 that:
+- Onboards with a 3-minute assessment
+- Assigns a starting difficulty tier (ladder)
+- Provides a single “Daily Maths Training” mode (adaptive mixed + − × ÷)
+- Tracks progress over time
+- Uses sign-in (so progress syncs across devices)
+- Has crisp, emotionally safe feedback that encourages repeat play
+
+NON-GOALS (V1)
+- No Duolingo-level animation complexity. Use light, responsive micro-interactions only.
+- No multiplayer, no social feed.
+- No complex content authoring system.
+
+PLATFORM / BUILD
+- Expo React Native (TypeScript)
+- Must run on iOS + Web (Expo for Web)
+- Navigation: @react-navigation/native with bottom tabs + stack modals where needed
+
+AUTH + DATA (REQUIRED IN V1)
+Implement sign-in and cloud sync from day one.
+Use Firebase:
+- Firebase Authentication (Email/Password + optional “Sign in with Apple” placeholder if hard; implement email/password at minimum)
+- Firestore for storing user profile + sessions + aggregated stats
+- Optional: Firebase Analytics (if easy), but not required
+
+If Firebase setup requires environment variables/keys, use Replit Secrets and document in README.
+
+PRIVACY / SAFETY
+- Store minimal personal data: email + UID.
+- No ads tracking.
+- Provide a basic Privacy Policy screen with placeholder text (user will replace later).
+- Provide “Delete account/data” stub (at minimum: explain “contact support” in V1; ideally implement deletion of Firestore user doc).
+
+CORE USER FLOW
+1) Launch app → Welcome → Sign in / Create account
+2) First login → Assessment intro → 3-minute assessment session
+3) Assessment results → starting Tier + baseline stats → “Start Training”
+4) Training sessions (timed or unlimited, with gating) → Session Summary → Progress updates
+5) Progress tab shows trends + streaks + level
+
+INFORMATION ARCHITECTURE (Bottom Tabs)
+1) Train
+2) Progress
+3) Settings
+
+SCREENS (DETAILED)
+A) Auth Screens
+- Welcome: brief value statement + CTA “Sign in” / “Create account”
+- Sign in: email + password
+- Create account: email + password + confirm password
+- Password reset (optional)
+
+B) Assessment
+- Intro screen explaining: “3 minutes, mixed operations, sets your starting level”
+- Assessment gameplay screen (same UI as training)
+- Assessment results:
+  - Accuracy
+  - Avg response time
+  - Questions attempted
+  - Breakdown by operation (simple)
+  - Assigned starting Tier
+  - Assigned starting Level (based on Tier + performance)
+  - CTA: “Start Training”
+
+C) Train Tab
+- Header shows:
+  - current avatar/icon + Level
+  - today’s streak indicator
+- Mode selector:
+  - V1: ONLY “Mixed (Adaptive)” (do not build separate operation modes yet)
+- Duration selector:
+  - 1 min, 2 min, 3 min, Unlimited
+- Start button begins session
+- If user is Free tier:
+  - 1 session/day allowed
+  - Unlimited option locked
+  - If used session today, show paywall prompt
+
+D) Gameplay Screen (Session)
+Strict mental maths:
+- Display one question at a time, large type
+- Numeric input only (number-pad)
+- Timer visible
+- Minimal distractions
+- Submit on “Enter/Done” + explicit Submit button
+- Provide “Skip” option (configurable) with no XP and streak reset
+
+Feedback design (use well-supported engagement principles without overbuilding):
+- Correct:
+  - instant confirmation (check icon + subtle scale/flash)
+  - positive sound (toggleable)
+  - light haptic (toggleable)
+  - show next question immediately (fast pace)
+- Incorrect:
+  - gentle shake animation + “Correct: X” shown briefly (600–900ms)
+  - neutral “try again” tone, not harsh
+  - streak resets (but do not heavily punish XP)
+- Hot streak:
+  - visually show multiplier (e.g., small “🔥 x1.4” pill)
+  - subtle ramp-up sound optional
+- Accessibility: ensure good contrast, large tap targets, supports system text size reasonably
+
+E) Session Summary
+After each session show:
+- XP earned
+- Accuracy
+- Avg response time
+- Best streak
+- XP/minute
+- Mini chart vs last 7 sessions (sparkline or bar)
+- “What you did well” bullet (based on metrics, e.g. “Accuracy improved vs last week”)
+- CTA: “Play again” / “Back to Train”
+
+F) Progress Tab
+Show:
+- Current Level + avatar
+- Streak (consecutive days with ≥1 session)
+- Rolling trends:
+  - accuracy (last 14 sessions)
+  - speed (avg response time, last 14 sessions)
+  - XP/min (last 14 sessions)
+Charts:
+- Sessions per day (last 14 days)
+- Speed trend (line)
+- Accuracy trend (line)
+Keep it clean.
+
+G) Settings Tab
+- Sound on/off
+- Haptics on/off
+- “Difficulty feel”: Easier / Balanced / Harder (affects tier movement thresholds slightly)
+- Account:
+  - Sign out
+  - Delete account/data (if implemented)
+- Pro / Subscription screen (placeholder purchase)
+- Reset local cache (if needed)
+
+MONETIZATION (PLACEHOLDER, BUT WITH REAL GATING)
+Plans:
+- Free: Assessment + 1 session/day + durations up to 3 minutes + basic progress
+- Pro: Unlimited sessions + Unlimited duration + full progress history (30–90 days) + advanced breakdowns
+Implement:
+- A Pro screen with benefits and “Subscribe” buttons (Monthly £0.99, Annual £9.99)
+- Do NOT implement Apple IAP in V1 unless easy; instead:
+  - Build the UI and gating logic
+  - Add a Dev/Test toggle “Pro Enabled” for testing
+  - Store subscription state in Firestore as a boolean field for now (e.g. userProfile.isPro)
+Document clearly that this is a placeholder.
+
+DATA MODEL (FIRESTORE)
+Collections:
+- users/{uid}
+  - createdAt
+  - email
+  - settings: soundOn, hapticsOn, difficultyPreference
+  - hasCompletedAssessment
+  - currentTier
+  - lifetimeXP
+  - level
+  - isPro (placeholder)
+  - lastSessionDate (for daily limit)
+  - streakCount
+  - lastStreakDate
+- users/{uid}/sessions/{sessionId}
+  - startedAt, endedAt
+  - durationMode (60/120/180/unlimited)
+  - durationSecondsActual
+  - tierAtStart
+  - totalQuestions
+  - correctQuestions
+  - accuracy
+  - avgResponseTimeMs
+  - medianResponseTimeMs
+  - bestStreak
+  - xpEarned
+  - xpPerMinute
+  - perOperationStats: { add: {attempts, correct, avgTimeMs}, sub: {...}, mul: {...}, div: {...} }
+- users/{uid}/assessment/latest
+  - takenAt
+  - metrics same as session + assignedTier
+
+Also maintain derived aggregates in user doc for quick load:
+- last14SessionSummaries (array of lightweight objects) OR compute on client by querying last N sessions (simpler, but watch performance)
+Prefer querying last N sessions ordered by startedAt desc and computing on device.
+
+ADAPTIVE DIFFICULTY LADDER (REQUIRED)
+Define tiers 0..6 (adjust as needed), and ensure strict generation rules:
+Tier 0: +/− within 10 (no negatives; subtraction ensures a>=b)
+Tier 1: +/− within 20
+Tier 2: +/− within 50
+Tier 3: +/− within 100
+Tier 4: × facts 1–10, ÷ exact with dividends <= 100, plus easier +/− within 100
+Tier 5: mixed ×/÷ with 2-digit x 1-digit; ÷ exact; +/− within 200
+Tier 6: mixed: 2-digit x 2-digit occasionally (light), ÷ exact, +/− within 500 (still keep reasonable)
+
+Tier assignment from assessment:
+- Use accuracy + median response time.
+Example rule:
+- if accuracy < 60% → tier 0
+- 60–75% → tier 1–2 based on speed
+- 75–90% → tier 3–4
+- >90% and fast → tier 4–5
+Keep simple and document.
+
+Dynamic adjustment during training:
+- Track rolling window of last 20 questions:
+  - accuracyWindow
+  - medianTimeWindow
+- If accuracy >= 90% AND medianTime <= 1800ms → tier +1 (cap)
+- If accuracy <= 70% → tier -1 (floor)
+- Weight operation selection toward weaknesses:
+  - For each op, compute weakness = (1 - accuracyOp) + (avgTimeOp / targetTime)
+  - Use weighted random selection (ensure minimum diversity)
+- Avoid repetition: keep last 30 questions hash set; don’t repeat.
+
+QUESTION GENERATION RULES
+Addition: a+b within range
+Subtraction: a-b non-negative early tiers; a>=b
+Multiplication:
+- early tiers: 1..10 facts
+- later: 2-digit x 1-digit; optionally 2-digit x 2-digit rarely at top tier
+Division:
+- exact division only in V1:
+  - pick divisor and quotient, compute dividend = divisor*quotient
+  - show dividend ÷ divisor
+Input must be integer only for V1.
+
+SCORING / XP (V1 BALANCED, NOT PUNISHING)
+Config constants in src/config/gameConfig.ts
+- Base XP per correct: 10
+- Wrong: 0 XP + streak reset (NO XP subtraction)
+- Speed bonus: under 1500ms adds +5 XP
+- Hot streak activation: 3 consecutive answers that are correct AND under 1500ms
+  - multiplier starts 1.2x and increases +0.1 per additional fast-correct
+  - cap 2.0x
+  - multiplier resets on wrong OR slow answer
+- Provide per-session XP and lifetime XP
+- Level thresholds: based on lifetime XP (simple increasing thresholds)
+- Level-up triggers avatar unlock toast + optional sound/haptic
+
+UI PRINCIPLES (IMPLEMENT THESE, DON’T CLAIM “PROVEN BEST”)
+Aim for high engagement and low friction using widely supported UX patterns:
+- Immediate feedback (<150ms perceived) on submit
+- Consistent layout and typography
+- Clear progress indicators (streak, level, session summary)
+- Emotionally safe errors (no harsh penalties; helpful correction display)
+- Micro-rewards: streak multiplier, level-up toast, avatar unlock
+- Keep cognitive load low: one question at a time, minimal controls
+
+UI STYLE
+- Use system theme (light/dark), modern minimal design, large readable question text.
+- Subtle animated state changes on correct/wrong/hot-streak.
+- Crisp spacing and alignment.
+- Avoid visual clutter.
+
+AUDIO / HAPTICS
+Use Expo AV or a compatible solution:
+- 3 sounds: correct, wrong, level-up (placeholders ok)
+- Toggleable in settings
+- Haptics toggleable (Expo Haptics)
+
+FOLDER STRUCTURE
+src/
+  screens/
+  components/
+  navigation/
+  logic/
+    scoring.ts
+    difficulty.ts
+    questionGen.ts
+    stats.ts
+  services/
+    firebase.ts
+    auth.ts
+    firestore.ts
+  state/
+  config/
+  assets/ (icons, sounds)
+README.md
+
+TESTS (MINIMUM)
+Jest tests for:
+- scoring: multiplier logic, speed bonus, XP totals
+- difficulty: tier up/down based on rolling window
+- question gen: division exactness, subtraction non-negative tiers
+
+DELIVERABLES
+- Working app with sign-in, assessment, training, summary, progress, settings
+- Firestore persistence
+- Daily limit gating + Pro placeholder gating
+- README with setup instructions (Firebase, secrets, running iOS/web)
+
+IMPLEMENTATION ORDER
+1) Scaffold Expo RN TS app + navigation
+2) Firebase init + Auth screens
+3) Firestore user profile create-on-first-login
+4) Implement core logic modules (questionGen, scoring, difficulty)
+5) Assessment flow + tier assignment
+6) Training session + summary saving to Firestore
+7) Progress screen querying last N sessions and computing charts
+8) Settings toggles
+9) Pro gating placeholders + daily limit
+10) Polish micro-interactions + sounds/haptics
+
+If something is ambiguous, pick the simplest correct approach, document assumptions, and keep the app stable.
+After initial scaffold, show me the file tree and proceed iteratively.
