@@ -62,17 +62,29 @@ export class AudioManager {
   }
 
   static playEnergyRise(duration: number) {
-    // Energy rise for XP tally: 440Hz -> 880Hz sweep
     this.playSynth(440, 'sine', duration, 0.2, true, 880);
   }
 
   static playTallyTick() {
-    // Precise digital counting tick
     this.playSynth(1200, 'square', 0.02, 0.05);
   }
 
   static playSuccessBell() {
-    // Clean, magical success bell for high accuracy
     this.playSynth(1500, 'sine', 0.25, 0.3, true, 1800);
+  }
+
+  static playCompletion() {
+    // Short, clean completion cue
+    this.playSynth(660, 'sine', 0.15, 0.2, true, 880);
+  }
+
+  static playThud() {
+    // Precise thud for target icon pulse
+    this.playSynth(220, 'triangle', 0.15, 0.3);
+  }
+
+  static playZap() {
+    // Digital zap for speed reveal
+    this.playSynth(2000, 'square', 0.1, 0.1, true, 1000);
   }
 }

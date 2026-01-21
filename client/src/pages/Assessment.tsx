@@ -52,8 +52,15 @@ export default function Assessment() {
   const [_, setLocation] = useLocation();
   const completeAssessment = useStore(s => s.completeAssessment);
   const settings = useStore(s => s.settings);
+  const revealRun = React.useRef(false);
+
+  // Pre-initialize audio context on mount
+  useEffect(() => {
+    AudioManager.init();
+  }, []);
 
   const handleComplete = (stats: SessionStats) => {
+    console.log(`[SESSION_FLOW] Assessment complete: ${Date.now()}`, stats);
     setResults(stats);
     setStep('results');
     
@@ -67,15 +74,27 @@ export default function Assessment() {
   };
 
   useEffect(() => {
-    if (step === 'results' && results && settings.soundOn) {
-      // Start XP tally sound
-      AudioManager.playEnergyRise(0.9);
+    if (step === 'results') {
+      console.log(`[SESSION_FLOW] Results step entered: ${Date.now()}`);
+    }
+  }, [step]);
+
+  useEffect(() => {
+    if (step === 'results' && results && !revealRun.current) {
+      revealRun.current = true;
+      console.log(`[SESSION_FLOW] Reveal sequence started: ${Date.now()}`);
       
-      // Delay for accuracy bell if high enough
-      if (results.accuracy >= 0.95) {
+      if (settings.soundOn) {
+        AudioManager.playCompletion();
+        setTimeout(() => AudioManager.playEnergyRise(0.8), 200);
+        
+        // Accuracy reveal overlap
         setTimeout(() => {
-          AudioManager.playSuccessBell();
-        }, 1200);
+          AudioManager.playThud();
+          if (results.accuracy >= 0.95) {
+            setTimeout(() => AudioManager.playSuccessBell(), 600);
+          }
+        }, 900);
       }
     }
   }, [step, results, settings.soundOn]);

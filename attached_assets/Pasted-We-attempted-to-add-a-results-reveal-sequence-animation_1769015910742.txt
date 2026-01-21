@@ -1,0 +1,138 @@
+We attempted to add a results reveal sequence (animations + sound) after completing the 3-minute test/training, but it did NOT show. Instead, after completion it jumped straight back to the starting page with normal stats and NO animation/sound. I need a full diagnostic and fix.
+
+DO NOT add new features until you have identified the exact root cause and proven the results reveal screen lifecycle is correct.
+
+GOAL:
+After finishing a session, the app must reliably show a results reveal sequence with sound + animation every time.
+
+------------------------------------------------------------
+PART A — DIAGNOSE WHY THE REVEAL DID NOT RUN (MANDATORY)
+------------------------------------------------------------
+
+1) Identify the actual navigation flow after session completion.
+- Locate the code path that runs when the timer hits 0 (or session ends).
+- Document the intended target screen (e.g., SessionSummary, ResultsModal, Train screen).
+- Identify whether navigation is:
+  a) navigating to a results screen then immediately navigating away
+  b) never navigating to results screen at all
+  c) rendering results inside the same Train screen
+  d) unmounting the results screen before animation runs
+
+2) Add explicit logging at each critical step (no silent behavior).
+Add console logs WITH TIMESTAMPS at:
+- session start
+- each answer submission (optional)
+- session end triggered (timer reached 0 or manual stop)
+- stats computed (show computed xp, accuracy, speed)
+- stats persisted (firestore/local)
+- navigation call to results screen (log destination route)
+- results screen mount (log once on mount)
+- reveal sequence start (log)
+- reveal sequence end (log)
+- any navigation away from results screen (log route + reason)
+
+IMPORTANT:
+If logs show results screen is never mounted, fix routing first.
+If results screen mounts but immediately unmounts, identify what triggers the second navigation and remove it.
+
+3) Confirm the results screen receives REAL stats values (not default zeros).
+- Log the props/state used to display XP/accuracy/speed at mount.
+- If values are 0 on first render then update later, ensure the reveal sequence waits for final values before running.
+
+4) Ensure reveal sequence does not get blocked by:
+- component remount resetting state
+- conditional rendering (e.g. “if (!session) return null;”)
+- animation starting before layout exists
+- sound toggle forced off
+- web audio restrictions (confirm tested on iPhone)
+
+At the end of Part A, you MUST produce a short “Root Cause Report”:
+- what exactly prevented the reveal from running
+- which file(s) were responsible
+- what change fixes it
+
+Do not proceed until you have fixed navigation/lifecycle so the results screen reliably shows.
+
+------------------------------------------------------------
+PART B — IMPLEMENT A FAST STAGED RESULTS REVEAL (ONLY AFTER PART A FIX)
+------------------------------------------------------------
+
+Desired UX:
+Once session ends and results screen is visible:
+
+Sequence total duration: ~1.0–1.4 seconds (fast; do not bore the user)
+
+Step 0: Completion cue
+- Immediately upon results screen mount (and only once), play a short “completion” sound (≤200ms), clean and modern.
+
+Step 1: XP reveal (first)
+- XP starts at 0 and rapidly counts up to final XP (600–800ms)
+- XP card/row pops in slightly larger then settles (scale 1.0 → 1.06 → 1.0, subtle)
+- Use a short “energy tally” sound while counting that stops exactly when count ends.
+- Ensure no latency: sounds must be preloaded.
+
+Step 2: Accuracy reveal (second)
+- After XP completes (or slightly overlapping by 100ms max), reveal Accuracy:
+  - Accuracy number counts up from 0% to final %
+  - Accuracy target icon pulses once (scale 1.0 → 1.08 → 1.0)
+  - Play a short “thud” sound timed to icon pulse (like an arrow hitting a target), ≤180ms
+  - If accuracy ≥ 95%:
+    - accuracy number turns the same green as the accuracy icon
+    - becomes slightly emboldened
+    - play a short bell/chime (≤250ms) AFTER the count finishes (no jingle)
+
+Step 3: Speed reveal (third)
+- After Accuracy completes, reveal Speed:
+  - speed number counts up from 0.0s to final (or counts down from a higher value to final—choose whichever feels more “fast” but keep it consistent)
+  - speed icon shakes subtly once (tiny horizontal shake)
+  - Play a short “electric buzz” or “digital zap” sound ≤150ms, not harsh, not cartoon
+
+IMPORTANT VISUAL RULES:
+- No confetti, no fireworks.
+- Minimalist, data-driven gratification.
+- No overlapping long sounds. Every sound must be DONE before the next stat is fully revealed.
+
+IMPLEMENTATION REQUIREMENTS:
+- Use a single “revealSequence” state machine:
+  - phase = "start" | "xp" | "accuracy" | "speed" | "done"
+- Trigger it once:
+  - guard with a ref like didRun.current to prevent reruns on re-renders
+- Preload sounds ONCE (on app start or screen mount) and reuse Audio.Sound instances.
+- Do not create new sound objects per event.
+- Ensure that when navigating away and back, the reveal does not run unintentionally.
+
+------------------------------------------------------------
+PART C — ACCEPTANCE TESTS (MUST PASS)
+------------------------------------------------------------
+
+1) Run a 3-minute session:
+- Verify you land on results screen and do NOT bounce back to start page.
+- Verify reveal sequence happens every time.
+
+2) Stress test:
+- Run 3 sessions back-to-back quickly.
+- No missing sounds, no overlaps, no delayed sounds playing into next screen.
+
+3) If sound is OFF:
+- Reveal animations still play, silently.
+
+4) Log evidence:
+- Provide sample console logs showing:
+  - end trigger
+  - route navigation
+  - results mount
+  - reveal start/end
+
+Do all this before making any other UX changes.
+Why this diagnostic prompt will work
+It forces Replit to stop “assuming it’s wired” and instead:
+
+map the actual navigation flow
+
+prove the results screen mounts
+
+prove stats arrive before the animation runs
+
+implement a state-machine reveal (prevents silent failures)
+
+preload sounds and stop overlap
