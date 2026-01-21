@@ -27,9 +27,9 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-32 h-32 flex items-center justify-center"
+        className="w-48 h-48 flex items-center justify-center"
       >
-        <img src={logo} alt="Numerate Logo" className="w-full h-full object-contain drop-shadow-2xl shadow-primary/10" />
+        <img src={logo} alt="Numerate Logo" className="w-full h-full object-contain mix-blend-multiply drop-shadow-2xl" />
       </motion.div>
     </div>
   );

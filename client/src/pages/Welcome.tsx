@@ -38,9 +38,9 @@ export default function Welcome() {
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="w-24 h-24 flex items-center justify-center"
+            className="w-36 h-36 flex items-center justify-center"
         >
-            <img src={logo} alt="Numerate Logo" className="w-full h-full object-contain drop-shadow-2xl shadow-primary/10" />
+            <img src={logo} alt="Numerate Logo" className="w-full h-full object-contain mix-blend-multiply drop-shadow-2xl" />
         </motion.div>
 
         <div className="space-y-4 max-w-[280px]">
