@@ -13,10 +13,16 @@ export default function Welcome() {
   const [_, setLocation] = useLocation();
   const login = useStore(s => s.login);
   const isAuthenticated = useStore(s => s.isAuthenticated);
+  const uid = useStore(s => s.uid);
+  const loadFromBackend = useStore(s => s.loadFromBackend);
 
   useEffect(() => {
     AudioManager.init();
-  }, []);
+    
+    if (isAuthenticated && uid) {
+      loadFromBackend();
+    }
+  }, [isAuthenticated, uid, loadFromBackend]);
 
   const handleStart = () => {
     if (!isAuthenticated) {

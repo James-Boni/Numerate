@@ -9,6 +9,7 @@ import {
   updateAntiWhiplash,
   getBandFromLevel
 } from './logic/difficulty';
+import { api } from './api';
 
 // --- Types ---
 
@@ -63,6 +64,10 @@ export interface UserState {
   settings: UserSettings;
   sessions: SessionStats[];
   
+  // Sync state
+  isSyncing: boolean;
+  lastSyncError: string | null;
+  
   // Actions
   login: (email: string) => void;
   logout: () => void;
@@ -74,6 +79,10 @@ export interface UserState {
   // Progression Actions
   recordAnswer: (correct: boolean, timeMs: number, templateId: string, currentTargetTimeMs: number) => void;
   toggleDebugOverlay: () => void;
+  
+  // Sync Actions
+  syncWithBackend: () => Promise<void>;
+  loadFromBackend: () => Promise<void>;
 }
 
 // --- Store ---
@@ -104,12 +113,44 @@ export const useStore = create<UserState>()(
       
       sessions: [],
       
-      login: (email) => set({ 
-        isAuthenticated: true, 
-        email, 
-        uid: 'mock-uid-' + Date.now(),
-        createdAt: new Date().toISOString()
-      }),
+      isSyncing: false,
+      lastSyncError: null,
+      
+      login: async (email) => {
+        try {
+          const { user, progress } = await api.createUser();
+          
+          set({ 
+            isAuthenticated: true, 
+            email, 
+            uid: user.id,
+            createdAt: user.createdAt.toString(),
+            hasCompletedAssessment: progress.hasCompletedAssessment,
+            level: progress.level,
+            lifetimeXP: progress.lifetimeXP,
+            streakCount: progress.streakCount,
+            lastStreakDate: progress.lastStreakDate?.toString() || null,
+            progression: {
+              level: progress.level,
+              band: progress.band,
+              srGlobal: progress.srGlobal,
+              difficultyStep: progress.difficultyStep,
+              goodStreak: progress.goodStreak,
+              poorStreak: progress.poorStreak,
+              history: progress.history as any[]
+            },
+            settings: {
+              soundOn: progress.soundOn,
+              hapticsOn: progress.hapticsOn,
+              difficultyPreference: progress.difficultyPreference as 'easier' | 'balanced' | 'harder',
+              showDebugOverlay: progress.showDebugOverlay
+            }
+          });
+        } catch (error) {
+          console.error('Login error:', error);
+          set({ lastSyncError: 'Failed to login' });
+        }
+      },
       
       logout: () => set({ isAuthenticated: false, email: null, uid: null }),
       
@@ -118,7 +159,9 @@ export const useStore = create<UserState>()(
         currentTier: tier,
       }),
       
-      saveSession: (session) => set((state) => {
+      saveSession: async (session) => {
+        const state = get();
+        
         // Calculate new streak
         const today = new Date().toISOString().split('T')[0];
         const lastStreak = state.lastStreakDate ? state.lastStreakDate.split('T')[0] : null;
@@ -132,23 +175,21 @@ export const useStore = create<UserState>()(
            if (lastStreak === yesterday) {
              newStreak += 1;
            } else if (lastStreak !== today) {
-             newStreak = 1; // Reset or start
+             newStreak = 1;
            }
            newLastStreakDate = new Date().toISOString();
         }
 
         const newLifetimeXP = state.lifetimeXP + session.xpEarned;
         
-        // Progression level logic: allow multi-level ups
         let newLevel = state.level;
         while (newLifetimeXP >= getRequiredXPForLevel(newLevel + 1)) {
           newLevel++;
         }
         
-        // Update Band based on Level
         const newBand = getBandFromLevel(newLevel);
 
-        return {
+        set({
           sessions: [session, ...state.sessions],
           lifetimeXP: newLifetimeXP,
           level: newLevel,
@@ -159,8 +200,34 @@ export const useStore = create<UserState>()(
             level: newLevel,
             band: newBand
           }
-        };
-      }),
+        });
+        
+        if (state.uid) {
+          try {
+            await api.createSession(state.uid, {
+              durationMode: session.durationMode === 'unlimited' ? 9999 : session.durationMode,
+              durationSecondsActual: session.durationSecondsActual,
+              totalQuestions: session.totalQuestions,
+              correctQuestions: session.correctQuestions,
+              accuracy: session.accuracy,
+              xpEarned: session.xpEarned,
+              bestStreak: session.bestStreak,
+              avgResponseTimeMs: session.avgResponseTimeMs,
+              medianMs: session.medianMs ?? null,
+              variabilityMs: session.variabilityMs ?? null,
+              throughputQps: session.throughputQps ?? null,
+              fluencyScore: session.fluencyScore ?? null,
+              metBonus: session.metBonus ?? null,
+              valid: session.valid ?? true
+            });
+            
+            await get().syncWithBackend();
+          } catch (error) {
+            console.error('Failed to save session to backend:', error);
+            set({ lastSyncError: 'Failed to save session' });
+          }
+        }
+      },
       
       updateSettings: (newSettings) => set((state) => ({
         settings: { ...state.settings, ...newSettings }
@@ -216,7 +283,99 @@ export const useStore = create<UserState>()(
       
       toggleDebugOverlay: () => set(state => ({
         settings: { ...state.settings, showDebugOverlay: !state.settings.showDebugOverlay }
-      }))
+      })),
+      
+      syncWithBackend: async () => {
+        const state = get();
+        if (!state.uid) return;
+        
+        try {
+          set({ isSyncing: true, lastSyncError: null });
+          
+          await api.updateProgress(state.uid, {
+            userId: state.uid,
+            hasCompletedAssessment: state.hasCompletedAssessment,
+            level: state.level,
+            lifetimeXP: state.lifetimeXP,
+            streakCount: state.streakCount,
+            lastStreakDate: state.lastStreakDate ? new Date(state.lastStreakDate) : null,
+            band: state.progression.band,
+            srGlobal: state.progression.srGlobal,
+            difficultyStep: state.progression.difficultyStep,
+            goodStreak: state.progression.goodStreak,
+            poorStreak: state.progression.poorStreak,
+            history: state.progression.history as any,
+            soundOn: state.settings.soundOn,
+            hapticsOn: state.settings.hapticsOn,
+            difficultyPreference: state.settings.difficultyPreference,
+            showDebugOverlay: state.settings.showDebugOverlay
+          });
+          
+          set({ isSyncing: false });
+        } catch (error) {
+          console.error('Sync error:', error);
+          set({ isSyncing: false, lastSyncError: 'Failed to sync with backend' });
+        }
+      },
+      
+      loadFromBackend: async () => {
+        const state = get();
+        if (!state.uid) return;
+        
+        try {
+          set({ isSyncing: true, lastSyncError: null });
+          
+          const [progress, sessions] = await Promise.all([
+            api.getProgress(state.uid),
+            api.getSessions(state.uid)
+          ]);
+          
+          set({
+            hasCompletedAssessment: progress.hasCompletedAssessment,
+            level: progress.level,
+            lifetimeXP: progress.lifetimeXP,
+            streakCount: progress.streakCount,
+            lastStreakDate: progress.lastStreakDate?.toString() || null,
+            progression: {
+              level: progress.level,
+              band: progress.band,
+              srGlobal: progress.srGlobal,
+              difficultyStep: progress.difficultyStep,
+              goodStreak: progress.goodStreak,
+              poorStreak: progress.poorStreak,
+              history: progress.history as any[]
+            },
+            settings: {
+              soundOn: progress.soundOn,
+              hapticsOn: progress.hapticsOn,
+              difficultyPreference: progress.difficultyPreference as 'easier' | 'balanced' | 'harder',
+              showDebugOverlay: progress.showDebugOverlay
+            },
+            sessions: sessions.map(s => ({
+              id: s.id,
+              date: s.date.toString(),
+              durationMode: s.durationMode === 9999 ? 'unlimited' as const : s.durationMode as 60 | 120 | 180,
+              durationSecondsActual: s.durationSecondsActual,
+              totalQuestions: s.totalQuestions,
+              correctQuestions: s.correctQuestions,
+              accuracy: s.accuracy,
+              xpEarned: s.xpEarned,
+              bestStreak: s.bestStreak,
+              avgResponseTimeMs: s.avgResponseTimeMs,
+              medianMs: s.medianMs ?? undefined,
+              variabilityMs: s.variabilityMs ?? undefined,
+              throughputQps: s.throughputQps ?? undefined,
+              fluencyScore: s.fluencyScore ?? undefined,
+              metBonus: s.metBonus ?? undefined,
+              valid: s.valid
+            })),
+            isSyncing: false
+          });
+        } catch (error) {
+          console.error('Load error:', error);
+          set({ isSyncing: false, lastSyncError: 'Failed to load from backend' });
+        }
+      }
     }),
     {
       name: 'maths-trainer-storage',
