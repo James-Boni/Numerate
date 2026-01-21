@@ -13,26 +13,26 @@ export default function Train() {
   const [_, setLocation] = useLocation();
 
   return (
-    <MobileLayout className="bg-slate-50">
+    <MobileLayout className="bg-white">
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <div className="px-6 pt-12 pb-6 space-y-6">
           <div className="flex justify-between items-start">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-200">
+              <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-primary/10">
                 {level}
               </div>
               <div>
-                <h2 className="font-bold text-lg">Daily Training</h2>
+                <h2 className="font-bold text-lg text-slate-900">Daily Training</h2>
                 <div className="flex items-center gap-2 text-slate-400 text-sm">
-                  <Zap size={14} className="text-amber-500 fill-amber-500" />
+                  <Zap size={14} className="text-primary fill-primary" />
                   <span>{lifetimeXP} XP Total</span>
                 </div>
               </div>
             </div>
             
-            <div className="flex items-center gap-1 bg-white px-3 py-2 rounded-xl border border-slate-100 shadow-sm">
-              <Flame size={18} className="text-orange-500 fill-orange-500" />
+            <div className="flex items-center gap-1 bg-slate-50 px-3 py-2 rounded-2xl border border-slate-100">
+              <Flame size={18} className="text-primary fill-primary" />
               <span className="font-bold text-slate-700">{streakCount}</span>
             </div>
           </div>
@@ -40,25 +40,21 @@ export default function Train() {
 
         {/* Hero Card */}
         <div className="px-6 pb-8">
-          <Card className="p-6 bg-gradient-to-br from-slate-900 to-slate-800 border-none shadow-xl shadow-slate-200 overflow-hidden relative group">
-            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-                <DumbbellIcon size={120} className="text-white" />
-            </div>
-            
+          <Card className="p-6 bg-slate-50 border-none shadow-none rounded-3xl overflow-hidden relative group">
             <div className="relative z-10 space-y-6">
               <div className="space-y-1">
-                <h3 className="text-white font-bold text-2xl">Daily Focus</h3>
-                <p className="text-slate-400 text-sm">Mixed arithmetic adaptation.</p>
+                <h3 className="text-slate-900 font-bold text-2xl">Daily Focus</h3>
+                <p className="text-slate-500 text-sm">Mixed arithmetic adaptation.</p>
               </div>
 
               <div className="flex gap-2">
-                <span className="bg-white/10 text-white/80 px-3 py-1 rounded-full text-xs font-medium">3 Minutes</span>
-                <span className="bg-white/10 text-white/80 px-3 py-1 rounded-full text-xs font-medium">Mixed Ops</span>
+                <span className="bg-white text-slate-600 px-3 py-1 rounded-full text-xs font-medium border border-slate-100">3 Minutes</span>
+                <span className="bg-white text-slate-600 px-3 py-1 rounded-full text-xs font-medium border border-slate-100">Mixed Ops</span>
               </div>
 
               <Button 
                 onClick={() => setLocation('/game')}
-                className="w-full h-12 bg-white text-slate-900 hover:bg-slate-100 font-bold rounded-xl flex items-center justify-center gap-2"
+                className="w-full h-12 bg-primary text-white hover:opacity-90 font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-primary/10"
               >
                 <Play size={18} fill="currentColor" />
                 Start Training

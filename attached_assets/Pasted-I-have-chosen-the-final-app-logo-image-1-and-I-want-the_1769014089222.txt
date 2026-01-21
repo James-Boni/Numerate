@@ -1,0 +1,54 @@
+I have chosen the final app logo (image 1) and I want the UI/UX to be made visually and emotionally consistent with it. This is an aesthetic refinement pass, not a feature expansion.
+
+1) Treat the logo as the single source of visual truth
+The logo defines:
+- Colour palette
+- Visual tone
+- Corner radius / softness
+- Overall aesthetic (clean, calm, confident, adult)
+
+All UI elements should feel like they belong to the same visual system as the logo.
+
+2) Colour system (IMPORTANT)
+- Limit the UI to the logo’s colours + white + neutral greys.
+- Do NOT introduce extra accent colours.
+- Green/blue tones from the logo should be used consistently for:
+  - correct feedback
+  - progress indicators
+  - primary actions
+- Red should be muted and used sparingly for errors only.
+
+3) Typography & spacing
+- Use a clean, modern sans-serif font.
+- Prioritise readability and calmness over playfulness.
+- Generous spacing, no clutter.
+- Large, clear question text during gameplay.
+
+4) Shapes & surfaces
+- Buttons, cards, and containers should echo the logo’s softness (rounded corners, not sharp).
+- Avoid heavy shadows or “material” depth.
+- Keep surfaces flat and modern.
+
+5) Animation & motion philosophy
+- Animations should be subtle, fast, and purposeful.
+- No bouncy, elastic, or playful motion.
+- Micro-interactions only (e.g. small scale, fade, or colour transitions).
+- Motion should reinforce clarity, not draw attention to itself.
+
+6) Add a launch / loading screen
+Add a simple loading screen:
+- White background
+- Logo centred
+- Very subtle fade-in or scale-in (200–300ms)
+- No spinner unless loading actually takes time
+- Transition smoothly into the app once ready
+
+This screen should communicate “quality and calm”, not excitement.
+
+7) Consistency check
+Ensure:
+- Gameplay, assessment, progress, and settings all share the same visual language.
+- No screen feels like it came from a different app.
+- Feedback colours, sounds, and animations align with the logo’s tone.
+
+Do NOT redesign flows or add features. This is a visual and experiential alignment pass only.

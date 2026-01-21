@@ -16,31 +16,32 @@
   --color-popover: hsl(0 0% 100%);
   --color-popover-foreground: hsl(222 47% 11%);
   
-  --color-primary: hsl(221 83% 53%);
-  --color-primary-foreground: hsl(210 40% 98%);
+  /* Primary Green/Blue from Logo */
+  --color-primary: hsl(174 65% 41%);
+  --color-primary-foreground: hsl(0 0% 100%);
   
-  --color-secondary: hsl(210 40% 96.1%);
-  --color-secondary-foreground: hsl(222 47% 11.2%);
+  --color-secondary: hsl(174 20% 96%);
+  --color-secondary-foreground: hsl(174 65% 20%);
   
-  --color-muted: hsl(210 40% 96.1%);
-  --color-muted-foreground: hsl(215.4 16.3% 46.9%);
+  --color-muted: hsl(210 20% 96%);
+  --color-muted-foreground: hsl(215 16% 47%);
   
-  --color-accent: hsl(210 40% 96.1%);
-  --color-accent-foreground: hsl(222.2 47.4% 11.2%);
+  --color-accent: hsl(174 65% 95%);
+  --color-accent-foreground: hsl(174 65% 30%);
   
-  --color-destructive: hsl(0 84.2% 60.2%);
-  --color-destructive-foreground: hsl(210 40% 98%);
+  --color-destructive: hsl(0 60% 50%);
+  --color-destructive-foreground: hsl(0 0% 100%);
 
-  --color-success: hsl(142 76% 36%);
-  --color-success-foreground: hsl(356 100% 100%);
+  --color-success: hsl(174 65% 41%);
+  --color-success-foreground: hsl(0 0% 100%);
   
-  --color-border: hsl(214.3 31.8% 91.4%);
-  --color-input: hsl(214.3 31.8% 91.4%);
-  --color-ring: hsl(221.2 83.2% 53.3%);
+  --color-border: hsl(210 20% 90%);
+  --color-input: hsl(210 20% 90%);
+  --color-ring: hsl(174 65% 41%);
   
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
+  --radius-sm: 0.75rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.5rem;
 }
 
 @layer base {
@@ -48,14 +49,12 @@
     @apply border-border;
   }
   body {
-    @apply font-sans antialiased bg-zinc-100 text-foreground overflow-hidden selection:bg-primary/20;
-    /* iOS Momentum Scrolling */
+    @apply font-sans antialiased bg-white text-foreground overflow-hidden selection:bg-primary/20;
     -webkit-overflow-scrolling: touch;
   }
   
-  /* Mobile-first constraints */
   #root {
-    @apply h-[100dvh] w-full flex justify-center bg-zinc-100;
+    @apply h-[100dvh] w-full flex justify-center bg-white;
   }
 }
 
@@ -68,17 +67,14 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Hide scrollbar for Chrome, Safari and Opera */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
-  /* Hide scrollbar for IE, Edge and Firefox */
   .no-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 
-  /* Safe Area Utilities for Mobile */
   .safe-top {
     padding-top: env(safe-area-inset-top);
   }
@@ -87,23 +83,11 @@
   }
 }
 
-/* Custom animations */
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  75% { transform: translateX(4px); }
+@keyframes fade-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
 }
 
-.animate-shake {
-  animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
-}
-
-@keyframes scale-pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-
-.animate-scale-pulse {
-  animation: scale-pulse 0.2s ease-in-out;
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
 }

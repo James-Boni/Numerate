@@ -33,10 +33,10 @@ export default function Welcome() {
     <MobileLayout className="bg-white">
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-8">
         <motion.div 
-            initial={{ scale: 0.8, opacity: 0 }}
+            initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="w-24 h-24 bg-primary rounded-[2rem] flex items-center justify-center shadow-xl shadow-primary/20"
+            className="w-24 h-24 bg-primary rounded-[2rem] flex items-center justify-center shadow-2xl shadow-primary/10"
         >
             <span className="text-4xl text-white font-bold">∑</span>
         </motion.div>
@@ -53,7 +53,7 @@ export default function Welcome() {
         <div className="w-full max-w-xs pt-8">
             <button 
                 onClick={handleStart}
-                className="w-full h-14 bg-slate-900 text-white rounded-xl font-semibold text-lg hover:scale-95 active:scale-90 transition-transform shadow-lg shadow-slate-900/10 flex items-center justify-center gap-2"
+                className="w-full h-14 bg-primary text-white rounded-2xl font-semibold text-lg hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-primary/10 flex items-center justify-center gap-2"
             >
                 Get Started
                 <ArrowRight size={20} />

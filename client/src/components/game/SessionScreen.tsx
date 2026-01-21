@@ -146,13 +146,13 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   };
 
   return (
-    <MobileLayout className="bg-zinc-50 overflow-hidden">
+    <MobileLayout className="bg-white overflow-hidden">
       {/* Background Flash Layer - Entire area except keypad */}
       <div 
         className={clsx(
-          "absolute inset-x-0 top-0 bottom-[320px] z-0 transition-colors duration-100",
-          flash === 'correct' ? "bg-emerald-500/20" : 
-          flash === 'wrong' ? "bg-rose-500/20" : 
+          "absolute inset-x-0 top-0 bottom-[320px] z-0 transition-colors duration-150",
+          flash === 'correct' ? "bg-primary/5" : 
+          flash === 'wrong' ? "bg-destructive/5" : 
           "bg-transparent"
         )}
       />
@@ -203,14 +203,14 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
                       
                       <div className={clsx(
                         "h-24 flex items-center justify-center text-7xl font-mono font-medium transition-all",
-                        feedback === 'correct' ? "text-emerald-500" :
-                        feedback === 'wrong' ? "text-rose-500" :
-                        "text-foreground"
+                        feedback === 'correct' ? "text-primary" :
+                        feedback === 'wrong' ? "text-destructive" :
+                        "text-slate-900"
                       )}>
                           {feedback === 'wrong' ? (
-                              <span className="text-rose-400 text-3xl font-sans font-bold">Ans: {question.answer}</span>
+                              <span className="text-destructive/60 text-3xl font-sans font-bold">Ans: {question.answer}</span>
                           ) : (
-                              input || <span className="opacity-10 font-sans text-5xl">?</span>
+                              input || <span className="text-slate-200 font-sans text-5xl">?</span>
                           )}
                       </div>
                   </motion.div>
