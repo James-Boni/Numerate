@@ -25,13 +25,13 @@ export const computeFluencyComponents = (
   const accuracy = total > 0 ? correct / total : 0;
   
   const medianMs = computeMedian(responseTimes);
-  const speedScore = medianMs > 0 ? clamp(CFG.targetTimeMs / medianMs, 0, 1) : 0;
+  const speedScore = medianMs > 0 ? clamp(CFG.TARGET_TIME_MS / medianMs, 0, 1) : 0;
   
   const variabilityMs = computeMAD(responseTimes);
-  const consistencyScore = clamp(1 - (variabilityMs / CFG.referenceVarMs), 0, 1);
+  const consistencyScore = clamp(1 - (variabilityMs / CFG.REFERENCE_VARIABILITY_MS), 0, 1);
   
   const qps = total / durationSeconds;
-  const throughputScore = clamp(qps / CFG.targetQps, 0, 1);
+  const throughputScore = clamp(qps / CFG.TARGET_QPS, 0, 1);
   
   return { accuracy, speedScore, consistencyScore, throughputScore, medianMs, variabilityMs, qps };
 };
@@ -40,15 +40,15 @@ export const computeFluencyScore = (components: ReturnType<typeof computeFluency
   const { accuracy, speedScore, consistencyScore, throughputScore } = components;
   
   let score = 100 * (
-    accuracy * CFG.weights.accuracy +
-    speedScore * CFG.weights.speed +
-    throughputScore * CFG.weights.throughput +
-    consistencyScore * CFG.weights.consistency
+    accuracy * CFG.WEIGHTS.ACCURACY +
+    speedScore * CFG.WEIGHTS.SPEED +
+    throughputScore * CFG.WEIGHTS.THROUGHPUT +
+    consistencyScore * CFG.WEIGHTS.CONSISTENCY
   );
   
   // Accuracy floor safeguard
-  if (accuracy < 0.55) {
-    score = Math.min(score, 45);
+  if (accuracy < CFG.ACCURACY_FLOOR) {
+    score = Math.min(score, CFG.FLUENCY_CAP_BELOW_ACCURACY_FLOOR);
   }
   
   return Math.round(score);
@@ -60,24 +60,24 @@ export const computeSessionXP = (
   components: ReturnType<typeof computeFluencyComponents>,
   isValid: boolean
 ) => {
-  if (!isValid && totalQuestions === 0) return CFG.baseXP;
+  if (!isValid && totalQuestions === 0) return CFG.BASE_XP;
   
-  const effortScore = clamp(totalQuestions / CFG.effortTargetQuestions, 0, 1);
+  const effortScore = clamp(totalQuestions / CFG.EFFORT_TARGET_QUESTIONS, 0, 1);
   
-  const performanceXP = Math.round(CFG.maxPerformanceXP * (fluencyScore / 100));
-  const effortXP = Math.round(CFG.maxEffortXP * effortScore);
+  const performanceXP = Math.round(CFG.MAX_PERFORMANCE_XP * (fluencyScore / 100));
+  const effortXP = Math.round(CFG.MAX_EFFORT_XP * effortScore);
   
-  let totalXP = CFG.baseXP + performanceXP + effortXP;
+  let totalXP = CFG.BASE_XP + performanceXP + effortXP;
   
   // Excellence Bonus
   const { accuracy, medianMs, consistencyScore, throughputScore } = components;
-  const metBonus = accuracy >= CFG.bonusThresholds.accuracy &&
-                   medianMs <= CFG.bonusThresholds.medianMs &&
-                   consistencyScore >= CFG.bonusThresholds.consistency &&
-                   throughputScore >= CFG.bonusThresholds.throughput;
+  const metBonus = accuracy >= CFG.BONUS_THRESHOLDS.ACCURACY &&
+                   medianMs <= (CFG.TARGET_TIME_MS * (1 / CFG.BONUS_THRESHOLDS.SPEED_SCORE)) && // Derived from speed score threshold
+                   consistencyScore >= CFG.BONUS_THRESHOLDS.CONSISTENCY &&
+                   throughputScore >= CFG.BONUS_THRESHOLDS.THROUGHPUT;
                    
   if (metBonus) {
-    const multiplier = accuracy >= 0.95 ? CFG.eliteBonusMultiplier : CFG.bonusMultiplier;
+    const multiplier = accuracy >= 0.95 ? CFG.ELITE_BONUS_MULTIPLIER : CFG.BONUS_MULTIPLIER;
     totalXP = Math.round(totalXP * multiplier);
   }
   
