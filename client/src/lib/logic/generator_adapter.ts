@@ -7,10 +7,10 @@ const getAllFamiliesForBand = (band: number): TemplateFamily[] => {
     return [ADD_FAMILIES.ADD_1D_1D];
   }
   if (band === 1) {
-    return [ADD_FAMILIES.ADD_2D_1D, SUB_FAMILIES.SUB_1D_1D];
+    return [ADD_FAMILIES.ADD_1D_1D, SUB_FAMILIES.SUB_1D_1D];
   }
   if (band >= 2) {
-    return [ADD_FAMILIES.ADD_2D_2D, SUB_FAMILIES.SUB_2D_1D];
+    return [ADD_FAMILIES.ADD_2D_2D, SUB_FAMILIES.SUB_1D_1D];
   }
   return [ADD_FAMILIES.ADD_1D_1D];
 };
