@@ -1,0 +1,206 @@
+PART 3/6 — Curriculum bands + plateaus + non-trivial filter (fix “too easy too long”)
+Goal
+
+Make the type of questions change by level band, and ensure trivial questions are filtered out beyond onboarding.
+
+Implement level bands (width 10)
+
+band = floor((level-1)/10).
+
+Use this baseline curriculum (1–100 pacing reference):
+
+Band 0 (1–10): non-trivial 1-digit add/sub
+
+Band 1 (11–20): 2-digit add/sub (carry/borrow ramps)
+
+Band 2 (21–30): 3-digit add/sub common
+
+Band 3 (31–40): introduce 3-digit × 1-digit meaningfully
+
+Band 4 (41–50): introduce 4-digit ÷ 2-digit
+
+Band 5 (51–60): 4-digit + 4-digit common
+
+Band 6 (61–70): 4-digit − 4-digit common
+
+Band 7 (71–80): 2–3 digit × 2-digit common
+
+Band 8 (81–90): 5-digit ÷ 2-digit common
+
+Band 9 (91–100): introduce 2-term expressions at low frequency
+
+Plateau rule: Within a band, keep the same template family dominant; use difficultyStep to ramp within that family (ranges/awkwardness/carry/borrow/time).
+
+Implement a strict “non-trivial” filter (after onboarding)
+
+Once band >= 1 (or after first N questions), reject generation of questions that are obviously trivial for that band. Examples to filter aggressively:
+
+tiny operands (e.g. both <= 3) for addition/subtraction
+
+repeated toy patterns like 10+7, 9-3, 6÷3
+
+division that collapses to memorized tiny facts repeatedly
+Scale the filter stricter as band increases.
+
+Controlled variance (simple version for now)
+
+Per 20 questions:
+
+mostly target band family
+
+allow limited relief/hard tails based on recent performance
+
+never >2 “relief” questions in a row
+
+confidence check ~1 in 10 (still non-trivial)
+
+Acceptance checks
+
+At higher bands, the generator no longer produces 1+2 type questions.
+
+Questions reflect the band’s allowed structure.
+
+Debug overlay shows band and chosen family.
+
+PART 4/6 — Template families + Difficulty Points (make plateaus real)
+Goal
+
+Formalize generation as template families with 5 variants (0..4) so plateaus are consistent and controllable.
+
+Implement template families (minimum set)
+
+Addition:
+
+ADD_1D_1D, ADD_2D_2D, ADD_3D_3D, ADD_4D_4D, ADD_ND_ND
+Subtraction:
+
+SUB_1D_1D, SUB_2D_1D, SUB_2D_2D, SUB_3D_3D, SUB_4D_4D, SUB_ND_ND
+Multiplication:
+
+MUL_1D_1D (brief), MUL_3D_1D, MUL_2D_2D, MUL_3D_2D, MUL_ND_MD
+Division:
+
+DIV_2D_BY_1D, DIV_4D_BY_2D, DIV_5D_BY_2D, DIV_ND_BY_MD
+Expressions:
+
+EXPR_TWO_TERM (start in band 9), optional EXPR_THREE_TERM later
+
+Each family has variants 0..4 controlling:
+
+operand ranges/digits
+
+carry/borrow probability
+
+awkwardness
+
+targetTimeMs
+
+Difficulty Points (DP)
+
+Compute DP for mixing/balancing:
+
+base by operation: add 1, sub 2, mul 3, div 4
+
++1 per extra digit beyond 1-digit per operand
+
++1 carry/borrow
+
++1 multi-digit multiplier/divisor
+
++2 multi-step expressions
+
++1–2 awkwardness
+
+Use DP to keep most questions near target and prevent long easy streaks.
+
+Acceptance checks
+
+TemplateId exists and is used.
+
+difficultyStep selects variantIndex in the chosen family.
+
+DP is logged and roughly tracks perceived difficulty.
+
+PART 5/6 — Division answer validation (exact + strict repeating-decimal rule)
+Goal
+
+Implement strict division answer acceptance exactly as specified.
+
+Canonical representation
+
+Store the exact result as reduced fraction p/q (integers, gcd reduced).
+
+Determine terminating vs repeating
+
+A reduced fraction p/q terminates iff q has no prime factors except 2 and 5.
+
+Acceptance rules
+
+Division answers must accept:
+
+integers exactly
+
+terminating decimals exactly (allow trailing zeros)
+
+repeating/non-terminating decimals: accept rounded to exactly 2 decimal places
+
+must have exactly 2 digits after decimal
+
+must be correctly rounded
+
+example: 10/3 => accept 3.33, reject 3.3, reject 3.333
+
+Generation constraint
+Division question generator must create A ÷ B such that validation is possible under these rules, and should avoid overusing trivial divisors at higher bands.
+
+Required tests
+
+10/3 accepts “3.33”
+
+10/3 rejects “3.3”
+
+terminating decimal matches exact
+
+integer division matches exact
+
+PART 6/6 — New domains + infinite scaling rules
+Goal
+
+Add fractions/decimals/percent/negatives/missing-value and ensure difficulty increases forever (no cap).
+
+Add curriculum-gated introduction + plateau ramps
+
+Fractions:
+
+same denom → different denom → simplify required → frac mul/div
+Decimals:
+
+add/sub → mul → div
+Percent:
+
+percent of → percent change → reverse percent
+Negatives:
+
+sign reasoning in add/sub → mixed into expressions
+Missing-value/algebra:
+
+one-step → two-step → missing factor/dividend
+Expressions:
+
+2-term → 3-term → parentheses/deeper
+
+Infinite scaling after level 100
+
+every +2 bands: increase digit counts in dominant families
+
+every +3 bands: increase expression frequency/depth
+
+maintain strict trivial filter forever
+
+maintain controlled variance and anti-whiplash stepping
+
+Acceptance checks
+
+New domains appear only when unlocked and then plateau + ramp correctly.
+
+Difficulty continues increasing beyond level 100.

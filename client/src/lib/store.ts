@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getRequiredXPForLevel } from './logic/progression';
+import { 
+  ProgressionState, 
+  INITIAL_PROGRESSION_STATE, 
+  computePerformanceScore, 
+  updateSkillRating, 
+  updateAntiWhiplash,
+  getBandFromLevel
+} from './logic/difficulty';
 
 // --- Types ---
 
@@ -11,6 +19,7 @@ export interface UserSettings {
   soundOn: boolean;
   hapticsOn: boolean;
   difficultyPreference: 'easier' | 'balanced' | 'harder';
+  showDebugOverlay: boolean;
 }
 
 export interface SessionStats {
@@ -41,12 +50,15 @@ export interface UserState {
   
   // Progress
   hasCompletedAssessment: boolean;
-  currentTier: number; // 0-6
+  currentTier: number; // Legacy 0-6
   level: number;
   lifetimeXP: number;
   streakCount: number;
   lastStreakDate: string | null; // ISO string
   
+  // New Progression Engine State
+  progression: ProgressionState;
+
   // Data
   settings: UserSettings;
   sessions: SessionStats[];
@@ -58,6 +70,10 @@ export interface UserState {
   saveSession: (session: SessionStats) => void;
   updateSettings: (settings: Partial<UserSettings>) => void;
   resetProgress: () => void;
+  
+  // Progression Actions
+  recordAnswer: (correct: boolean, timeMs: number, templateId: string, currentTargetTimeMs: number) => void;
+  toggleDebugOverlay: () => void;
 }
 
 // --- Store ---
@@ -77,10 +93,13 @@ export const useStore = create<UserState>()(
       streakCount: 0,
       lastStreakDate: null,
       
+      progression: { ...INITIAL_PROGRESSION_STATE },
+      
       settings: {
         soundOn: true,
         hapticsOn: true,
         difficultyPreference: 'balanced',
+        showDebugOverlay: false,
       },
       
       sessions: [],
@@ -97,7 +116,6 @@ export const useStore = create<UserState>()(
       completeAssessment: (tier, initialStats) => set({
         hasCompletedAssessment: true,
         currentTier: tier,
-        // Reset streak/level on fresh start if needed, but keeping simple
       }),
       
       saveSession: (session) => set((state) => {
@@ -126,13 +144,21 @@ export const useStore = create<UserState>()(
         while (newLifetimeXP >= getRequiredXPForLevel(newLevel + 1)) {
           newLevel++;
         }
+        
+        // Update Band based on Level
+        const newBand = getBandFromLevel(newLevel);
 
         return {
           sessions: [session, ...state.sessions],
           lifetimeXP: newLifetimeXP,
           level: newLevel,
           streakCount: newStreak,
-          lastStreakDate: newLastStreakDate
+          lastStreakDate: newLastStreakDate,
+          progression: {
+            ...state.progression,
+            level: newLevel,
+            band: newBand
+          }
         };
       }),
       
@@ -147,8 +173,50 @@ export const useStore = create<UserState>()(
         lifetimeXP: 0,
         sessions: [],
         streakCount: 0,
-        lastStreakDate: null
-      })
+        lastStreakDate: null,
+        progression: { ...INITIAL_PROGRESSION_STATE }
+      }),
+      
+      recordAnswer: (correct, timeMs, templateId, currentTargetTimeMs) => set((state) => {
+        const { progression } = state;
+        const ps = computePerformanceScore(correct, timeMs, currentTargetTimeMs);
+        
+        // Update SR
+        // Use band or tier as approximation for difficultyTier in the K formula
+        // K = 6 + difficultyTier. Using band for now as per "Part 2" MVP
+        const newSR = updateSkillRating(progression.srGlobal, ps, progression.band);
+        
+        // Anti-whiplash
+        const { newStep, newGood, newPoor } = updateAntiWhiplash(
+          progression.difficultyStep,
+          progression.goodStreak,
+          progression.poorStreak,
+          correct,
+          timeMs,
+          currentTargetTimeMs
+        );
+        
+        // Update History
+        const newHistory = [
+          { correct, timeMs, templateId, dp: 0, ps }, // DP 0 for now
+          ...progression.history
+        ].slice(0, 20);
+        
+        return {
+          progression: {
+            ...progression,
+            srGlobal: newSR,
+            difficultyStep: newStep,
+            goodStreak: newGood,
+            poorStreak: newPoor,
+            history: newHistory
+          }
+        };
+      }),
+      
+      toggleDebugOverlay: () => set(state => ({
+        settings: { ...state.settings, showDebugOverlay: !state.settings.showDebugOverlay }
+      }))
     }),
     {
       name: 'maths-trainer-storage',

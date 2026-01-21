@@ -7,6 +7,9 @@ import { KeypadModern } from '@/components/game/Keypad';
 import { generateQuestion, calculateXP, Question, TIERS } from '@/lib/game-logic';
 import { useStore, SessionStats } from '@/lib/store';
 import { AudioManager } from '@/lib/audio';
+import { computeFluencyComponents, computeFluencyScore, computeSessionXP } from '@/lib/logic/progression';
+import { PROGRESSION_CONFIG as CFG } from '@/config/progression';
+import { DebugOverlay } from './DebugOverlay';
 
 interface SessionScreenProps {
   mode: 'assessment' | 'training';
@@ -38,6 +41,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   const responseTimesRef = useRef<number[]>([]);
   
   const settings = useStore(s => s.settings);
+  const recordAnswer = useStore(s => s.recordAnswer);
 
   useEffect(() => {
     nextQuestion();
@@ -75,20 +79,46 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
 
   const endSession = () => {
     setIsActive(false);
-    const duration = (Date.now() - startTimeRef.current) / 1000;
+    const durationSecondsActual = durationSeconds === 'unlimited' ? 0 : Number(durationSeconds);
     
+    const components = computeFluencyComponents(
+      correctCount,
+      totalCount,
+      responseTimesRef.current,
+      durationSecondsActual
+    );
+    
+    const fluencyScore = computeFluencyScore(components);
+    
+    const isValid = totalCount >= CFG.MIN_QUESTIONS_FOR_VALID_SESSION && 
+                  durationSecondsActual >= CFG.MIN_DURATION_FOR_VALID_SESSION_SEC;
+                  
+    const { totalXP, metBonus } = computeSessionXP(
+      fluencyScore,
+      totalCount,
+      components,
+      isValid
+    );
+
     const stats: SessionStats = {
-      id: Math.random().toString(36),
+      id: Math.random().toString(36).substring(7),
       date: new Date().toISOString(),
       durationMode: durationSeconds === 'unlimited' ? 'unlimited' : (durationSeconds as any),
-      durationSecondsActual: duration,
+      durationSecondsActual,
       totalQuestions: totalCount,
       correctQuestions: correctCount,
       accuracy: totalCount > 0 ? correctCount / totalCount : 0,
-      xpEarned: score,
-      bestStreak: bestStreak,
-      avgResponseTimeMs: responseTimesRef.current.length > 0 ? responseTimesRef.current.reduce((a, b) => a + b, 0) / responseTimesRef.current.length : 0
+      xpEarned: totalXP,
+      bestStreak,
+      avgResponseTimeMs: components.medianMs, // Emphasizing median per spec
+      medianMs: components.medianMs,
+      variabilityMs: components.variabilityMs,
+      throughputQps: components.qps,
+      fluencyScore,
+      metBonus,
+      valid: isValid
     };
+    
     onComplete(stats);
   };
 
@@ -102,6 +132,10 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     
     setTotalCount(prev => prev + 1);
     responseTimesRef.current.push(timeTaken);
+
+    // Record answer in Progression Engine
+    // Note: Using 3000ms as placeholder target time, should come from template later
+    recordAnswer(isCorrect, timeTaken, 'ADD_GENERIC', 3000);
 
     if (isCorrect) {
       console.log(`[AUDIO_LOG] CORRECT_SUBMITTED: ${Date.now()}`);
@@ -147,6 +181,8 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
 
   return (
     <MobileLayout className="bg-white overflow-hidden">
+      <DebugOverlay />
+      
       {/* Background Flash Layer - Entire area except keypad */}
       <div 
         className={clsx(

@@ -1,4 +1,4 @@
-import { PROGRESSION_CONFIG as CFG } from '../config/progression';
+import { PROGRESSION_CONFIG as CFG } from '@/config/progression';
 
 export const computeMedian = (values: number[]): number => {
   if (values.length === 0) return 0;
@@ -60,7 +60,7 @@ export const computeSessionXP = (
   components: ReturnType<typeof computeFluencyComponents>,
   isValid: boolean
 ) => {
-  if (!isValid && totalQuestions === 0) return CFG.BASE_XP;
+  if (!isValid && totalQuestions === 0) return { totalXP: CFG.BASE_XP, metBonus: false };
   
   const effortScore = clamp(totalQuestions / CFG.EFFORT_TARGET_QUESTIONS, 0, 1);
   

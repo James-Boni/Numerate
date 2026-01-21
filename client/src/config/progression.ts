@@ -1,34 +1,17 @@
 export const PROGRESSION_CONFIG = {
-  // Fluency Normalization
-  targetTimeMs: 1600,
-  referenceVarMs: 600,
-  targetQps: 0.28, // ~17 questions/min
-  
-  // Weights (Sum = 1)
-  weights: {
-    accuracy: 0.35,
-    speed: 0.25,
-    throughput: 0.25,
-    consistency: 0.15,
-  },
-  
-  // XP Rewards
-  baseXP: 10,
-  maxPerformanceXP: 220,
-  maxEffortXP: 80,
-  effortTargetQuestions: 35,
-  
-  // Excellence Bonus Thresholds
-  bonusThresholds: {
-    accuracy: 0.90,
-    medianMs: 1400,
-    consistency: 0.75,
-    throughput: 0.85,
-  },
-  bonusMultiplier: 1.25,
-  eliteBonusMultiplier: 1.35, // For Accuracy >= 0.95
-  
-  // Validity Rules
-  minQuestionsForValid: 12,
-  minDurationSeconds: 30,
+  MIN_QUESTIONS_FOR_VALID_SESSION: 12,
+  MIN_DURATION_FOR_VALID_SESSION_SEC: 30,
+  TARGET_TIME_MS: 1600,
+  REFERENCE_VARIABILITY_MS: 600,
+  TARGET_QPS: 0.28,
+  BASE_XP: 10,
+  MAX_PERFORMANCE_XP: 220,
+  MAX_EFFORT_XP: 80,
+  EFFORT_TARGET_QUESTIONS: 35,
+  WEIGHTS: { ACCURACY: 0.35, SPEED: 0.25, THROUGHPUT: 0.25, CONSISTENCY: 0.15 },
+  ACCURACY_FLOOR: 0.55,
+  FLUENCY_CAP_BELOW_ACCURACY_FLOOR: 45,
+  BONUS_THRESHOLDS: { ACCURACY: 0.9, SPEED_SCORE: 0.95, CONSISTENCY: 0.75, THROUGHPUT: 0.85 },
+  BONUS_MULTIPLIER: 1.25,
+  ELITE_BONUS_MULTIPLIER: 1.35,
 };
