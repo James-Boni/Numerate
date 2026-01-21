@@ -103,6 +103,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     responseTimesRef.current.push(timeTaken);
 
     if (isCorrect) {
+      // Play correct sound IMMEDIATELY
       if (settings.soundOn) AudioManager.playCorrect();
       const xp = calculateXP(true, timeTaken, streak);
       setScore(prev => prev + xp);
@@ -116,6 +117,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       
       setTimeout(nextQuestion, 120);
     } else {
+      // Play wrong sound IMMEDIATELY
       if (settings.soundOn) AudioManager.playWrong();
       setStreak(0);
       setFeedback('wrong');
@@ -132,6 +134,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
 
   const handleKeyPress = (k: string) => {
     if (feedback) return;
+    // Play tap sound IMMEDIATELY on key press
     if (settings.soundOn) AudioManager.playTap();
     if (input.length < 6) setInput(prev => prev + k);
   };
