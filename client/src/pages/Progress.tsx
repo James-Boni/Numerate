@@ -25,33 +25,33 @@ export default function Progress() {
 
   return (
     <MobileLayout className="bg-slate-50">
-      <div className="flex-1 flex flex-col p-6 pb-24 space-y-6 overflow-y-auto no-scrollbar">
+      <div className="flex-1 flex flex-col p-6 space-y-6">
         <div className="pt-6">
-          <h1 className="text-3xl font-bold tracking-tight">Your Progress</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Your Progress</h1>
           <p className="text-slate-500">Tracking your arithmetic journey.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <Card className="p-4 bg-white border-none shadow-sm flex flex-col items-center text-center space-y-1">
-            <Flame className="text-orange-500" size={20} />
-            <span className="text-2xl font-bold">{streakCount}</span>
+          <Card className="p-4 bg-white border-none shadow-sm flex flex-col items-center text-center space-y-1 rounded-3xl">
+            <Flame className="text-primary" size={20} />
+            <span className="text-2xl font-bold text-slate-900">{streakCount}</span>
             <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Day Streak</span>
           </Card>
-          <Card className="p-4 bg-white border-none shadow-sm flex flex-col items-center text-center space-y-1">
-            <TrendingUp className="text-indigo-500" size={20} />
-            <span className="text-2xl font-bold">{level}</span>
+          <Card className="p-4 bg-white border-none shadow-sm flex flex-col items-center text-center space-y-1 rounded-3xl">
+            <TrendingUp className="text-primary" size={20} />
+            <span className="text-2xl font-bold text-slate-900">{level}</span>
             <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Current Level</span>
           </Card>
         </div>
 
-        <Card className="p-6 border-none shadow-sm space-y-4">
+        <Card className="p-6 border-none shadow-sm space-y-4 rounded-[2.5rem]">
           <div className="flex justify-between items-end">
             <div>
               <h3 className="font-bold text-slate-800">Accuracy Trend</h3>
               <p className="text-xs text-slate-400">Last 14 sessions (%)</p>
             </div>
             <div className="text-right">
-              <span className="text-2xl font-bold text-emerald-500">{avgAccuracy}%</span>
+              <span className="text-2xl font-bold text-primary">{avgAccuracy}%</span>
               <p className="text-[10px] text-slate-400 uppercase font-bold">Average</p>
             </div>
           </div>
@@ -67,9 +67,9 @@ export default function Progress() {
                 <Line 
                   type="monotone" 
                   dataKey="accuracy" 
-                  stroke="#10b981" 
+                  stroke="var(--color-primary)" 
                   strokeWidth={3} 
-                  dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
+                  dot={{ r: 4, fill: 'var(--color-primary)', strokeWidth: 2, stroke: '#fff' }}
                   activeDot={{ r: 6 }}
                 />
               </LineChart>
@@ -77,14 +77,14 @@ export default function Progress() {
           </div>
         </Card>
 
-        <Card className="p-6 border-none shadow-sm space-y-4">
+        <Card className="p-6 border-none shadow-sm space-y-4 rounded-[2.5rem]">
           <div className="flex justify-between items-end">
             <div>
               <h3 className="font-bold text-slate-800">Speed Trend</h3>
               <p className="text-xs text-slate-400">Response time (seconds)</p>
             </div>
             <div className="text-right">
-              <span className="text-2xl font-bold text-blue-500">{avgSpeed}s</span>
+              <span className="text-2xl font-bold text-primary">{avgSpeed}s</span>
               <p className="text-[10px] text-slate-400 uppercase font-bold">Average</p>
             </div>
           </div>
@@ -100,9 +100,9 @@ export default function Progress() {
                 <Line 
                   type="monotone" 
                   dataKey="speed" 
-                  stroke="#3b82f6" 
+                  stroke="var(--color-primary)" 
                   strokeWidth={3} 
-                  dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
+                  dot={{ r: 4, fill: 'var(--color-primary)', strokeWidth: 2, stroke: '#fff' }}
                   activeDot={{ r: 6 }}
                 />
               </LineChart>

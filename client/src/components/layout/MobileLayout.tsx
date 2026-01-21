@@ -15,7 +15,7 @@ export function MobileLayout({ children, className, fullHeight = true }: MobileL
       fullHeight ? "h-[100dvh]" : "min-h-[100dvh]",
       className
     )}>
-      <div className="flex-1 flex flex-col relative z-0">
+      <div className="flex-1 flex flex-col relative z-0 overflow-y-auto no-scrollbar pb-24">
         {children}
       </div>
     </div>
