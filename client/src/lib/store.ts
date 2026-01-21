@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { getRequiredXPForLevel } from './logic/progression';
 
 // --- Types ---
 
@@ -23,6 +24,12 @@ export interface SessionStats {
   xpEarned: number;
   bestStreak: number;
   avgResponseTimeMs: number;
+  medianMs?: number;
+  variabilityMs?: number;
+  throughputQps?: number;
+  fluencyScore?: number;
+  metBonus?: boolean;
+  valid?: boolean;
 }
 
 export interface UserState {
@@ -102,10 +109,6 @@ export const useStore = create<UserState>()(
         let newLastStreakDate = state.lastStreakDate;
         
         if (lastStreak !== today) {
-           // Simple streak logic: if last streak was yesterday, increment. If today, same. If older, reset.
-           // For MVP, just increment if played today and wasn't played today already?
-           // Actually, let's just increment if it's a new day.
-           // A real app checks consecutive days.
            const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
            
            if (lastStreak === yesterday) {
@@ -116,12 +119,17 @@ export const useStore = create<UserState>()(
            newLastStreakDate = new Date().toISOString();
         }
 
-        const newXP = state.lifetimeXP + session.xpEarned;
-        const newLevel = Math.floor(newXP / 1000) + 1; // Simple level curve
+        const newLifetimeXP = state.lifetimeXP + session.xpEarned;
+        
+        // Progression level logic: allow multi-level ups
+        let newLevel = state.level;
+        while (newLifetimeXP >= getRequiredXPForLevel(newLevel + 1)) {
+          newLevel++;
+        }
 
         return {
           sessions: [session, ...state.sessions],
-          lifetimeXP: newXP,
+          lifetimeXP: newLifetimeXP,
           level: newLevel,
           streakCount: newStreak,
           lastStreakDate: newLastStreakDate

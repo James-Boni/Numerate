@@ -1,0 +1,253 @@
+You are Replit Agent. We are redefining Numerate’s core progression system. This is the “rules of the world” spec and must be implemented carefully and deterministically. Do not guess or improvise the math beyond what is specified. If something is ambiguous, choose the simplest implementation and document the assumption.
+
+HIGH-LEVEL PRINCIPLES
+1) Primary success metric is IMPROVEMENT visible on the Progress page (7-day averages + 30-day trends).
+2) Fluency is defined by FOUR signals: Accuracy, Speed, Consistency, Throughput.
+3) XP and Levels exist, are unlimited, and are important emotionally, but they are NOT the primary success metric.
+4) XP is earned from a combination of effort + performance (fluency). Users never lose XP.
+5) Levels are derived from cumulative XP thresholds and become progressively harder to earn (increasing XP per level).
+6) XP ignores difficulty tier entirely. This ensures early fast progression and later natural slowing as fluency becomes harder to maintain.
+7) Exceptional sessions should be felt in BOTH XP and Levels. If a session earns enough XP to cross multiple level thresholds, allow multi-level-ups.
+8) Difficulty is adaptive and separate from level. Do NOT force difficulty to jump just because level jumped. Difficulty increases only when performance remains high.
+
+CORE DEFINITIONS
+A) Session (one training run) produces:
+- raw stats: totalQuestions, correctQuestions, responseTimes[]
+- derived stats: accuracy, medianTime, consistency, throughput
+- sessionFluencyScore (0..100) [defined below]
+- sessionXP (integer) [defined below]
+
+B) Rolling progress metrics:
+- 7-day rolling average: accuracy, medianTime, throughput, fluency, XP
+- 30-day trend: slope/percent change for the same metrics
+
+C) User progression:
+- lifetimeXP (unbounded)
+- level (unbounded)
+- currentDifficultyTier (finite and adaptive)
+- level thresholds: XP required increases as level increases (progressively harder)
+
+FLUENCY METRICS (FOUR SIGNALS)
+Compute these per session, and also per rolling windows for trends.
+
+1) Accuracy (A)
+A = correctQuestions / totalQuestions  (0..1)
+If totalQuestions < MIN_QUESTIONS_FOR_VALID_SESSION, mark session “valid=false” for progression/trends but still record it.
+
+2) Speed (S) using MEDIAN response time
+Let medianMs = median(responseTimesMs for submitted answers)
+Define a target time per tier is NOT used for XP (XP ignores difficulty), but we still need a universal normalization target so speed isn’t unfair.
+Use a universal targetTimeMs = 1600ms (config).
+SpeedScore S = clamp(0..1, targetTimeMs / medianMs)
+- If medianMs <= targetTimeMs, S approaches 1.
+- If slower, S decreases.
+
+3) Consistency (C)
+Consistency measures stability of response times.
+Compute robust variability:
+- Use IQR (interquartile range) or median absolute deviation (MAD).
+Let variabilityMs = MAD(responseTimesMs) (or IQR if easier).
+Normalize consistency using a referenceVarMs = 600ms (config).
+C = clamp(0..1, 1 - (variabilityMs / referenceVarMs))
+- More variability => lower consistency.
+- Very consistent => close to 1.
+
+4) Throughput (T)
+Throughput is questions answered per second (or per minute), and prevents “one correct answer = 100%”.
+Let durationSeconds = actual gameplay seconds (exclude result screen).
+Raw throughput: qps = totalQuestions / durationSeconds.
+Normalize using targetQps = 0.28 qps (~17 questions/min) (config; adjustable).
+T = clamp(0..1, qps / targetQps)
+- Hitting target throughput => ~1
+- Faster caps at 1 (no infinite scaling)
+
+SESSION FLUENCY SCORE (0..100)
+FluencyScore = 100 * weightedMean(A, S, C, T)
+Default weights (configurable, sum=1):
+- wA = 0.35
+- wS = 0.25
+- wT = 0.25
+- wC = 0.15
+
+Additionally, add an accuracy floor safeguard:
+- If A < 0.55, cap FluencyScore at max 45 regardless of speed/throughput.
+This prevents reckless speed gaming.
+
+EFFORT COMPONENT
+We want XP to reward effort as well as performance.
+Define EffortScore E (0..1) using quantity in a session:
+- E = clamp(0..1, totalQuestions / effortTargetQuestions)
+Where effortTargetQuestions is config, e.g. 35 for a 3-min session.
+This is not difficulty-dependent.
+
+SESSION XP (ALWAYS POSITIVE, PERFORMANCE + EFFORT)
+XP must always count; low fluency => minimal XP but not zero.
+
+Define:
+- baseXP = 10 (always earned if session valid OR at least MIN_QUESTIONS_SUBMIT > 0)
+- performanceXP = round( maxPerformanceXP * (FluencyScore/100) )
+- effortXP = round( maxEffortXP * E )
+Set defaults:
+- maxPerformanceXP = 220
+- maxEffortXP = 80
+So typical session XP ranges roughly from ~10 to ~310.
+
+SessionXP = baseXP + performanceXP + effortXP
+
+EXCELLENCE BONUS (THRESHOLD + MULTIPLIER)
+If user excels across ALL FOUR signals simultaneously, apply an XP multiplier.
+
+Define thresholds (config):
+- A >= 0.90
+- medianMs <= 1400ms  (or S >= 0.95)
+- C >= 0.75
+- T >= 0.85
+If all thresholds met => apply multiplier.
+
+Multiplier behavior:
+- bonusMultiplier = 1.25 (default)
+- If A >= 0.95 and other thresholds met, bonusMultiplier = 1.35
+Apply: SessionXP = round(SessionXP * bonusMultiplier)
+This makes excellence felt strongly in XP.
+
+IMPORTANT: bonus applies only if all 4 criteria met. No partial bonus.
+
+LEVELING SYSTEM (UNLIMITED LEVELS, XP-BASED, PROGRESSIVELY HARDER)
+Levels are derived from lifetimeXP.
+- Users NEVER lose XP
+- Levels NEVER decrease
+- Allow multi-level ups if lifetimeXP crosses multiple thresholds after a great session.
+
+We need an increasing XP requirement curve.
+Implement as either:
+A) Threshold table generated by formula
+or
+B) Function to compute XP needed for next level.
+
+Use formula approach:
+Let level start at 1.
+Define total XP needed to reach a given level L:
+requiredXP(L) = round( 150 * (L-1) ^ 1.25 + 50*(L-1) )
+This yields:
+- very fast early levels
+- progressively harder later levels
+
+On earning XP:
+- lifetimeXP += SessionXP
+- while lifetimeXP >= requiredXP(level+1): level++
+
+Also track:
+- xpToNextLevel = requiredXP(level+1) - lifetimeXP
+
+IMPORTANT SEPARATION: LEVEL VS DIFFICULTY
+- Level is reputation/progression.
+- DifficultyTier is adaptive based on rolling performance and should NOT jump just because level jumped.
+- Difficulty continues to be controlled by the adaptive engine.
+
+DIFFICULTY ENGINE (FINITE TIERS, ADAPTIVE)
+Keep existing tier ladder (you can keep 0..6 or expand to 1..10 later), but do NOT bind tier directly to level.
+
+Tier adjustment uses rolling window of last 20 answers:
+- If accuracyWindow >= 0.90 and medianTimeWindow <= 1800ms => tier +1 (cap)
+- If accuracyWindow <= 0.70 => tier -1 (floor)
+Additionally weight question selection toward weak operation areas.
+
+PROGRESS PAGE AS PRIMARY SUCCESS FEEDBACK
+Implement rich progress, visually and numerically, focusing on improvement.
+
+Must show:
+- 7-day rolling averages for:
+  - FluencyScore
+  - Accuracy
+  - Median response time
+  - Throughput
+  - XP per session (or XP/day)
+- 30-day trend indicators:
+  - percent change or slope for each metric
+  - simple arrows ↑ ↓ and percent values
+
+Also show:
+- Personal bests:
+  - Highest FluencyScore session
+  - Fastest median time session
+  - Best accuracy session (with minimum question count)
+  - Highest throughput session
+- “You are improving” messaging based on trends, not one-off sessions.
+
+ANTI-GAMING RULES / SESSION VALIDITY
+Define config:
+- MIN_QUESTIONS_FOR_VALID_SESSION = 12
+- MIN_DURATION_FOR_VALID_SESSION = 30 seconds (except 1-min mode)
+If session is below validity:
+- Still award minimal XP: baseXP + small effort component
+- Do NOT use it for trend calculations or level bonus logic
+- Still store it, but mark valid=false
+
+This prevents “one answer” exploitation while still honoring “XP always counts”.
+
+RESULTS SUMMARY OUTPUT
+After each session show:
+- SessionXP
+- Level (and level-up if occurred, allow multi-level up)
+- FluencyScore (0..100) and a short label:
+  - 0–25 Building
+  - 26–50 Improving
+  - 51–75 Strong
+  - 76–90 Fluent
+  - 91–100 Elite
+- The four components (A,S,C,T) as small bars or icons
+- Comparison vs recent 7-day average (better/worse)
+
+DATA STORAGE
+Persist per session:
+- totalQuestions, correctQuestions, durationSeconds
+- responseTimes array (or store summary stats only to reduce size)
+- accuracy, medianMs, variabilityMs, throughputQps
+- FluencyScore
+- SessionXP
+- bonusApplied boolean
+- valid boolean
+Persist user:
+- lifetimeXP
+- level
+- currentTier
+- rolling stats can be computed client-side from session history, but caching is OK.
+
+IMPLEMENTATION REQUIREMENTS
+- Put all constants in one config file, e.g. src/config/progression.ts
+- Implement pure functions in src/logic:
+  - computeAccuracy
+  - computeMedian
+  - computeMAD (or IQR)
+  - computeThroughput
+  - computeFluencyScore
+  - computeEffortScore
+  - computeSessionXP (including bonus)
+  - requiredXP(level)
+  - applyXPAndLevelUp
+
+TESTS (MANDATORY)
+Add tests that verify:
+- one correct answer does NOT produce high fluency or large XP due to validity rules
+- FluencyScore increases with better A,S,C,T
+- bonus only applies when all four thresholds are met
+- levels increase faster early and slow later (requiredXP curve)
+- multi-level-up works when SessionXP crosses multiple thresholds
+
+OUTPUT / EXPLAIN
+After implementing:
+- Provide a short “Progression Spec Summary” in README:
+  - fluency formula
+  - XP formula
+  - bonus thresholds
+  - level curve
+  - validity rules
+- Include example calculations for:
+  - weak session
+  - average session
+  - exceptional session
+
+IMPORTANT UX NOTE
+Even though XP and levels are connected, the app should always emphasize improvement in the Progress page (7-day avg and 30-day trend) as the main success. XP/levels are reinforcing signals, not the truth metric.
+
+Proceed to implement these changes carefully and iteratively. Show file changes and confirm with tests.
