@@ -1,0 +1,199 @@
+We need a deep, evidence-based diagnostic and fix. Current symptoms:
+- User is assigned starting level correctly (e.g., level 10).
+- First Daily 3-minute session generates questions that are far too easy and show no variance (only simple addition).
+- Level does not meaningfully affect difficulty.
+- XP is still being calculated incorrectly.
+
+This task is not “add features”. This is “make the system coherent end-to-end”.
+
+NON-NEGOTIABLE OUTPUTS
+You must provide:
+1) A DIAGNOSTICS OVERLAY (dev-only) during gameplay that proves what values are being used.
+2) A POST-SESSION DEBUG REPORT that prints the exact inputs/outputs of XP and leveling.
+3) A GENERATOR VALIDATION TEST that proves level 10 produces mixed operations and harder numbers.
+4) Fixes that make Daily sessions respect level=difficulty and Mixed Ops variance.
+
+Do NOT hand-wave. Do NOT say “already correct” without evidence. Show file paths and the exact changes.
+
+-------------------------------------------------------------------
+A) TRACE THE PIPELINE (MUST IMPLEMENT)
+-------------------------------------------------------------------
+Instrument these points with logs AND the dev overlay:
+
+A1) When session starts (Daily):
+- log: sessionType, requestedDuration, actualDurationPlanned
+- log: user.level, user.competenceGroup, user.startingLevel, xpIntoLevel
+- log: the difficulty parameters returned from difficulty/curriculum (ranges, op weights)
+
+A2) Every question generation:
+- record: operation (+, -, ×, ÷), operands, correct answer
+- record: which generator produced it
+- record: current level used to generate
+Keep a rolling counter in memory for the session:
+- opCounts: {add, sub, mul, div}
+- operandStats: min/max of operands, mean, % with carry/borrow (if tracked)
+
+A3) Session end:
+- dump a structured report:
+  - sessionType, durationSeconds D
+  - attempts N, correct C, accuracy A
+  - medianMs, variabilityMs, qps
+  - speedScore S, consistencyScore Cns, throughputScore T, fluency F
+  - baseSessionXP, modeMultiplier, excellence multiplier, elite multiplier, finalSessionXP
+  - levelBefore->levelAfter, levelUpCount, xpIntoLevel before/after
+  - xpRequiredToAdvance(currentLevel) and next 5 requirements
+Also dump:
+  - opCounts totals and percentages
+  - min/max operands seen
+This report must be visible in UI dev overlay AND console.
+
+-------------------------------------------------------------------
+B) CREATE A DEV-ONLY DIAGNOSTICS OVERLAY (REQUIRED)
+-------------------------------------------------------------------
+Add a small overlay panel (toggle via a flag) on the gameplay screen showing:
+
+- Level being used for generation: currentLevel
+- Session type: daily/quick_fire/etc
+- Difficulty params snapshot:
+  - operand ranges
+  - opWeights
+  - any special rules (carry/borrow rates)
+- Live op distribution this session:
+  - add %, sub %, mul %, div %
+- Live XP preview (optional):
+  - attempts, correct, running accuracy
+  - (does not need to update every question, can update every 5 questions)
+
+This overlay must prove whether Level is being used.
+
+-------------------------------------------------------------------
+C) FIX 1: DAILY MUST USE MIXED OPS (NOT ADDITION ONLY)
+-------------------------------------------------------------------
+Find the code path that starts the Daily session and chooses the curriculum/mode.
+
+Requirement:
+- Daily session must use mixed operations by default.
+- At level 10, mixed ops must include at least addition and subtraction (minimum), ideally some multiplication/division depending on our level design.
+
+Implement a deterministic operation weighting function based on level (level = difficulty, 1..100). Use this baseline:
+
+For level 1–5:
+- mostly addition, some subtraction:
+  add 80%, sub 20%, mul 0%, div 0%
+
+For level 6–12:
+- balanced add/sub:
+  add 55%, sub 45%, mul 0%, div 0%
+
+For level 13–20:
+- add/sub dominant with intro mul:
+  add 40%, sub 35%, mul 25%, div 0%
+
+For level 21–30:
+- add/sub/mul/div all present:
+  add 30%, sub 30%, mul 25%, div 15%
+
+For level 31+:
+- keep all four:
+  add 25%, sub 25%, mul 30%, div 20%
+
+IMPORTANT:
+- Division questions must be exact-integer (no fractions).
+- Multiplication/division should be limited to operand ranges appropriate for level (see Fix 2).
+- If you already have a curriculum system, integrate these as defaults for “mixed ops”.
+
+Then verify in logs and in unit tests that level 10 is NOT generating only addition.
+
+-------------------------------------------------------------------
+D) FIX 2: LEVEL MUST AFFECT NUMBER RANGES (DIFFICULTY)
+-------------------------------------------------------------------
+Currently the difficulty feels stuck at beginner ranges.
+
+Implement/repair a mapping from level -> operand ranges:
+(keep it simple and tunable)
+
+For addition/subtraction:
+- maxAddSub = round(10 + level * 4)  (so L10 ~ 50, L30 ~ 130)
+- use operands from 0..maxAddSub, with increasing carry/borrow likelihood as level increases.
+
+For multiplication:
+- only allow multiplication when level >= 13
+- maxMulA = round(5 + (level-13)*0.6)  capped e.g. at 40
+- maxMulB = round(5 + (level-13)*0.4)  capped e.g. at 20
+- ensure products are not absurdly large early.
+
+For division:
+- only allow division when level >= 21
+- generate by picking divisor and quotient, then dividend = divisor*quotient (integer results only)
+- keep divisor/quotient ranges scaled with level.
+
+This is enough to make L10 meaningfully harder than L1 without jumping into advanced math.
+
+Again: show these params in the dev overlay.
+
+-------------------------------------------------------------------
+E) FIX 3: XP CALC MUST USE REAL METRICS (ROOT CAUSE)
+-------------------------------------------------------------------
+XP being “incorrect” typically means inputs are wrong. Diagnose and fix:
+
+Verify these are actually captured:
+- durationSeconds D must be the real play time (not 0, not including results screen)
+- responseTimesMs[] must be recorded per submitted answer
+- attempts N increments every submission
+- correct C increments only on correct
+- sessionType must be correct (daily should not be treated as assessment)
+
+Add assertions:
+- if N>0 then responseTimes length must equal N
+- if D<=0 then compute D from timestamps between first question shown and last submission
+
+Then ensure XP pipeline:
+baseSessionXP -> mode multiplier -> excellence -> elite -> finalSessionXP
+And assessment bypass:
+- sessionType="assessment" returns XP=0 and does not call level-up logic.
+
+If XP is still in the thousands, that’s fine; we’re calibrating thresholds accordingly. But it must be consistent and explainable from the debug report.
+
+-------------------------------------------------------------------
+F) VALIDATION: GENERATOR DISTRIBUTION TESTS (MANDATORY)
+-------------------------------------------------------------------
+Create automated tests to prove correctness:
+
+F1) At level 10 in Mixed Ops:
+- Generate 500 questions
+- Assert: subtraction proportion >= 25%
+- Assert: not all questions are addition
+- Assert: max operand >= 20 at least sometimes (not stuck at single-digit)
+- Assert: division count == 0 and multiplication count == 0 (since we start mul at 13+ in this baseline)
+
+F2) At level 25 in Mixed Ops:
+- Generate 500 questions
+- Assert: each op (+,-,×,÷) appears at least 10%
+- Assert: division results are integers
+
+F3) XP sanity test:
+- Feed a known synthetic session (N,C, times, duration) and assert XP matches expected formula.
+- Also assert that invalid sessions don’t trigger excellence/elite.
+
+-------------------------------------------------------------------
+G) FINAL DELIVERABLE CHECKLIST (YOU MUST REPORT)
+-------------------------------------------------------------------
+After changes, report:
+1) Which file decides op mix for Daily and how it uses user.level
+2) Which file maps level -> operand ranges
+3) A sample of the debug report from a level 10 Daily run showing:
+   - opCounts distribution (should not be 100% add)
+   - operand ranges (should not be single digits only)
+   - XP breakdown and level-up computation
+
+Do NOT proceed to new features until this is correct.
+Why this prompt works
+It forces Replit to:
+
+instrument the system so you can see what’s happening
+
+prove that Level 10 results in mixed ops and harder numbers (tests)
+
+fix the typical root causes (wrong sessionType, wrong level source, generator defaulting)
+
+fix XP by verifying inputs rather than tweaking multipliers blindly

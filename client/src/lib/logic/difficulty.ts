@@ -112,3 +112,83 @@ export const getBandFromLevel = (level: number) => {
   // Band 0 = 1-10, Band 1 = 11-20
   return Math.floor((level - 1) / 10);
 };
+
+export interface OperationWeights {
+  add: number;
+  sub: number;
+  mul: number;
+  div: number;
+}
+
+export interface DifficultyParams {
+  level: number;
+  band: number;
+  opWeights: OperationWeights;
+  maxAddSub: number;
+  maxMulA: number;
+  maxMulB: number;
+  maxDivDivisor: number;
+  maxDivQuotient: number;
+  allowMul: boolean;
+  allowDiv: boolean;
+}
+
+export const getOperationWeights = (level: number): OperationWeights => {
+  if (level <= 5) {
+    return { add: 0.80, sub: 0.20, mul: 0, div: 0 };
+  }
+  if (level <= 12) {
+    return { add: 0.55, sub: 0.45, mul: 0, div: 0 };
+  }
+  if (level <= 20) {
+    return { add: 0.40, sub: 0.35, mul: 0.25, div: 0 };
+  }
+  if (level <= 30) {
+    return { add: 0.30, sub: 0.30, mul: 0.25, div: 0.15 };
+  }
+  return { add: 0.25, sub: 0.25, mul: 0.30, div: 0.20 };
+};
+
+export const getDifficultyParams = (level: number): DifficultyParams => {
+  const band = getBandFromLevel(level);
+  const opWeights = getOperationWeights(level);
+  
+  const maxAddSub = Math.round(10 + level * 4);
+  
+  const allowMul = level >= 13;
+  const maxMulA = allowMul ? Math.min(40, Math.round(5 + (level - 13) * 0.6)) : 0;
+  const maxMulB = allowMul ? Math.min(20, Math.round(5 + (level - 13) * 0.4)) : 0;
+  
+  const allowDiv = level >= 21;
+  const maxDivDivisor = allowDiv ? Math.min(12, Math.round(2 + (level - 21) * 0.3)) : 0;
+  const maxDivQuotient = allowDiv ? Math.min(15, Math.round(3 + (level - 21) * 0.4)) : 0;
+  
+  return {
+    level,
+    band,
+    opWeights,
+    maxAddSub,
+    maxMulA,
+    maxMulB,
+    maxDivDivisor,
+    maxDivQuotient,
+    allowMul,
+    allowDiv,
+  };
+};
+
+export const selectOperation = (weights: OperationWeights): 'add' | 'sub' | 'mul' | 'div' => {
+  const rand = Math.random();
+  let cumulative = 0;
+  
+  cumulative += weights.add;
+  if (rand < cumulative) return 'add';
+  
+  cumulative += weights.sub;
+  if (rand < cumulative) return 'sub';
+  
+  cumulative += weights.mul;
+  if (rand < cumulative) return 'mul';
+  
+  return 'div';
+};

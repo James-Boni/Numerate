@@ -5,14 +5,30 @@ import { clsx } from 'clsx';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { KeypadModern } from '@/components/game/Keypad';
 import { generateQuestion, calculateXP, Question, TIERS } from '@/lib/game-logic';
-import { generateQuestionForProgression } from '@/lib/logic/generator_adapter';
+import { generateQuestionForLevel, GeneratedQuestionMeta } from '@/lib/logic/generator_adapter';
 import { useStore, SessionStats } from '@/lib/store';
 
 import { AudioManager } from '@/lib/audio';
 import { computeFluencyComponents, computeFluencyScore, computeSessionXP } from '@/lib/logic/progression';
 import { PROGRESSION_CONFIG as CFG } from '@/config/progression';
 import { calculateFullSessionXP, applyXPAndLevelUp } from '@/lib/logic/xp-system';
+import { getDifficultyParams, DifficultyParams } from '@/lib/logic/difficulty';
 import { DebugOverlay } from './DebugOverlay';
+import { SessionDiagnosticsOverlay } from './SessionDiagnosticsOverlay';
+
+interface OpCounts {
+  add: number;
+  sub: number;
+  mul: number;
+  div: number;
+}
+
+interface OperandStats {
+  minOperand: number;
+  maxOperand: number;
+  operandSum: number;
+  count: number;
+}
 
 interface SessionScreenProps {
   mode: 'assessment' | 'training';
@@ -49,6 +65,11 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   const questionStartTimeRef = useRef<number>(Date.now());
   const responseTimesRef = useRef<number[]>([]);
   
+  const opCountsRef = useRef<OpCounts>({ add: 0, sub: 0, mul: 0, div: 0 });
+  const operandStatsRef = useRef<OperandStats>({ minOperand: Infinity, maxOperand: 0, operandSum: 0, count: 0 });
+  const [difficultyParams, setDifficultyParams] = useState<DifficultyParams | null>(null);
+  const [currentOpCounts, setCurrentOpCounts] = useState<OpCounts>({ add: 0, sub: 0, mul: 0, div: 0 });
+  
   const settings = useStore(s => s.settings);
   const recordAnswer = useStore(s => s.recordAnswer);
   const currentLevel = useStore(s => s.level);
@@ -56,16 +77,28 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
 
   const progression = useStore(s => s.progression);
   
-  // DIAGNOSTIC LOGGING
   useEffect(() => {
-    console.log("[GENERATOR INPUT]", {
-      level: progression.level,
-      band: progression.band,
-      difficultyStep: progression.difficultyStep,
-      SR: progression.srGlobal,
-      mode
+    const params = getDifficultyParams(currentLevel);
+    console.log("[SESSION_START]", {
+      sessionType: mode,
+      requestedDuration: durationSeconds,
+      userLevel: currentLevel,
+      xpIntoLevel: currentXpIntoLevel,
+      difficultyParams: {
+        level: params.level,
+        band: params.band,
+        maxAddSub: params.maxAddSub,
+        opWeights: params.opWeights,
+        allowMul: params.allowMul,
+        allowDiv: params.allowDiv,
+        maxMulA: params.maxMulA,
+        maxMulB: params.maxMulB,
+        maxDivDivisor: params.maxDivDivisor,
+        maxDivQuotient: params.maxDivQuotient
+      }
     });
-  }, [progression, mode]);
+    setDifficultyParams(params);
+  }, [currentLevel, mode, durationSeconds]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -121,17 +154,28 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   }, [durationSeconds]);
 
   const nextQuestion = () => {
-    // MVP: Use new generator if in training mode
     if (mode === 'training') {
-      const q = generateQuestionForProgression(
-        progression.band, 
-        progression.difficultyStep,
+      const q = generateQuestionForLevel(
+        currentLevel,
         recentQuestionsRef.current
       );
       setQuestion(q);
       currentQuestionMetaRef.current = { targetTimeMs: q.targetTimeMs, dp: q.dp, id: q.id };
       
-      // Track recent questions for repetition prevention
+      opCountsRef.current[q.meta.operation]++;
+      setCurrentOpCounts({ ...opCountsRef.current });
+      
+      const maxOp = Math.max(q.meta.operandA, q.meta.operandB);
+      const minOp = Math.min(q.meta.operandA, q.meta.operandB);
+      operandStatsRef.current.maxOperand = Math.max(operandStatsRef.current.maxOperand, maxOp);
+      operandStatsRef.current.minOperand = Math.min(operandStatsRef.current.minOperand, minOp);
+      operandStatsRef.current.operandSum += (q.meta.operandA + q.meta.operandB);
+      operandStatsRef.current.count += 2;
+      
+      if (!difficultyParams) {
+        setDifficultyParams(q.meta.difficultyParams);
+      }
+      
       recentQuestionsRef.current = [
         { templateId: q.id, text: q.text },
         ...recentQuestionsRef.current
@@ -139,12 +183,15 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       
       console.log("[GEN_OUTPUT]", {
         question: q.text,
-        templateId: q.id,
-        band: progression.band,
-        step: progression.difficultyStep
+        operation: q.meta.operation,
+        operandA: q.meta.operandA,
+        operandB: q.meta.operandB,
+        level: currentLevel,
+        opWeights: q.meta.difficultyParams.opWeights,
+        maxAddSub: q.meta.difficultyParams.maxAddSub
       });
     } else {
-       setQuestion(generateQuestion(tier)); // Legacy for assessment
+       setQuestion(generateQuestion(tier));
        currentQuestionMetaRef.current = { targetTimeMs: 3000, dp: 1, id: 'legacy' };
     }
     
@@ -180,10 +227,52 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       xpResult.finalSessionXP
     );
     
-    console.log("[XP_SESSION_END]", {
-      fluencyMetrics,
-      xpResult,
-      levelResult
+    const opCounts = opCountsRef.current;
+    const opTotal = opCounts.add + opCounts.sub + opCounts.mul + opCounts.div;
+    const opPct = (n: number) => opTotal > 0 ? ((n / opTotal) * 100).toFixed(1) : '0';
+    
+    console.log("[SESSION_END_REPORT]", {
+      sessionType,
+      durationSecondsActual,
+      attempts: finalTotalCount,
+      correct: finalCorrectCount,
+      accuracy: fluencyMetrics.accuracy,
+      medianMs: fluencyMetrics.medianMs,
+      variabilityMs: fluencyMetrics.variabilityMs,
+      qps: fluencyMetrics.qps,
+      speedScore: fluencyMetrics.speedScore,
+      consistencyScore: fluencyMetrics.consistencyScore,
+      throughputScore: fluencyMetrics.throughputScore,
+      fluencyScore: fluencyMetrics.fluencyScore,
+      baseSessionXP: xpResult.baseSessionXP,
+      modeMultiplier: xpResult.modeMultiplier,
+      excellenceMultiplier: xpResult.excellenceMultiplierApplied,
+      eliteMultiplier: xpResult.eliteMultiplierApplied,
+      finalSessionXP: xpResult.finalSessionXP,
+      levelBefore: levelResult.levelBefore,
+      levelAfter: levelResult.levelAfter,
+      levelUpCount: levelResult.levelUpCount,
+      xpIntoLevelBefore: levelResult.xpIntoLevelBefore,
+      xpIntoLevelAfter: levelResult.xpIntoLevelAfter,
+      opCounts: {
+        add: opCounts.add,
+        sub: opCounts.sub,
+        mul: opCounts.mul,
+        div: opCounts.div
+      },
+      opPercentages: {
+        add: `${opPct(opCounts.add)}%`,
+        sub: `${opPct(opCounts.sub)}%`,
+        mul: `${opPct(opCounts.mul)}%`,
+        div: `${opPct(opCounts.div)}%`
+      },
+      operandStats: {
+        min: operandStatsRef.current.minOperand,
+        max: operandStatsRef.current.maxOperand,
+        avg: operandStatsRef.current.count > 0 
+          ? operandStatsRef.current.operandSum / operandStatsRef.current.count 
+          : 0
+      }
     });
 
     const stats: SessionStats = {
@@ -311,6 +400,21 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   return (
     <MobileLayout className="bg-white overflow-hidden">
       <DebugOverlay />
+      
+      {settings.showDebugOverlay && mode === 'training' && (
+        <SessionDiagnosticsOverlay
+          level={currentLevel}
+          sessionType={mode}
+          difficultyParams={difficultyParams}
+          opCounts={currentOpCounts}
+          totalQuestions={totalCount}
+          correctCount={correctCount}
+          accuracy={totalCount > 0 ? correctCount / totalCount : 0}
+          minOperand={operandStatsRef.current.minOperand}
+          maxOperand={operandStatsRef.current.maxOperand}
+          avgOperand={operandStatsRef.current.count > 0 ? operandStatsRef.current.operandSum / operandStatsRef.current.count : 0}
+        />
+      )}
       
       {/* Background Flash Layer - Entire area except keypad */}
       <div 
