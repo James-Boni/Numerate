@@ -1,0 +1,139 @@
+We have backend coherence bugs. Symptoms:
+1) Assessment grouping is inconsistent/arbitrary: user performed worse but got a higher starting level (e.g., 16).
+2) After Daily session, XP displayed is wrong (e.g., UI shows 242 but expected around 870).
+3) There are likely stale state issues, wrong metric capture, or mismatch between XP used for level-up vs XP displayed.
+
+This task is NOT tuning. It is BUG FIXING with proof.
+
+NON-NEGOTIABLE: You must produce evidence outputs (debug logs/overlay) that show the exact numeric inputs used at every step and prove consistency.
+
+-------------------------------------------------------------------
+A) ASSESSMENT PLACEMENT MUST BE PURE + RESET EVERY RUN
+-------------------------------------------------------------------
+1) Locate the assessment placement function and make it a PURE function:
+   computePlacement({attempted N, correct C, responseTimes[], durationSeconds}) -> {G0, Gcap, Gfinal, startingLevel}
+   It must have NO access to global store, previous sessions, or cached values.
+
+2) On assessment start, RESET all assessment counters:
+   attempted=0, correct=0, responseTimes=[]
+   startTimestamp = now()
+   Ensure these do not share state with Daily sessions.
+
+3) On assessment end, compute:
+   - durationSeconds = (endTimestamp - startTimestamp)
+   - CPM = C / (durationSeconds/60)
+     IMPORTANT: CPM must use ACTUAL duration, not hard-coded 3 minutes, because early termination or pauses could distort CPM.
+     If durationSeconds is within 175..185 seconds, you may treat as 180 for stability, but log both values.
+
+4) Add an “Assessment Debug Block” on the Assessment Complete screen showing:
+   attempted N, correct C, accuracy A, durationSeconds D, CPM computed, medianMs, G0, Gcap, Gfinal, startingLevel
+   This must match the actual run and must not change after the screen renders.
+
+5) Add unit tests for placement with fixed input values to prove it is deterministic.
+   Also add a test ensuring assessment counters reset properly between runs.
+
+-------------------------------------------------------------------
+B) STARTING LEVEL APPLICATION MUST BE SINGLE-SOURCE-OF-TRUTH
+-------------------------------------------------------------------
+We must avoid “placed at 16 randomly”.
+
+1) Define the single source of truth for user level:
+   user.level stored in the central store.
+
+2) On assessment completion ONLY:
+   - set user.level = startingLevel
+   - set user.xpIntoLevel = 0
+   - set user.competenceGroup = Gfinal
+   - set hasCompletedAssessment = true
+
+3) Ensure no other code path overwrites user.level on app start, welcome screen, or daily start.
+   Remove any fallback like “if missing use 16” or any dev defaults.
+
+4) Add logs:
+   - When assessment completes: log previousLevel -> newLevel and why.
+   - When Daily session starts: log the user.level at that moment.
+   - When question generator runs: log which level it is using.
+
+If these logs ever disagree, fix it.
+
+-------------------------------------------------------------------
+C) XP CALCULATION MUST HAVE ONE CANONICAL VALUE AND UI MUST SHOW THAT SAME VALUE
+-------------------------------------------------------------------
+We currently have XP mismatch: UI shows 242 but expected ~870.
+
+We must define:
+- baseSessionXP
+- xpAfterMode
+- xpAfterExcellence
+- finalSessionXP (after elite)
+
+Rule:
+- The session summary UI must display finalSessionXP (the exact XP used to update progression).
+- The level-up logic must also use finalSessionXP.
+- Store finalSessionXP in the session record and display that exact stored value.
+
+Steps:
+1) Find where XP is calculated and where XP is displayed.
+2) Ensure only ONE function returns a structured object:
+   computeSessionXP(...) -> {
+     baseSessionXP,
+     modeMultiplier,
+     xpAfterMode,
+     excellenceMultiplierApplied,
+     xpAfterExcellence,
+     eliteMultiplierApplied,
+     finalSessionXP,
+     wasValidSession
+   }
+
+3) Make the UI display finalSessionXP exactly.
+   If you want, you can also show breakdown in debug mode, but the main XP number must be finalSessionXP.
+
+4) Add an assertion:
+   - The XP used to update user.xpIntoLevel must equal the XP displayed on the session results screen.
+   If mismatch, throw/log an error in dev.
+
+5) Add logs at session end:
+   - “XP_CANONICAL finalSessionXP=... (base=..., mode=..., excellence=..., elite=...)”
+   - “XP_APPLIED_TO_LEVELING=...”
+   - “XP_SHOWN_IN_UI=...”
+   These three must match for finalSessionXP.
+
+-------------------------------------------------------------------
+D) SESSION TYPE MUST BE CORRECT (ASSESSMENT ≠ DAILY)
+-------------------------------------------------------------------
+XP could be reduced if sessionType is wrong (e.g., using practice multiplier, or treated as assessment/invalid).
+
+1) Ensure assessment sessionType is exactly "assessment" and returns XP=0 and does NOT run leveling.
+2) Ensure Daily is exactly "daily" and uses daily multiplier 1.0.
+3) Add debug display of sessionType on both gameplay and summary screens.
+
+-------------------------------------------------------------------
+E) VALIDATION TESTS (MANDATORY)
+-------------------------------------------------------------------
+1) Placement determinism:
+   same (N,C,D,responseTimes) -> same group/level every time
+
+2) Placement reset:
+   Run assessment twice in a test harness; ensure counters are not carried over.
+
+3) XP display consistency:
+   For a synthetic session:
+   - computeSessionXP returns finalSessionXP
+   - applyXPAndLevelUp uses exactly that
+   - UI component reads exactly stored finalSessionXP
+
+4) Regression test for the reported mismatch pattern:
+   Ensure there is no code path where UI shows baseSessionXP or xpAfterMode while leveling uses finalSessionXP.
+
+-------------------------------------------------------------------
+F) DELIVERABLES YOU MUST REPORT BACK
+-------------------------------------------------------------------
+1) The exact file + function that computes placement
+2) The exact file + function that applies starting level
+3) The exact file + function that computes XP and returns the structured breakdown
+4) Confirmation logs from one assessment run and one daily run showing:
+   - assessment: N,C,D,CPM,G,startingLevel
+   - daily: sessionType, levelUsed, finalSessionXP, xp applied, xp shown
+
+No new features until these are consistent.

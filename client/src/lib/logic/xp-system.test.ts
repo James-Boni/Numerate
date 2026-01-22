@@ -299,7 +299,81 @@ describe('Mode multipliers diminish XP correctly', () => {
 });
 
 describe('Assessment gives NO XP', () => {
-  it('assessment sessions should not be processed for XP (handled by store logic)', () => {
-    expect(true).toBe(true);
+  it('assessment mode multiplier is 0 - gives NO XP', () => {
+    const { xpResult } = calculateFullSessionXP(
+      'assessment', 45, 40, 180, Array(45).fill(1500)
+    );
+    
+    // Assessment mode multiplier should be 0
+    expect(xpResult.modeMultiplier).toBe(0);
+    expect(xpResult.finalSessionXP).toBe(0);
+  });
+});
+
+describe('XP Consistency Tests', () => {
+  it('finalSessionXP is the only value used for leveling and display', () => {
+    const { fluencyMetrics, xpResult } = calculateFullSessionXP(
+      'daily', 40, 35, 180, Array(40).fill(1800)
+    );
+    
+    // The canonical XP value used for leveling
+    const xpForLeveling = xpResult.finalSessionXP;
+    
+    // Verify the computation chain
+    expect(xpResult.baseSessionXP).toBeGreaterThan(0);
+    expect(xpResult.modeMultiplier).toBe(1.0);
+    expect(xpResult.xpAfterMode).toBe(xpResult.baseSessionXP);
+    expect(xpResult.finalSessionXP).toBeGreaterThanOrEqual(xpResult.xpAfterMode);
+    
+    // Verify leveling uses finalSessionXP
+    const levelResult = applyXPAndLevelUp(1, 0, xpForLeveling);
+    expect(levelResult.xpIntoLevelAfter).toBe(xpForLeveling);
+  });
+
+  it('XP calculation is deterministic - same inputs always produce same outputs', () => {
+    const inputs = {
+      sessionType: 'daily',
+      totalAnswers: 42,
+      correctAnswers: 38,
+      durationSeconds: 180,
+      responseTimes: Array(42).fill(1700),
+    };
+    
+    const results = Array(5).fill(null).map(() => 
+      calculateFullSessionXP(
+        inputs.sessionType,
+        inputs.totalAnswers,
+        inputs.correctAnswers,
+        inputs.durationSeconds,
+        inputs.responseTimes
+      )
+    );
+    
+    const first = results[0];
+    results.forEach(result => {
+      expect(result.xpResult.baseSessionXP).toBe(first.xpResult.baseSessionXP);
+      expect(result.xpResult.finalSessionXP).toBe(first.xpResult.finalSessionXP);
+      expect(result.fluencyMetrics.fluencyScore).toBe(first.fluencyMetrics.fluencyScore);
+    });
+  });
+
+  it('daily mode always uses multiplier 1.0', () => {
+    const { xpResult } = calculateFullSessionXP(
+      'daily', 30, 25, 120, Array(30).fill(2000)
+    );
+    
+    expect(xpResult.modeMultiplier).toBe(1.0);
+  });
+
+  it('applyXPAndLevelUp preserves XP carryover correctly', () => {
+    // Start at level 1 with 0 XP
+    const result1 = applyXPAndLevelUp(1, 0, 300);
+    expect(result1.levelAfter).toBe(1);
+    expect(result1.xpIntoLevelAfter).toBe(300);
+    
+    // Add more XP from the carryover position
+    const result2 = applyXPAndLevelUp(result1.levelAfter, result1.xpIntoLevelAfter, 250);
+    expect(result2.levelAfter).toBe(2);
+    expect(result2.xpIntoLevelAfter).toBe(50); // 300 + 250 = 550, level 1 needs 500, carryover = 50
   });
 });

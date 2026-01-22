@@ -26,11 +26,13 @@ export const MAX_EFFORT_XP = 80;
 export const EFFORT_TARGET_QUESTIONS = 35;
 
 // Mode multipliers (future-proof)
+// Assessment mode returns 0 XP - assessments should not award XP
 export const MODE_MULTIPLIERS: Record<string, number> = {
   daily: 1.0,
   quick_fire: 0.55,
   practice: 0.7,
   unlimited: 0.4,
+  assessment: 0, // Assessment gives NO XP
 };
 
 // Excellence thresholds (must meet ALL)

@@ -214,4 +214,79 @@ describe('computeStartingPlacement', () => {
       }
     }
   });
+
+  // DETERMINISM TESTS - Prove placement is pure and deterministic
+  it('Placement is deterministic - same inputs always produce same outputs', () => {
+    const input = {
+      totalAnswers: 45,
+      correctAnswers: 40,
+      responseTimes: Array(45).fill(1800),
+      assessmentDurationSeconds: 180,
+    };
+    
+    // Call placement 5 times with identical inputs
+    const results = Array(5).fill(null).map(() => computeStartingPlacement(input));
+    
+    // All results should be identical
+    const first = results[0];
+    results.forEach((result, i) => {
+      expect(result.competenceGroup).toBe(first.competenceGroup);
+      expect(result.startingLevel).toBe(first.startingLevel);
+      expect(result.debug.G0).toBe(first.debug.G0);
+      expect(result.debug.Gcap).toBe(first.debug.Gcap);
+      expect(result.debug.G).toBe(first.debug.G);
+      expect(result.debug.CPM).toBe(first.debug.CPM);
+    });
+  });
+
+  it('Placement function has no side effects - isolated runs produce identical results', () => {
+    // First run
+    const input1 = {
+      totalAnswers: 30,
+      correctAnswers: 28,
+      responseTimes: Array(30).fill(2000),
+      assessmentDurationSeconds: 180,
+    };
+    const result1a = computeStartingPlacement(input1);
+    
+    // Run a completely different input
+    const input2 = {
+      totalAnswers: 60,
+      correctAnswers: 55,
+      responseTimes: Array(60).fill(1500),
+      assessmentDurationSeconds: 180,
+    };
+    const result2 = computeStartingPlacement(input2);
+    
+    // Run the first input again - should be identical to first run
+    const result1b = computeStartingPlacement(input1);
+    
+    expect(result1b.competenceGroup).toBe(result1a.competenceGroup);
+    expect(result1b.startingLevel).toBe(result1a.startingLevel);
+    expect(result1b.debug.G).toBe(result1a.debug.G);
+  });
+
+  it('Placement uses actual duration, not hardcoded 180 seconds', () => {
+    const input180 = {
+      totalAnswers: 30,
+      correctAnswers: 30,
+      responseTimes: Array(30).fill(1500),
+      assessmentDurationSeconds: 180, // 3 minutes
+    };
+    const result180 = computeStartingPlacement(input180);
+    
+    // Same answers in 90 seconds = higher CPM
+    const input90 = {
+      totalAnswers: 30,
+      correctAnswers: 30,
+      responseTimes: Array(30).fill(1500),
+      assessmentDurationSeconds: 90, // 1.5 minutes
+    };
+    const result90 = computeStartingPlacement(input90);
+    
+    // CPM should be double for 90s vs 180s with same correct answers
+    expect(result90.debug.CPM).toBe(result180.debug.CPM * 2);
+    // Higher CPM should lead to higher or equal group
+    expect(result90.debug.G0).toBeGreaterThanOrEqual(result180.debug.G0);
+  });
 });

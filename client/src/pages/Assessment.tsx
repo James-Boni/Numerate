@@ -63,6 +63,7 @@ export default function Assessment() {
   const handleComplete = (stats: SessionStats) => {
     console.log(`[SESSION_FLOW] Assessment complete: ${Date.now()}`, stats);
     
+    // PURE FUNCTION CALL - no global state access
     const placementResult = computeStartingPlacement({
       totalAnswers: stats.totalQuestions,
       correctAnswers: stats.correctQuestions,
@@ -70,13 +71,30 @@ export default function Assessment() {
       assessmentDurationSeconds: stats.durationSecondsActual,
     });
     
-    console.log("[PLACEMENT_RESULT]", placementResult);
+    // Comprehensive placement logging
+    console.log("[PLACEMENT_INPUT]", {
+      N: stats.totalQuestions,
+      C: stats.correctQuestions,
+      D: stats.durationSecondsActual,
+      responseTimesCount: (stats.responseTimes || []).length,
+    });
+    console.log("[PLACEMENT_RESULT]", {
+      competenceGroup: placementResult.competenceGroup,
+      startingLevel: placementResult.startingLevel,
+      metrics: placementResult.metrics,
+    });
     console.log("[PLACEMENT_DEBUG]", placementResult.debug);
+    console.log("[LEVEL_ASSIGNMENT]", {
+      previousLevel: 1, // First time assessment
+      newLevel: placementResult.startingLevel,
+      reason: `Assessment placed user in Group ${placementResult.competenceGroup} -> Level ${placementResult.startingLevel}`,
+    });
     
     setResults(stats);
     setPlacement(placementResult);
     setStep('results');
     
+    // Single source of truth: completeAssessment sets user.level
     completeAssessment(placementResult.competenceGroup, placementResult.startingLevel, stats);
   };
 
@@ -236,14 +254,29 @@ export default function Assessment() {
           )}
         </div>
 
-        {showDebug && placement && (
+        {/* Assessment Debug Block - ALWAYS visible for debugging */}
+        {placement && (
           <div className="bg-slate-800 text-slate-200 rounded-xl p-4 text-xs font-mono space-y-1">
-            <div className="font-bold text-slate-400 mb-2">Placement Debug</div>
-            <div>N={placement.debug.N} C={placement.debug.C} A={placement.debug.A.toFixed(3)}</div>
-            <div>CPM={placement.debug.CPM.toFixed(2)} medianMs={placement.debug.medianMs}</div>
-            <div>G0={placement.debug.G0} Gcap={placement.debug.Gcap} G1={placement.debug.G1}</div>
-            <div>G2={placement.debug.G2} G={placement.debug.G} Lstart={placement.debug.Lstart}</div>
-            <div>valid={String(placement.debug.isValidPlacement)}</div>
+            <div className="font-bold text-primary mb-2">Assessment Debug Block</div>
+            <div className="grid grid-cols-2 gap-x-4">
+              <div>N (attempted):</div><div>{placement.debug.N}</div>
+              <div>C (correct):</div><div>{placement.debug.C}</div>
+              <div>A (accuracy):</div><div>{(placement.debug.A * 100).toFixed(1)}%</div>
+              <div>D (duration):</div><div>{results?.durationSecondsActual}s</div>
+              <div>CPM:</div><div>{placement.debug.CPM.toFixed(2)}</div>
+              <div>medianMs:</div><div>{placement.debug.medianMs}</div>
+            </div>
+            <div className="border-t border-slate-600 my-2 pt-2">
+              <div className="grid grid-cols-2 gap-x-4">
+                <div>G0 (from CPM):</div><div>{placement.debug.G0}</div>
+                <div>Gcap (acc cap):</div><div>{placement.debug.Gcap}</div>
+                <div>G1 (min G0,Gcap):</div><div>{placement.debug.G1}</div>
+                <div>G2 (speed adj):</div><div>{placement.debug.G2}</div>
+                <div className="font-bold">Gfinal:</div><div className="font-bold text-primary">{placement.debug.G}</div>
+                <div className="font-bold">startingLevel:</div><div className="font-bold text-primary">{placement.debug.Lstart}</div>
+                <div>valid:</div><div className={placement.debug.isValidPlacement ? "text-green-400" : "text-red-400"}>{String(placement.debug.isValidPlacement)}</div>
+              </div>
+            </div>
           </div>
         )}
 

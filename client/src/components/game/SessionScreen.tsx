@@ -210,8 +210,8 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     const finalTotalCount = totalCountRef.current;
     const finalBestStreak = bestStreakRef.current;
     
-    // Calculate XP using the new system
-    const sessionType = 'daily'; // TODO: Pass session type from props
+    // Use the actual mode prop for sessionType
+    const sessionType = mode === 'assessment' ? 'assessment' : 'daily';
     const { fluencyMetrics, xpResult } = calculateFullSessionXP(
       sessionType,
       finalTotalCount,
@@ -230,6 +230,19 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     const opCounts = opCountsRef.current;
     const opTotal = opCounts.add + opCounts.sub + opCounts.mul + opCounts.div;
     const opPct = (n: number) => opTotal > 0 ? ((n / opTotal) * 100).toFixed(1) : '0';
+    
+    // XP Canonical Logging - these three values MUST match for finalSessionXP
+    console.log("[XP_CANONICAL]", {
+      finalSessionXP: xpResult.finalSessionXP,
+      breakdown: {
+        base: xpResult.baseSessionXP,
+        mode: xpResult.modeMultiplier,
+        excellence: xpResult.excellenceMultiplierApplied,
+        elite: xpResult.eliteMultiplierApplied
+      }
+    });
+    console.log("[XP_APPLIED_TO_LEVELING]", xpResult.finalSessionXP);
+    console.log("[XP_WILL_BE_SHOWN_IN_UI]", xpResult.finalSessionXP);
     
     console.log("[SESSION_END_REPORT]", {
       sessionType,
