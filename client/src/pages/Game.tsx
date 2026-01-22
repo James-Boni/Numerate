@@ -10,6 +10,7 @@ import { ClipboardCheck, Zap, Target, TrendingUp, Clock } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { motion, animate, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
+import { xpRequiredToAdvance } from '@/lib/logic/xp-system';
 
 function CountUp({ value, duration = 1, delay = 0, onTick, suffix = '' }: { 
   value: number, 
@@ -207,6 +208,114 @@ export default function Game() {
             Continue
           </Button>
         </motion.div>
+
+        {settings.showDebugOverlay && results && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 2 }}
+            className="mt-8 p-4 bg-slate-900 rounded-xl text-xs text-slate-300 font-mono space-y-2"
+          >
+            <div className="text-slate-400 font-bold uppercase text-[10px] tracking-wider mb-3">Debug: XP Calculation</div>
+            
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              <span className="text-slate-500">sessionType:</span>
+              <span>{results.sessionType ?? 'daily'}</span>
+              
+              <span className="text-slate-500">duration (D):</span>
+              <span>{results.durationSecondsActual}s</span>
+              
+              <span className="text-slate-500">questions (N):</span>
+              <span>{results.totalQuestions}</span>
+              
+              <span className="text-slate-500">correct (C):</span>
+              <span>{results.correctQuestions}</span>
+              
+              <span className="text-slate-500">accuracy (A):</span>
+              <span>{(results.accuracy * 100).toFixed(1)}%</span>
+              
+              <span className="text-slate-500">medianMs:</span>
+              <span>{results.medianMs?.toFixed(0) ?? 'N/A'}</span>
+              
+              <span className="text-slate-500">variabilityMs:</span>
+              <span>{results.variabilityMs?.toFixed(0) ?? 'N/A'}</span>
+              
+              <span className="text-slate-500">qps:</span>
+              <span>{results.throughputQps?.toFixed(3) ?? 'N/A'}</span>
+            </div>
+
+            <div className="border-t border-slate-700 my-2 pt-2">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                <span className="text-slate-500">speedScore (S):</span>
+                <span>{results.speedScore?.toFixed(3) ?? 'N/A'}</span>
+                
+                <span className="text-slate-500">consistencyScore (Cns):</span>
+                <span>{results.consistencyScore?.toFixed(3) ?? 'N/A'}</span>
+                
+                <span className="text-slate-500">throughputScore (T):</span>
+                <span>{results.throughputScore?.toFixed(3) ?? 'N/A'}</span>
+                
+                <span className="text-slate-500">fluencyScore (F):</span>
+                <span>{results.fluencyScore?.toFixed(1) ?? 'N/A'}</span>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-700 my-2 pt-2">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                <span className="text-slate-500">baseSessionXP:</span>
+                <span>{results.baseSessionXP ?? 'N/A'}</span>
+                
+                <span className="text-slate-500">modeMultiplier:</span>
+                <span>{results.modeMultiplier?.toFixed(2) ?? '1.00'}</span>
+                
+                <span className="text-slate-500">excellenceMultiplier:</span>
+                <span>{results.excellenceMultiplierApplied?.toFixed(2) ?? '1.00'}</span>
+                
+                <span className="text-slate-500">eliteMultiplier:</span>
+                <span>{results.eliteMultiplierApplied?.toFixed(2) ?? '1.00'}</span>
+                
+                <span className="text-slate-500 font-bold">finalSessionXP:</span>
+                <span className="text-primary font-bold">{results.finalSessionXP ?? results.xpEarned}</span>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-700 my-2 pt-2">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                <span className="text-slate-500">levelBefore:</span>
+                <span>{results.levelBefore ?? 'N/A'}</span>
+                
+                <span className="text-slate-500">levelAfter:</span>
+                <span className="text-primary">{results.levelAfter ?? 'N/A'}</span>
+                
+                <span className="text-slate-500">levelUpCount:</span>
+                <span>{results.levelUpCount ?? 0}</span>
+                
+                <span className="text-slate-500">xpIntoLevel (before):</span>
+                <span>{results.xpIntoLevelBefore ?? 'N/A'}</span>
+                
+                <span className="text-slate-500">xpIntoLevel (after):</span>
+                <span>{results.xpIntoLevelAfter ?? 'N/A'}</span>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-700 my-2 pt-2">
+              <div className="text-slate-400 font-bold uppercase text-[10px] tracking-wider mb-2">Next 5 Level Requirements</div>
+              <div className="grid grid-cols-5 gap-2 text-center">
+                {[0, 1, 2, 3, 4].map(i => {
+                  const lvl = (results.levelAfter ?? 1) + i;
+                  return (
+                    <div key={i}>
+                      <div className="text-slate-500">L{lvl}</div>
+                      <div className="text-slate-300">{xpRequiredToAdvance(lvl)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="text-slate-500 text-[10px] mt-2">valid: {results.valid ? 'true' : 'false'}</div>
+          </motion.div>
+        )}
       </div>
     </MobileLayout>
   );

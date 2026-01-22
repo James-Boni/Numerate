@@ -11,6 +11,7 @@ import { useStore, SessionStats } from '@/lib/store';
 import { AudioManager } from '@/lib/audio';
 import { computeFluencyComponents, computeFluencyScore, computeSessionXP } from '@/lib/logic/progression';
 import { PROGRESSION_CONFIG as CFG } from '@/config/progression';
+import { calculateFullSessionXP, applyXPAndLevelUp } from '@/lib/logic/xp-system';
 import { DebugOverlay } from './DebugOverlay';
 
 interface SessionScreenProps {
@@ -50,6 +51,8 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   
   const settings = useStore(s => s.settings);
   const recordAnswer = useStore(s => s.recordAnswer);
+  const currentLevel = useStore(s => s.level);
+  const currentXpIntoLevel = useStore(s => s.xpIntoLevel);
 
   const progression = useStore(s => s.progression);
   
@@ -159,62 +162,61 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     const finalCorrectCount = correctCountRef.current;
     const finalTotalCount = totalCountRef.current;
     const finalBestStreak = bestStreakRef.current;
-    const finalScore = scoreRef.current; // Canonical accumulated XP
     
-    const components = computeFluencyComponents(
+    // Calculate XP using the new system
+    const sessionType = 'daily'; // TODO: Pass session type from props
+    const { fluencyMetrics, xpResult } = calculateFullSessionXP(
+      sessionType,
+      finalTotalCount,
       finalCorrectCount,
-      finalTotalCount,
-      responseTimesRef.current,
-      durationSecondsActual
+      durationSecondsActual,
+      responseTimesRef.current
     );
     
-    const fluencyScore = computeFluencyScore(components);
-    
-    const isValid = finalTotalCount >= CFG.MIN_QUESTIONS_FOR_VALID_SESSION && 
-                  durationSecondsActual >= CFG.MIN_DURATION_FOR_VALID_SESSION_SEC;
-    
-    // Use accumulated per-question XP as canonical XP (what user saw during session)
-    // Apply excellence bonus if met
-    const { metBonus } = computeSessionXP(
-      fluencyScore,
-      finalTotalCount,
-      components,
-      isValid
+    // Calculate level progression
+    const levelResult = applyXPAndLevelUp(
+      currentLevel,
+      currentXpIntoLevel,
+      xpResult.finalSessionXP
     );
-    
-    // Apply bonus multiplier to accumulated XP if earned
-    let xpEarnedTotal = finalScore;
-    if (metBonus && finalScore > 0) {
-      const { accuracy } = components;
-      const multiplier = accuracy >= 0.95 ? 1.35 : 1.25; // Elite or standard bonus
-      xpEarnedTotal = Math.round(finalScore * multiplier);
-    }
     
     console.log("[XP_SESSION_END]", {
-      xpTotalCanonical: xpEarnedTotal,
-      baseXpTotal: finalScore,
-      bonusApplied: metBonus,
-      answersCount: finalTotalCount,
-      correctCount: finalCorrectCount,
+      fluencyMetrics,
+      xpResult,
+      levelResult
     });
 
     const stats: SessionStats = {
       id: Math.random().toString(36).substring(7),
       date: new Date().toISOString(),
+      sessionType,
       durationMode: durationSeconds === 'unlimited' ? 'unlimited' : (durationSeconds as any),
       durationSecondsActual,
       totalQuestions: finalTotalCount,
       correctQuestions: finalCorrectCount,
-      accuracy: finalTotalCount > 0 ? finalCorrectCount / finalTotalCount : 0,
-      xpEarned: xpEarnedTotal,
+      accuracy: fluencyMetrics.accuracy,
+      xpEarned: xpResult.finalSessionXP,
       bestStreak: finalBestStreak,
-      avgResponseTimeMs: components.medianMs,
-      medianMs: components.medianMs,
-      variabilityMs: components.variabilityMs,
-      throughputQps: components.qps,
-      fluencyScore,
-      metBonus,
-      valid: isValid,
+      avgResponseTimeMs: fluencyMetrics.medianMs,
+      medianMs: fluencyMetrics.medianMs,
+      variabilityMs: fluencyMetrics.variabilityMs,
+      throughputQps: fluencyMetrics.qps,
+      speedScore: fluencyMetrics.speedScore,
+      consistencyScore: fluencyMetrics.consistencyScore,
+      throughputScore: fluencyMetrics.throughputScore,
+      fluencyScore: fluencyMetrics.fluencyScore,
+      baseSessionXP: xpResult.baseSessionXP,
+      modeMultiplier: xpResult.modeMultiplier,
+      excellenceMultiplierApplied: xpResult.excellenceMultiplierApplied,
+      eliteMultiplierApplied: xpResult.eliteMultiplierApplied,
+      finalSessionXP: xpResult.finalSessionXP,
+      levelBefore: levelResult.levelBefore,
+      levelAfter: levelResult.levelAfter,
+      levelUpCount: levelResult.levelUpCount,
+      xpIntoLevelBefore: levelResult.xpIntoLevelBefore,
+      xpIntoLevelAfter: levelResult.xpIntoLevelAfter,
+      metBonus: xpResult.excellenceMultiplierApplied > 1,
+      valid: xpResult.isValid,
       responseTimes: [...responseTimesRef.current],
     };
     
