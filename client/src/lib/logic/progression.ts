@@ -84,9 +84,15 @@ export const computeSessionXP = (
   return { totalXP, metBonus };
 };
 
+// Re-export the new xpRequiredToAdvance function
+export { xpRequiredToAdvance } from './xp-system';
+
+// Legacy function kept for backward compatibility (used by old level-up logic)
+// This returns cumulative XP required to reach a level
 export const getRequiredXPForLevel = (level: number): number => {
   if (level <= 1) return 0;
-  // requiredXP(L) = round( 150 * (L-1) ^ 1.25 + 50*(L-1) )
+  // Sum of all xpRequiredToAdvance from 1 to level-1
+  // For now, use the old formula for cumulative XP display purposes
   return Math.round(150 * Math.pow(level - 1, 1.25) + 50 * (level - 1));
 };
 

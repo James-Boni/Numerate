@@ -1,0 +1,325 @@
+Replit Prompt: XP + Infinite Levels + Elite Acceleration (Assessment gives NO XP)
+We are implementing Numerate’s XP + leveling system. This must be mathematically precise, infinite, and resistant to exploitation. Do NOT change assessment placement logic except to ensure assessment gives NO XP and does not change level after placement.
+
+NON-NEGOTIABLE RULES
+1) Assessment (initial 3-minute test) gives NO XP and NO level-ups. It only sets competenceGroup (G1–G10) and startingLevel.
+2) Level = difficulty. Higher level means harder questions.
+3) Levels are infinite (unbounded). No maximum.
+4) XP is never lost.
+5) XP and level-ups can happen in multi-level jumps if enough XP is earned.
+6) Elite acceleration applies across ALL modes (except assessment), but modes have multipliers so future modes can contribute less.
+
+-------------------------------------------------------------------
+A) DATA MODEL / STATE (REQUIRED)
+-------------------------------------------------------------------
+Store on user profile:
+- level: integer >= 1
+- xpIntoLevel: integer >= 0   (carryover XP within the current level)
+- competenceGroup: 1..10 (from assessment)
+- hasCompletedAssessment: boolean
+- startingLevel: integer
+
+Store per session record:
+- sessionType: string (e.g. "daily", "quick_fire", future modes)
+- durationSeconds D
+- totalAnswers N
+- correctAnswers C
+- accuracy A
+- medianMs
+- variabilityMs (MAD or IQR)
+- qps (questions per second)
+- speedScore S
+- consistencyScore Cns
+- throughputScore T
+- fluencyScore F (0..100)
+- baseSessionXP (before mode + bonuses)
+- modeMultiplier
+- excellenceMultiplierApplied (1.0, 1.25, 1.35)
+- eliteMultiplierApplied (1.0 or 2.0)
+- finalSessionXP (integer)
+- levelBefore, levelAfter, levelUpCount
+- xpIntoLevelBefore, xpIntoLevelAfter
+- timestamp
+
+-------------------------------------------------------------------
+B) CONFIG (IN client/src/config/progression.ts)
+-------------------------------------------------------------------
+Create/ensure these constants exist in config. Use these defaults (can tune later):
+
+// Session validity (anti-cheese)
+MIN_QUESTIONS_FOR_XP = 8
+MIN_DURATION_FOR_XP_SEC = 20
+
+// Fluency normalization
+TARGET_TIME_MS = 1600
+REFERENCE_VARIABILITY_MS = 600
+TARGET_QPS = 0.28
+
+// Fluency weights
+WEIGHTS = { ACCURACY: 0.35, SPEED: 0.25, THROUGHPUT: 0.25, CONSISTENCY: 0.15 }
+
+// Fluency safeguard
+ACCURACY_FLOOR = 0.55
+FLUENCY_CAP_BELOW_ACCURACY_FLOOR = 45
+
+// Base XP formula (KEEP EXISTING SCALE; do not shrink unless required)
+BASE_XP = 10
+MAX_PERFORMANCE_XP = 220
+MAX_EFFORT_XP = 80
+EFFORT_TARGET_QUESTIONS = 35
+
+// Mode multipliers (future-proof; can be tuned)
+MODE_MULTIPLIERS = {
+  daily: 1.0,
+  quick_fire: 0.55,
+  practice: 0.7,
+  unlimited: 0.4
+}
+
+// Excellence thresholds (must meet ALL)
+EXCELLENCE_THRESHOLDS = {
+  ACCURACY: 0.90,
+  SPEED_SCORE: 0.95,
+  CONSISTENCY: 0.75,
+  THROUGHPUT: 0.85
+}
+EXCELLENCE_MULTIPLIER = 1.25
+ELITE_ACCURACY_MULTIPLIER = 1.35  // if accuracy >= 0.95 and all excellence thresholds met
+
+// Elite Accelerator (applies across ALL non-assessment modes, must meet ALL)
+ELITE_THRESHOLDS = {
+  ACCURACY: 0.98,
+  SPEED_SCORE: 0.97,
+  CONSISTENCY: 0.80,
+  THROUGHPUT_SCORE: 1.00,
+  MIN_QUESTIONS: 45,
+  MIN_DURATION_SEC: 60
+}
+ELITE_MULTIPLIER = 2.0
+
+// Level XP requirements
+LEVEL_REQ_L1_TO_L4 = 500
+LEVEL_REQ_L5 = 1000
+INC_START_L6 = 120
+INC_GROWTH_STAGE1 = 15   // applies for levels 6..14
+INC_GROWTH_STAGE2 = 25   // applies for levels >=15
+
+-------------------------------------------------------------------
+C) FLUENCY METRICS (PER SESSION)
+-------------------------------------------------------------------
+For every non-assessment session:
+
+Inputs:
+- N = total answers submitted
+- C = correct answers
+- D = duration seconds
+- responseTimesMs[] for submitted answers
+
+Compute:
+A = C / max(N,1)
+
+medianMs = median(responseTimesMs) (if empty, set large e.g. 99999)
+
+SpeedScore S = clamp(0..1, TARGET_TIME_MS / medianMs)
+
+Consistency:
+variabilityMs = MAD(responseTimesMs)  (or IQR; choose one and be consistent)
+ConsistencyScore Cns = clamp(0..1, 1 - (variabilityMs / REFERENCE_VARIABILITY_MS))
+
+Throughput:
+qps = N / max(D,1)
+ThroughputScore T = clamp(0..1, qps / TARGET_QPS)
+
+FluencyScore F (0..100):
+F = 100 * (wA*A + wS*S + wT*T + wC*Cns)
+
+Safeguard:
+if A < ACCURACY_FLOOR then F = min(F, FLUENCY_CAP_BELOW_ACCURACY_FLOOR)
+
+-------------------------------------------------------------------
+D) BASE SESSION XP (PERFORMANCE + EFFORT)
+-------------------------------------------------------------------
+EffortScore E (0..1):
+E = clamp(0..1, N / EFFORT_TARGET_QUESTIONS)
+
+baseSessionXP (integer):
+baseSessionXP = BASE_XP + round(MAX_PERFORMANCE_XP * (F/100)) + round(MAX_EFFORT_XP * E)
+
+VALIDITY RULES:
+If N < MIN_QUESTIONS_FOR_XP OR D < MIN_DURATION_FOR_XP_SEC:
+- still grant XP, but minimal:
+  baseSessionXP = BASE_XP + round(0.25 * round(MAX_EFFORT_XP * E)) + round(0.25 * round(MAX_PERFORMANCE_XP * (F/100)))
+- DO NOT allow excellence or elite multipliers in invalid sessions
+
+-------------------------------------------------------------------
+E) MODE MULTIPLIER (ALL MODES EXCEPT ASSESSMENT)
+-------------------------------------------------------------------
+For non-assessment sessions:
+modeMultiplier = MODE_MULTIPLIERS[sessionType] if exists else 1.0
+
+xpAfterMode = round(baseSessionXP * modeMultiplier)
+
+-------------------------------------------------------------------
+F) EXCELLENCE BONUS (THRESHOLD + MULTIPLIER)
+-------------------------------------------------------------------
+If session is valid AND all true:
+- A >= EXCELLENCE_THRESHOLDS.ACCURACY
+- S >= EXCELLENCE_THRESHOLDS.SPEED_SCORE
+- Cns >= EXCELLENCE_THRESHOLDS.CONSISTENCY
+- T >= EXCELLENCE_THRESHOLDS.THROUGHPUT
+
+Then apply:
+- excellenceMultiplier = EXCELLENCE_MULTIPLIER (1.25)
+- If A >= 0.95 then excellenceMultiplier = ELITE_ACCURACY_MULTIPLIER (1.35)
+xpAfterExcellence = round(xpAfterMode * excellenceMultiplier)
+
+Else:
+xpAfterExcellence = xpAfterMode
+excellenceMultiplier = 1.0
+
+-------------------------------------------------------------------
+G) ELITE ACCELERATOR (ALL MODES, BUT GATED)
+-------------------------------------------------------------------
+Elite should make truly gifted users “fly up” BUT must be hard to fake and must not trigger on short runs.
+
+If session is valid AND all true:
+- A >= ELITE_THRESHOLDS.ACCURACY
+- S >= ELITE_THRESHOLDS.SPEED_SCORE
+- Cns >= ELITE_THRESHOLDS.CONSISTENCY
+- T >= ELITE_THRESHOLDS.THROUGHPUT_SCORE
+- N >= ELITE_THRESHOLDS.MIN_QUESTIONS
+- D >= ELITE_THRESHOLDS.MIN_DURATION_SEC
+
+Then:
+finalSessionXP = round(xpAfterExcellence * ELITE_MULTIPLIER)
+eliteMultiplierApplied = ELITE_MULTIPLIER
+
+Else:
+finalSessionXP = xpAfterExcellence
+eliteMultiplierApplied = 1.0
+
+IMPORTANT ORDER:
+baseSessionXP -> modeMultiplier -> excellence -> elite
+
+Elite applies across all modes (except assessment) but will naturally be diminished in lower-multiplier modes.
+
+-------------------------------------------------------------------
+H) LEVEL REQUIREMENT CURVE (INFINITE, PIECEWISE, WITH SPIKE AT 15+)
+-------------------------------------------------------------------
+We use incremental XP with carryover.
+
+Define function xpRequiredToAdvance(level L):
+- For L in {1,2,3,4}: return 500
+- For L == 5: return 1000
+- For L >= 6:
+  We model requirements using the increment method:
+  req(5)=1000
+  inc(6)=INC_START_L6
+  For levels 6..14, increment grows by INC_GROWTH_STAGE1 each level.
+  For levels >=15, increment grows by INC_GROWTH_STAGE2 each level.
+
+Implement xpRequiredToAdvance(L) deterministically without precomputing huge tables:
+- You may compute iteratively from 6 up to L (acceptable performance; L won't be huge).
+- Or derive a closed form; iterative is fine and clearer.
+
+Pseudo:
+if L <= 4: return 500
+if L == 5: return 1000
+req = 1000
+inc = INC_START_L6
+for x from 6 to L:
+  // apply current increment to get req(x)
+  req = req + inc
+  // update increment for next level step
+  if x < 15:
+    inc = inc + INC_GROWTH_STAGE1
+  else:
+    inc = inc + INC_GROWTH_STAGE2
+return req
+
+Confirm that:
+- xpRequiredToAdvance(6)=1120
+- xpRequiredToAdvance(7)=1255
+- xpRequiredToAdvance(14)=2620
+- xpRequiredToAdvance(15)=2875
+- xpRequiredToAdvance(16)=3160
+- xpRequiredToAdvance(30)=9775
+
+-------------------------------------------------------------------
+I) APPLY XP + MULTI-LEVEL UPS (CARRYOVER XP)
+-------------------------------------------------------------------
+On completion of a non-assessment session:
+
+levelBefore = user.level
+xpIntoBefore = user.xpIntoLevel
+
+user.xpIntoLevel += finalSessionXP
+
+levelUpCount = 0
+while user.xpIntoLevel >= xpRequiredToAdvance(user.level):
+  user.xpIntoLevel -= xpRequiredToAdvance(user.level)
+  user.level += 1
+  levelUpCount += 1
+
+Persist:
+- user.level
+- user.xpIntoLevel
+- session record including before/after and levelUpCount
+
+This ensures if someone earns 1500 XP at Level 1 they can reach Level 4 (500+500+500) with correct carryover behavior.
+
+-------------------------------------------------------------------
+J) ASSESSMENT MUST NOT GRANT XP / LEVELS
+-------------------------------------------------------------------
+Ensure assessment completion:
+- sets competenceGroup and startingLevel (and sets user.level to startingLevel once)
+- sets xpIntoLevel to 0 (or leaves existing for returning users, but initial placement should set it)
+- does NOT add XP
+- does NOT trigger level-up logic
+- does NOT create XP session records (or marks sessionType="assessment" and excludes from XP calculations)
+
+-------------------------------------------------------------------
+K) DEBUG PANEL (TEMPORARY, REQUIRED)
+-------------------------------------------------------------------
+On session summary screen, add a small Debug section showing:
+
+- sessionType, D, N, C
+- A, medianMs, variabilityMs, qps
+- S, Cns, T, FluencyScore F
+- baseSessionXP
+- modeMultiplier and xpAfterMode
+- excellenceMultiplierApplied and xpAfterExcellence
+- eliteMultiplierApplied and finalSessionXP
+- levelBefore -> levelAfter, levelUpCount
+- xpIntoLevelBefore -> xpIntoLevelAfter
+- xpRequiredToAdvance(currentLevel) and also next 5 levels requirements (for tuning)
+
+Make it easy to toggle off later.
+
+-------------------------------------------------------------------
+L) UNIT TESTS (MANDATORY)
+-------------------------------------------------------------------
+Add tests verifying:
+
+1) Assessment does not grant XP or level-ups.
+2) xpRequiredToAdvance matches known values:
+   L1..4=500, L5=1000, L6=1120, L15=2875, L30=9775
+3) Carryover + multi-level ups:
+   Start level=1 xpInto=0, add 1500 => ends at level=4 xpInto=0
+4) Excellence multiplier triggers only when all 4 thresholds met and session valid.
+5) Elite multiplier triggers only when all elite thresholds met and session valid, including duration and min questions.
+6) Mode multipliers diminish XP correctly.
+
+-------------------------------------------------------------------
+M) IMPLEMENTATION NOTES
+-------------------------------------------------------------------
+- Keep functions pure:
+  computeFluency(metrics) -> {A,S,Cns,T,F,medianMs,variabilityMs,qps}
+  computeBaseSessionXP(F,N) -> baseSessionXP
+  computeSessionXPWithMultipliers(baseXP, sessionType, thresholds...) -> finalSessionXP + applied multipliers
+  xpRequiredToAdvance(level) -> number
+  applyXPAndLevelUp(user, finalSessionXP) -> updated user + counts
+- Place constants in client/src/config/progression.ts
+- Ensure the build passes and tests pass.
+
+Proceed to implement exactly as specified. Do not redesign UI.

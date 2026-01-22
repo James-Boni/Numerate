@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getRequiredXPForLevel } from './logic/progression';
+import { xpRequiredToAdvance, applyXPAndLevelUp } from './logic/xp-system';
 import { 
   ProgressionState, 
   INITIAL_PROGRESSION_STATE, 
@@ -26,6 +27,7 @@ export interface UserSettings {
 export interface SessionStats {
   id: string;
   date: string; // ISO string
+  sessionType: string;
   durationMode: DurationMode;
   durationSecondsActual: number;
   totalQuestions: number;
@@ -37,7 +39,20 @@ export interface SessionStats {
   medianMs?: number;
   variabilityMs?: number;
   throughputQps?: number;
+  speedScore?: number;
+  consistencyScore?: number;
+  throughputScore?: number;
   fluencyScore?: number;
+  baseSessionXP?: number;
+  modeMultiplier?: number;
+  excellenceMultiplierApplied?: number;
+  eliteMultiplierApplied?: number;
+  finalSessionXP?: number;
+  levelBefore?: number;
+  levelAfter?: number;
+  levelUpCount?: number;
+  xpIntoLevelBefore?: number;
+  xpIntoLevelAfter?: number;
   metBonus?: boolean;
   valid?: boolean;
   responseTimes?: number[];
@@ -52,8 +67,11 @@ export interface UserState {
   
   // Progress
   hasCompletedAssessment: boolean;
-  currentTier: number; // Legacy 0-6
+  currentTier: number; // Legacy 0-6, now maps to competenceGroup
+  competenceGroup: number; // 1-10 from assessment
+  startingLevel: number; // Initial level from assessment
   level: number;
+  xpIntoLevel: number; // Carryover XP within current level
   lifetimeXP: number;
   streakCount: number;
   lastStreakDate: string | null; // ISO string
@@ -98,7 +116,10 @@ export const useStore = create<UserState>()(
       
       hasCompletedAssessment: false,
       currentTier: 0,
+      competenceGroup: 1,
+      startingLevel: 1,
       level: 1,
+      xpIntoLevel: 0,
       lifetimeXP: 0,
       streakCount: 0,
       lastStreakDate: null,
@@ -158,10 +179,14 @@ export const useStore = create<UserState>()(
       completeAssessment: (competenceGroup, startingLevel, initialStats) => set((state) => ({
         hasCompletedAssessment: true,
         currentTier: competenceGroup,
+        competenceGroup: competenceGroup,
+        startingLevel: startingLevel,
         level: startingLevel,
+        xpIntoLevel: 0, // Assessment gives NO XP
         progression: {
           ...state.progression,
           level: startingLevel,
+          band: getBandFromLevel(startingLevel),
         },
       })),
       
@@ -186,24 +211,26 @@ export const useStore = create<UserState>()(
            newLastStreakDate = new Date().toISOString();
         }
 
+        // Apply XP with the new carryover system
+        const levelResult = applyXPAndLevelUp(
+          state.level,
+          state.xpIntoLevel,
+          session.xpEarned
+        );
+        
         const newLifetimeXP = state.lifetimeXP + session.xpEarned;
-        
-        let newLevel = state.level;
-        while (newLifetimeXP >= getRequiredXPForLevel(newLevel + 1)) {
-          newLevel++;
-        }
-        
-        const newBand = getBandFromLevel(newLevel);
+        const newBand = getBandFromLevel(levelResult.levelAfter);
 
         set({
           sessions: [session, ...state.sessions],
           lifetimeXP: newLifetimeXP,
-          level: newLevel,
+          level: levelResult.levelAfter,
+          xpIntoLevel: levelResult.xpIntoLevelAfter,
           streakCount: newStreak,
           lastStreakDate: newLastStreakDate,
           progression: {
             ...state.progression,
-            level: newLevel,
+            level: levelResult.levelAfter,
             band: newBand
           }
         });
@@ -211,6 +238,7 @@ export const useStore = create<UserState>()(
         if (state.uid) {
           try {
             await api.createSession(state.uid, {
+              sessionType: session.sessionType ?? 'daily',
               durationMode: session.durationMode === 'unlimited' ? 9999 : session.durationMode,
               durationSecondsActual: session.durationSecondsActual,
               totalQuestions: session.totalQuestions,
@@ -221,9 +249,21 @@ export const useStore = create<UserState>()(
               avgResponseTimeMs: session.avgResponseTimeMs,
               medianMs: session.medianMs ?? null,
               variabilityMs: session.variabilityMs ?? null,
-              throughputQps: session.throughputQps ?? null,
+              qps: session.throughputQps ?? null,
+              speedScore: session.speedScore ?? null,
+              consistencyScore: session.consistencyScore ?? null,
+              throughputScore: session.throughputScore ?? null,
               fluencyScore: session.fluencyScore ?? null,
-              metBonus: session.metBonus ?? null,
+              baseSessionXP: session.baseSessionXP ?? null,
+              modeMultiplier: session.modeMultiplier ?? null,
+              excellenceMultiplierApplied: session.excellenceMultiplierApplied ?? null,
+              eliteMultiplierApplied: session.eliteMultiplierApplied ?? null,
+              finalSessionXP: session.finalSessionXP ?? null,
+              levelBefore: session.levelBefore ?? null,
+              levelAfter: session.levelAfter ?? null,
+              levelUpCount: session.levelUpCount ?? null,
+              xpIntoLevelBefore: session.xpIntoLevelBefore ?? null,
+              xpIntoLevelAfter: session.xpIntoLevelAfter ?? null,
               valid: session.valid ?? true
             });
             
@@ -242,7 +282,10 @@ export const useStore = create<UserState>()(
       resetProgress: () => set({
         hasCompletedAssessment: false,
         currentTier: 0,
+        competenceGroup: 1,
+        startingLevel: 1,
         level: 1,
+        xpIntoLevel: 0,
         lifetimeXP: 0,
         sessions: [],
         streakCount: 0,
@@ -377,6 +420,7 @@ export const useStore = create<UserState>()(
             sessions: sessions.map(s => ({
               id: s.id,
               date: s.date.toString(),
+              sessionType: s.sessionType ?? 'daily',
               durationMode: s.durationMode === 9999 ? 'unlimited' as const : s.durationMode as 60 | 120 | 180,
               durationSecondsActual: s.durationSecondsActual,
               totalQuestions: s.totalQuestions,
@@ -387,9 +431,22 @@ export const useStore = create<UserState>()(
               avgResponseTimeMs: s.avgResponseTimeMs,
               medianMs: s.medianMs ?? undefined,
               variabilityMs: s.variabilityMs ?? undefined,
-              throughputQps: s.throughputQps ?? undefined,
+              throughputQps: s.qps ?? undefined,
+              speedScore: s.speedScore ?? undefined,
+              consistencyScore: s.consistencyScore ?? undefined,
+              throughputScore: s.throughputScore ?? undefined,
               fluencyScore: s.fluencyScore ?? undefined,
-              metBonus: s.metBonus ?? undefined,
+              baseSessionXP: s.baseSessionXP ?? undefined,
+              modeMultiplier: s.modeMultiplier ?? undefined,
+              excellenceMultiplierApplied: s.excellenceMultiplierApplied ?? undefined,
+              eliteMultiplierApplied: s.eliteMultiplierApplied ?? undefined,
+              finalSessionXP: s.finalSessionXP ?? undefined,
+              levelBefore: s.levelBefore ?? undefined,
+              levelAfter: s.levelAfter ?? undefined,
+              levelUpCount: s.levelUpCount ?? undefined,
+              xpIntoLevelBefore: s.xpIntoLevelBefore ?? undefined,
+              xpIntoLevelAfter: s.xpIntoLevelAfter ?? undefined,
+              metBonus: s.excellenceMultiplierApplied ? s.excellenceMultiplierApplied > 1 : undefined,
               valid: s.valid
             })),
             isSyncing: false
