@@ -37,10 +37,19 @@ Preferred communication style: Simple, everyday language.
 1. Curriculum Gates (Level) - Controls what question types are available based on user level
 2. Adaptive Tuning (Skill Ratings) - Adjusts difficulty within allowed templates based on performance
 
-**Question Generation**:
-- Template-based generation with band progression (10 levels per band)
-- Non-trivial filter to prevent overly easy questions after onboarding
+**Question Generation (Level-Based System)**:
+- Level directly controls operation mix via `getOperationWeights(level)`:
+  - L1-5: 80% add, 20% sub
+  - L6-12: 55% add, 45% sub
+  - L13-20: 40% add, 35% sub, 25% mul
+  - L21-30: 30% add, 30% sub, 25% mul, 15% div
+  - L31+: 25% add, 25% sub, 30% mul, 20% div
+- Level controls operand ranges via `getDifficultyParams(level)`:
+  - maxAddSub = 10 + level * 4 (L10 = 50, L30 = 130)
+  - Multiplication unlocks at level 13
+  - Division unlocks at level 21 (integer results only)
 - Repetition guards to avoid asking the same question patterns repeatedly
+- Key files: `difficulty.ts` (weights/params), `generator_adapter.ts` (question generation)
 
 **XP and Scoring**:
 - Base XP per question plus performance bonuses
