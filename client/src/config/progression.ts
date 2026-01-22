@@ -15,3 +15,37 @@ export const PROGRESSION_CONFIG = {
   BONUS_MULTIPLIER: 1.25,
   ELITE_BONUS_MULTIPLIER: 1.35,
 };
+
+export const PLACEMENT_CONFIG = {
+  ASSESSMENT_DURATION_MINUTES: 3,
+  MIN_ANSWERS_FOR_PLACEMENT: 12,
+  MAX_START_LEVEL: 30,
+  
+  CPM_BANDS: [4, 6, 8, 10, 12, 14, 16, 18, 20] as const,
+  
+  ACCURACY_CAPS: {
+    BELOW_55: 3,
+    BELOW_65: 5,
+    BELOW_75: 7,
+    DEFAULT: 10,
+  },
+  
+  SPEED_NUDGE: {
+    FAST_THRESHOLD_MS: 1300,
+    FAST_ACCURACY_MIN: 0.80,
+    SLOW_THRESHOLD_MS: 2600,
+  },
+  
+  GROUP_TO_LEVEL: {
+    1: 1,
+    2: 2,
+    3: 4,
+    4: 6,
+    5: 8,
+    6: 10,
+    7: 12,
+    8: 16,
+    9: 22,
+    10: 30,
+  } as Record<number, number>,
+};

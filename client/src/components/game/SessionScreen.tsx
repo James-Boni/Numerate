@@ -206,7 +206,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       totalQuestions: finalTotalCount,
       correctQuestions: finalCorrectCount,
       accuracy: finalTotalCount > 0 ? finalCorrectCount / finalTotalCount : 0,
-      xpEarned: xpEarnedTotal,  // Use accumulated XP (consistent with in-game display)
+      xpEarned: xpEarnedTotal,
       bestStreak: finalBestStreak,
       avgResponseTimeMs: components.medianMs,
       medianMs: components.medianMs,
@@ -214,7 +214,8 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       throughputQps: components.qps,
       fluencyScore,
       metBonus,
-      valid: isValid
+      valid: isValid,
+      responseTimes: [...responseTimesRef.current],
     };
     
     onComplete(stats);

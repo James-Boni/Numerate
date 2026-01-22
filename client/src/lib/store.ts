@@ -40,6 +40,7 @@ export interface SessionStats {
   fluencyScore?: number;
   metBonus?: boolean;
   valid?: boolean;
+  responseTimes?: number[];
 }
 
 export interface UserState {
@@ -71,7 +72,7 @@ export interface UserState {
   // Actions
   login: (email: string) => void;
   logout: () => void;
-  completeAssessment: (tier: number, initialStats: any) => void;
+  completeAssessment: (competenceGroup: number, startingLevel: number, initialStats: any) => void;
   saveSession: (session: SessionStats) => void;
   updateSettings: (settings: Partial<UserSettings>) => void;
   resetProgress: () => void;
@@ -154,10 +155,15 @@ export const useStore = create<UserState>()(
       
       logout: () => set({ isAuthenticated: false, email: null, uid: null }),
       
-      completeAssessment: (tier, initialStats) => set({
+      completeAssessment: (competenceGroup, startingLevel, initialStats) => set((state) => ({
         hasCompletedAssessment: true,
-        currentTier: tier,
-      }),
+        currentTier: competenceGroup,
+        level: startingLevel,
+        progression: {
+          ...state.progression,
+          level: startingLevel,
+        },
+      })),
       
       saveSession: async (session) => {
         const state = get();

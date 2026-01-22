@@ -1,0 +1,172 @@
+We are perfecting the 3-minute initial assessment placement. This is the most important logic in the app.
+
+Objective:
+After the 3-minute assessment, assign:
+1) competenceGroup G ∈ {1..10}
+2) startingLevel Lstart ∈ {1..30} where level = difficulty
+Rules:
+- G1 must always map to level 1 (never 0).
+- No user can start at level 100; hard cap startingLevel at MAX_START_LEVEL=30.
+- Early grouping must be tight (small differences); top performers get fast-tracked.
+- Placement must avoid overwhelm (accuracy gating) and avoid boredom (throughput anchoring).
+
+Implement as a deterministic pipeline with clear intermediate values and unit tests.
+
+------------------------------------------
+A) COLLECT METRICS DURING ASSESSMENT
+------------------------------------------
+During the 3-minute assessment session, record per attempt:
+- wasCorrect: boolean
+- responseTimeMs: integer (time from question render to submit)
+- timestamp
+Also record:
+- assessmentDurationSeconds (should be close to 180, but use actual)
+
+At end compute:
+- N = totalAnswersSubmitted (integer)
+- C = correctAnswers (integer)
+- A = accuracy = C / max(N,1)  (float 0..1)
+- CPM = correct per minute = C / 3  (float)
+- medianMs = median(responseTimeMs of submitted answers) (integer)
+- If N==0 set A=0, CPM=0, medianMs=99999.
+
+Minimum validity:
+- MIN_ANSWERS_FOR_PLACEMENT = 12
+If N < MIN_ANSWERS_FOR_PLACEMENT:
+- Force group = 1 and startingLevel = 1
+- Still show results, but message encourages retake.
+
+------------------------------------------
+B) BASE GROUP FROM CPM (ANCHOR)
+------------------------------------------
+Define base group G0 from CPM using bands:
+
+G0 = 1 if CPM < 4
+G0 = 2 if 4 ≤ CPM < 6
+G0 = 3 if 6 ≤ CPM < 8
+G0 = 4 if 8 ≤ CPM < 10
+G0 = 5 if 10 ≤ CPM < 12
+G0 = 6 if 12 ≤ CPM < 14
+G0 = 7 if 14 ≤ CPM < 16
+G0 = 8 if 16 ≤ CPM < 18
+G0 = 9 if 18 ≤ CPM < 20
+G0 = 10 if CPM ≥ 20
+
+(These correspond to correct counts over 3 minutes:
+<12, 12–17, 18–23, 24–29, 30–35, 36–41, 42–47, 48–53, 54–59, 60+)
+
+------------------------------------------
+C) ACCURACY CAPS (SAFETY AGAINST OVERWHELM)
+------------------------------------------
+Apply an accuracy cap to prevent fast-but-sloppy users being placed too high.
+
+Define capGroup Gcap:
+- If A < 0.55 then Gcap = 3
+- Else if A < 0.65 then Gcap = 5
+- Else if A < 0.75 then Gcap = 7
+- Else Gcap = 10
+
+Now apply:
+G1 = min(G0, Gcap)
+
+This ensures low accuracy can’t start at extreme difficulty.
+
+------------------------------------------
+D) SPEED NUDGES (SMALL TIE-BREAKERS)
+------------------------------------------
+Speed should never overpower CPM+accuracy; only small nudges.
+
+Compute nudged group:
+G2 = G1
+
+If (medianMs <= 1300) AND (A >= 0.80):
+  G2 = min(10, G2 + 1)
+
+If (medianMs >= 2600):
+  G2 = max(1, G2 - 1)
+
+Final competenceGroup:
+G = clamp(G2, 1, 10)
+
+------------------------------------------
+E) MAP GROUP -> STARTING LEVEL (LEVEL = DIFFICULTY)
+------------------------------------------
+We use tight early mapping and increasing fast-track at the top.
+
+Level mapping table:
+G1 -> L=1
+G2 -> L=2
+G3 -> L=4
+G4 -> L=6
+G5 -> L=8
+G6 -> L=10
+G7 -> L=12
+G8 -> L=16
+G9 -> L=22
+G10 -> L=30
+
+Apply hard cap:
+MAX_START_LEVEL = 30
+Lstart = min(levelMap[G], MAX_START_LEVEL)
+
+Also ensure:
+- Lstart >= 1 always
+
+------------------------------------------
+F) STORE AND DISPLAY
+------------------------------------------
+Persist to user profile:
+- competenceGroup (1..10)
+- startingLevel (1..30)
+- assessment metrics: N, C, A, CPM, medianMs
+- hasCompletedAssessment = true
+
+On Assessment Results UI show:
+- Starting Level (prominent)
+- competence group label (small)
+- Accuracy (%)
+- Correct answers (C)
+- Questions attempted (N)
+- Median response time (ms or seconds)
+- A short, adult, encouraging message tailored to G (no childish hype)
+
+Add a temporary debug block (dev-only toggle or small text) showing:
+N, C, A, CPM, medianMs, G0, Gcap, G (final), Lstart
+This is necessary to validate placement.
+
+------------------------------------------
+G) UNIT TESTS (MANDATORY)
+------------------------------------------
+Add tests for placement function:
+
+1) Fast but low accuracy is capped:
+Example: CPM=18, A=0.60, medianMs=1100
+Expected: base G0=9, cap to Gcap=5 => G1=5, speed nudge eligible? A<0.80 so no => G=5 => Lstart=8
+
+2) Slow but accurate isn’t punished too hard:
+Example: CPM=8, A=0.92, medianMs=2700
+Expected: G0=4, cap=10 => G1=4, slow nudges down => G=3 => Lstart=4
+
+3) Elite performance reaches G10:
+Example: C=63, N=68 => CPM=21, A=0.93, medianMs=1200
+Expected: G0=10, cap=10 => G1=10, speed nudge +1 but capped => G=10 => Lstart=30
+
+4) Very low attempt count forces G1:
+Example: N=6, C=6
+Expected: group=1, level=1 due to MIN_ANSWERS_FOR_PLACEMENT
+
+5) Borderline CPM band checks (exact boundaries):
+- CPM=4.0 should be G2
+- CPM=6.0 should be G3
+- CPM=20.0 should be G10
+
+------------------------------------------
+H) IMPORTANT: DO NOT CHANGE XP/LEVEL-UP CURVE YET
+------------------------------------------
+This task is ONLY assessment placement. Do NOT implement XP thresholds for leveling in this pass.
+We will tune XP after placement is correct.
+
+Implementation notes:
+- Put placement code in a pure function, e.g. computeStartingPlacement(metrics) -> {group, startingLevel, debug}.
+- Keep all constants in client/src/config/progression.ts.
+- Ensure the app compiles and tests pass.

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ClipboardCheck, Zap, Target, TrendingUp } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { clsx } from 'clsx';
+import { computeStartingPlacement, getPlacementMessage, PlacementResult } from '@/lib/logic/placement';
 
 function CountUp({ value, duration = 1, delay = 0, onTick, prefix = '', suffix = '' }: { 
   value: number, 
@@ -49,28 +50,34 @@ function CountUp({ value, duration = 1, delay = 0, onTick, prefix = '', suffix =
 export default function Assessment() {
   const [step, setStep] = useState<'intro' | 'active' | 'results'>('intro');
   const [results, setResults] = useState<SessionStats | null>(null);
+  const [placement, setPlacement] = useState<PlacementResult | null>(null);
   const [_, setLocation] = useLocation();
   const completeAssessment = useStore(s => s.completeAssessment);
   const settings = useStore(s => s.settings);
   const revealRun = React.useRef(false);
 
-  // Pre-initialize audio context on mount
   useEffect(() => {
     AudioManager.init();
   }, []);
 
   const handleComplete = (stats: SessionStats) => {
     console.log(`[SESSION_FLOW] Assessment complete: ${Date.now()}`, stats);
+    
+    const placementResult = computeStartingPlacement({
+      totalAnswers: stats.totalQuestions,
+      correctAnswers: stats.correctQuestions,
+      responseTimes: stats.responseTimes || [],
+      assessmentDurationSeconds: stats.durationSecondsActual,
+    });
+    
+    console.log("[PLACEMENT_RESULT]", placementResult);
+    console.log("[PLACEMENT_DEBUG]", placementResult.debug);
+    
     setResults(stats);
+    setPlacement(placementResult);
     setStep('results');
     
-    let tier = 0;
-    if (stats.accuracy > 0.85 && stats.avgResponseTimeMs < 1800) tier = 8;
-    else if (stats.accuracy > 0.7) tier = 5;
-    else if (stats.accuracy > 0.5) tier = 3;
-    else if (stats.accuracy > 0.3) tier = 1;
-    
-    completeAssessment(tier, stats);
+    completeAssessment(placementResult.competenceGroup, placementResult.startingLevel, stats);
   };
 
   useEffect(() => {
@@ -104,12 +111,6 @@ export default function Assessment() {
     }
   }, [step, results, settings.soundOn]);
 
-  const getEncouragingMessage = (tier: number) => {
-    if (tier >= 8) return "You have a clear talent for mental arithmetic. We'll provide the challenges to help you reach elite fluency.";
-    if (tier >= 5) return "Your foundations are solid and your speed is promising. Focused daily practice will build your confidence quickly.";
-    if (tier >= 3) return "You're off to a strong start. With consistent training, these operations will soon become second nature.";
-    return "Great job completing the assessment. We'll start with the basics to build a rock-solid foundation for your future progress.";
-  };
 
   if (step === 'intro') {
     return (
@@ -159,11 +160,11 @@ export default function Assessment() {
     );
   }
 
-  const currentTier = useStore.getState().currentTier;
+  const showDebug = settings.showDebugOverlay;
 
   return (
     <MobileLayout className="bg-slate-50">
-      <div className="flex-1 p-8 space-y-8 flex flex-col justify-center">
+      <div className="flex-1 p-6 space-y-6 flex flex-col justify-center overflow-y-auto">
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full mb-4">
             <ClipboardCheck size={32} />
@@ -172,8 +173,19 @@ export default function Assessment() {
           <p className="text-slate-500">Your personalised training plan is ready.</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm rounded-3xl">
+        <div className="bg-white border border-slate-100 rounded-3xl p-6 text-center shadow-sm">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Starting Level</span>
+          <div className="text-6xl font-black text-primary mt-2">
+            <CountUp 
+              value={placement?.startingLevel || 1} 
+              duration={0.8} 
+            />
+          </div>
+          <span className="text-xs text-slate-400 mt-1 block">Group {placement?.competenceGroup || 1}</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm rounded-2xl">
             <span className="text-2xl font-bold">
               <CountUp 
                 value={results?.correctQuestions || 0} 
@@ -182,9 +194,15 @@ export default function Assessment() {
                 onTick={() => settings.soundOn && AudioManager.playTallyTick()}
               />
             </span>
-            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider text-center">Correct Answers</span>
+            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider text-center">Correct</span>
           </Card>
-          <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm rounded-3xl">
+          <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm rounded-2xl">
+            <span className="text-2xl font-bold">
+              {results?.totalQuestions || 0}
+            </span>
+            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider text-center">Attempted</span>
+          </Card>
+          <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm rounded-2xl">
             <span className={clsx(
               "text-2xl font-bold transition-colors duration-300",
               (results?.accuracy || 0) >= 0.95 ? "text-primary" : "text-slate-900"
@@ -199,27 +217,41 @@ export default function Assessment() {
             </span>
             <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider text-center">Accuracy</span>
           </Card>
+          <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm rounded-2xl">
+            <span className="text-2xl font-bold">
+              {placement?.metrics.medianMs ? `${(placement.metrics.medianMs / 1000).toFixed(1)}s` : '-'}
+            </span>
+            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider text-center">Median Time</span>
+          </Card>
         </div>
 
-        <div className="bg-white border border-slate-100 rounded-3xl p-6 text-center space-y-6 shadow-sm">
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assessment XP Earned</span>
-            <div className="text-6xl font-black text-primary mt-2">
-              <CountUp 
-                value={results?.xpEarned || 0} 
-                duration={0.9} 
-              />
-            </div>
-          </div>
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 text-center shadow-sm">
           <p className="text-slate-600 leading-relaxed text-sm">
-            {getEncouragingMessage(currentTier)}
+            {placement ? getPlacementMessage(placement.competenceGroup) : ''}
           </p>
+          {!placement?.debug.isValidPlacement && (
+            <p className="text-amber-600 text-xs mt-2">
+              Minimum 12 answers required for accurate placement. Consider retaking the assessment.
+            </p>
+          )}
         </div>
+
+        {showDebug && placement && (
+          <div className="bg-slate-800 text-slate-200 rounded-xl p-4 text-xs font-mono space-y-1">
+            <div className="font-bold text-slate-400 mb-2">Placement Debug</div>
+            <div>N={placement.debug.N} C={placement.debug.C} A={placement.debug.A.toFixed(3)}</div>
+            <div>CPM={placement.debug.CPM.toFixed(2)} medianMs={placement.debug.medianMs}</div>
+            <div>G0={placement.debug.G0} Gcap={placement.debug.Gcap} G1={placement.debug.G1}</div>
+            <div>G2={placement.debug.G2} G={placement.debug.G} Lstart={placement.debug.Lstart}</div>
+            <div>valid={String(placement.debug.isValidPlacement)}</div>
+          </div>
+        )}
 
         <Button 
           size="lg" 
           className="w-full h-14 text-lg font-semibold rounded-xl shadow-lg shadow-primary/20"
           onClick={() => setLocation('/train')}
+          data-testid="button-start-training"
         >
           Start Daily Training
         </Button>
