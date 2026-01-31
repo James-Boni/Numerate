@@ -282,7 +282,140 @@ export function applyXPAndLevelUp(
   };
 }
 
-// --- Convenience function for full session XP calculation ---
+// --- Bonus XP Calculation (post-session bonuses based on performance thresholds) ---
+
+export interface BonusXPResult {
+  bonusXP: number;
+  excellenceBonus: number;
+  eliteBonus: number;
+  meetsExcellence: boolean;
+  meetsElite: boolean;
+}
+
+export function computeBonusXP(
+  fluencyMetrics: FluencyMetrics,
+  totalAnswers: number,
+  durationSeconds: number,
+  isValid: boolean
+): BonusXPResult {
+  const { accuracy, speedScore, consistencyScore, throughputScore } = fluencyMetrics;
+  
+  let bonusXP = 0;
+  let excellenceBonus = 0;
+  let eliteBonus = 0;
+  let meetsExcellence = false;
+  let meetsElite = false;
+  
+  if (!isValid) {
+    return { bonusXP: 0, excellenceBonus: 0, eliteBonus: 0, meetsExcellence: false, meetsElite: false };
+  }
+  
+  // Excellence bonus: flat bonus for meeting all excellence thresholds
+  meetsExcellence =
+    accuracy >= EXCELLENCE_THRESHOLDS.ACCURACY &&
+    speedScore >= EXCELLENCE_THRESHOLDS.SPEED_SCORE &&
+    consistencyScore >= EXCELLENCE_THRESHOLDS.CONSISTENCY &&
+    throughputScore >= EXCELLENCE_THRESHOLDS.THROUGHPUT;
+  
+  if (meetsExcellence) {
+    // Award bonus based on accuracy tier
+    excellenceBonus = accuracy >= 0.95 ? 100 : 50; // Higher bonus for 95%+ accuracy
+    bonusXP += excellenceBonus;
+  }
+  
+  // Elite bonus: additional bonus for exceptional performance
+  meetsElite =
+    accuracy >= ELITE_THRESHOLDS.ACCURACY &&
+    speedScore >= ELITE_THRESHOLDS.SPEED_SCORE &&
+    consistencyScore >= ELITE_THRESHOLDS.CONSISTENCY &&
+    throughputScore >= ELITE_THRESHOLDS.THROUGHPUT_SCORE &&
+    totalAnswers >= ELITE_THRESHOLDS.MIN_QUESTIONS &&
+    durationSeconds >= ELITE_THRESHOLDS.MIN_DURATION_SEC;
+  
+  if (meetsElite) {
+    eliteBonus = 150; // Flat elite bonus
+    bonusXP += eliteBonus;
+  }
+  
+  return { bonusXP, excellenceBonus, eliteBonus, meetsExcellence, meetsElite };
+}
+
+// --- Combined XP Calculation (in-game XP + bonus XP) ---
+
+export interface CombinedXPResult {
+  inGameXP: number;
+  bonusXP: number;
+  finalSessionXP: number;
+  excellenceBonus: number;
+  eliteBonus: number;
+  meetsExcellence: boolean;
+  meetsElite: boolean;
+  modeMultiplier: number;
+  isValid: boolean;
+}
+
+export function calculateCombinedSessionXP(
+  sessionType: string,
+  inGameXP: number,
+  totalAnswers: number,
+  correctAnswers: number,
+  durationSeconds: number,
+  responseTimesMs: number[]
+): { fluencyMetrics: FluencyMetrics; xpResult: CombinedXPResult } {
+  const fluencyMetrics = computeFluency(
+    totalAnswers,
+    correctAnswers,
+    durationSeconds,
+    responseTimesMs
+  );
+  
+  // Check session validity
+  const isValid = totalAnswers >= MIN_QUESTIONS_FOR_XP && durationSeconds >= MIN_DURATION_FOR_XP_SEC;
+  
+  // Get mode multiplier (assessment = 0)
+  const modeMultiplier = MODE_MULTIPLIERS[sessionType] ?? 1.0;
+  
+  // For assessment, return 0 XP
+  if (modeMultiplier === 0) {
+    return {
+      fluencyMetrics,
+      xpResult: {
+        inGameXP: 0,
+        bonusXP: 0,
+        finalSessionXP: 0,
+        excellenceBonus: 0,
+        eliteBonus: 0,
+        meetsExcellence: false,
+        meetsElite: false,
+        modeMultiplier: 0,
+        isValid
+      }
+    };
+  }
+  
+  // Compute bonus XP
+  const bonusResult = computeBonusXP(fluencyMetrics, totalAnswers, durationSeconds, isValid);
+  
+  // Final XP = In-game XP + Bonus XP (no double-counting)
+  const finalSessionXP = inGameXP + bonusResult.bonusXP;
+  
+  return {
+    fluencyMetrics,
+    xpResult: {
+      inGameXP,
+      bonusXP: bonusResult.bonusXP,
+      finalSessionXP,
+      excellenceBonus: bonusResult.excellenceBonus,
+      eliteBonus: bonusResult.eliteBonus,
+      meetsExcellence: bonusResult.meetsExcellence,
+      meetsElite: bonusResult.meetsElite,
+      modeMultiplier,
+      isValid
+    }
+  };
+}
+
+// --- Legacy function for backward compatibility ---
 
 export function calculateFullSessionXP(
   sessionType: string,

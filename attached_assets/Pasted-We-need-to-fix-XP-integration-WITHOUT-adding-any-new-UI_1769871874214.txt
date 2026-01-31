@@ -1,0 +1,80 @@
+We need to fix XP integration WITHOUT adding any new UI elements or debug panels.
+
+Problem:
+The session results XP currently counts only “additional/bonus XP” (accuracy/speed/etc) and ignores the in-game XP earned during play (shown top-right during the game). This breaks trust.
+
+Requirement:
+For every non-assessment session:
+FinalSessionXP = InGameXP + BonusXP
+
+User-facing UI:
+- Show ONLY one combined number: “X XP”
+- Do NOT show a breakdown.
+- Do NOT add any debug block or developer panel to the UI.
+
+Assessment:
+- Assessment remains placement-only and grants 0 XP. Do not change that.
+
+--------------------------------------------
+A) Identify and standardize XP variables
+--------------------------------------------
+1) Locate where in-game XP is tracked during gameplay (top-right counter).
+   Common names: score, points, xp, earnedXP, runXP, sessionXP, etc.
+   Call this canonical value: inGameXP.
+
+2) Locate where bonus XP is computed from post-session metrics (accuracy, speed, consistency, throughput, effort).
+   Refactor this to a function that returns BONUS XP ONLY:
+   computeBonusXP(metrics) -> { bonusXP, breakdown }
+
+3) At session end, compute:
+finalSessionXP = inGameXP + bonusXP
+
+--------------------------------------------
+B) Make finalSessionXP the single source of truth
+--------------------------------------------
+1) Store finalSessionXP in the session result record.
+2) Apply finalSessionXP to leveling (xpIntoLevel += finalSessionXP).
+3) Display finalSessionXP in the session results screen as “X XP”.
+   Ensure the UI does not display bonusXP or inGameXP separately.
+
+IMPORTANT:
+- The displayed XP value must be the exact same finalSessionXP that gets applied and stored.
+
+--------------------------------------------
+C) Remove the bug pattern (first session after assessment)
+--------------------------------------------
+This often fails on the first Daily session due to state reset/race conditions.
+
+Ensure:
+- inGameXP is initialized to 0 at the start of EVERY session.
+- inGameXP is incremented reliably on each correct answer (and streak/speed logic if applicable).
+- the session summary is computed BEFORE session state is cleared/reset.
+- sessionType is correctly “daily” (not “assessment” or “practice”) after the assessment.
+- the results screen reads from the stored session result object, not live session state.
+
+--------------------------------------------
+D) Backend-only diagnostics (no UI)
+--------------------------------------------
+Add backend-only logging at session end (console only):
+"XP_SUMMARY sessionType=<...> inGameXP=<...> bonusXP=<...> finalSessionXP=<...> appliedToLeveling=<...> storedFinal=<...>"
+
+Add a DEV assertion:
+If finalSessionXP !== inGameXP + bonusXP, log an error.
+
+Also assert:
+- XP applied to leveling == stored finalSessionXP == displayed XP value source
+
+But do not display any of this in the UI.
+
+--------------------------------------------
+E) Tests (required)
+--------------------------------------------
+1) If inGameXP=600 and bonusXP=242, finalSessionXP must be 842, and 842 must be applied/stored/displayed.
+2) Assessment session yields 0 XP and does not level up.
+3) First Daily session after assessment still uses combined XP.
+
+Return:
+- Where inGameXP is sourced
+- Where bonusXP is computed
+- Where finalSessionXP is created/stored/applied
+- Confirm results UI now shows combined XP as a single number.

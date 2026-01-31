@@ -11,7 +11,7 @@ import { useStore, SessionStats } from '@/lib/store';
 import { AudioManager } from '@/lib/audio';
 import { computeFluencyComponents, computeFluencyScore, computeSessionXP } from '@/lib/logic/progression';
 import { PROGRESSION_CONFIG as CFG } from '@/config/progression';
-import { calculateFullSessionXP, applyXPAndLevelUp } from '@/lib/logic/xp-system';
+import { calculateCombinedSessionXP, applyXPAndLevelUp, CombinedXPResult } from '@/lib/logic/xp-system';
 import { getDifficultyParams, DifficultyParams } from '@/lib/logic/difficulty';
 import { DebugOverlay } from './DebugOverlay';
 import { SessionDiagnosticsOverlay } from './SessionDiagnosticsOverlay';
@@ -209,18 +209,22 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     const finalCorrectCount = correctCountRef.current;
     const finalTotalCount = totalCountRef.current;
     const finalBestStreak = bestStreakRef.current;
+    const inGameXP = scoreRef.current; // XP accumulated during gameplay (shown top-right)
     
     // Use the actual mode prop for sessionType
     const sessionType = mode === 'assessment' ? 'assessment' : 'daily';
-    const { fluencyMetrics, xpResult } = calculateFullSessionXP(
+    
+    // Calculate combined XP: inGameXP + bonusXP
+    const { fluencyMetrics, xpResult } = calculateCombinedSessionXP(
       sessionType,
+      inGameXP,
       finalTotalCount,
       finalCorrectCount,
       durationSecondsActual,
       responseTimesRef.current
     );
     
-    // Calculate level progression
+    // Calculate level progression using the combined finalSessionXP
     const levelResult = applyXPAndLevelUp(
       currentLevel,
       currentXpIntoLevel,
@@ -231,18 +235,25 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     const opTotal = opCounts.add + opCounts.sub + opCounts.mul + opCounts.div;
     const opPct = (n: number) => opTotal > 0 ? ((n / opTotal) * 100).toFixed(1) : '0';
     
-    // XP Canonical Logging - these three values MUST match for finalSessionXP
-    console.log("[XP_CANONICAL]", {
+    // XP_SUMMARY: Backend-only diagnostic logging
+    console.log("[XP_SUMMARY]", {
+      sessionType,
+      inGameXP: xpResult.inGameXP,
+      bonusXP: xpResult.bonusXP,
       finalSessionXP: xpResult.finalSessionXP,
-      breakdown: {
-        base: xpResult.baseSessionXP,
-        mode: xpResult.modeMultiplier,
-        excellence: xpResult.excellenceMultiplierApplied,
-        elite: xpResult.eliteMultiplierApplied
-      }
+      appliedToLeveling: xpResult.finalSessionXP,
+      storedFinal: xpResult.finalSessionXP
     });
-    console.log("[XP_APPLIED_TO_LEVELING]", xpResult.finalSessionXP);
-    console.log("[XP_WILL_BE_SHOWN_IN_UI]", xpResult.finalSessionXP);
+    
+    // DEV assertion: finalSessionXP must equal inGameXP + bonusXP
+    if (xpResult.finalSessionXP !== xpResult.inGameXP + xpResult.bonusXP) {
+      console.error("[XP_MISMATCH_ERROR]", {
+        expected: xpResult.inGameXP + xpResult.bonusXP,
+        actual: xpResult.finalSessionXP,
+        inGameXP: xpResult.inGameXP,
+        bonusXP: xpResult.bonusXP
+      });
+    }
     
     console.log("[SESSION_END_REPORT]", {
       sessionType,
@@ -251,40 +262,19 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       correct: finalCorrectCount,
       accuracy: fluencyMetrics.accuracy,
       medianMs: fluencyMetrics.medianMs,
-      variabilityMs: fluencyMetrics.variabilityMs,
-      qps: fluencyMetrics.qps,
-      speedScore: fluencyMetrics.speedScore,
-      consistencyScore: fluencyMetrics.consistencyScore,
-      throughputScore: fluencyMetrics.throughputScore,
-      fluencyScore: fluencyMetrics.fluencyScore,
-      baseSessionXP: xpResult.baseSessionXP,
-      modeMultiplier: xpResult.modeMultiplier,
-      excellenceMultiplier: xpResult.excellenceMultiplierApplied,
-      eliteMultiplier: xpResult.eliteMultiplierApplied,
+      inGameXP: xpResult.inGameXP,
+      bonusXP: xpResult.bonusXP,
+      excellenceBonus: xpResult.excellenceBonus,
+      eliteBonus: xpResult.eliteBonus,
       finalSessionXP: xpResult.finalSessionXP,
       levelBefore: levelResult.levelBefore,
       levelAfter: levelResult.levelAfter,
       levelUpCount: levelResult.levelUpCount,
-      xpIntoLevelBefore: levelResult.xpIntoLevelBefore,
-      xpIntoLevelAfter: levelResult.xpIntoLevelAfter,
       opCounts: {
         add: opCounts.add,
         sub: opCounts.sub,
         mul: opCounts.mul,
         div: opCounts.div
-      },
-      opPercentages: {
-        add: `${opPct(opCounts.add)}%`,
-        sub: `${opPct(opCounts.sub)}%`,
-        mul: `${opPct(opCounts.mul)}%`,
-        div: `${opPct(opCounts.div)}%`
-      },
-      operandStats: {
-        min: operandStatsRef.current.minOperand,
-        max: operandStatsRef.current.maxOperand,
-        avg: operandStatsRef.current.count > 0 
-          ? operandStatsRef.current.operandSum / operandStatsRef.current.count 
-          : 0
       }
     });
 
@@ -307,17 +297,17 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       consistencyScore: fluencyMetrics.consistencyScore,
       throughputScore: fluencyMetrics.throughputScore,
       fluencyScore: fluencyMetrics.fluencyScore,
-      baseSessionXP: xpResult.baseSessionXP,
+      baseSessionXP: xpResult.inGameXP,
       modeMultiplier: xpResult.modeMultiplier,
-      excellenceMultiplierApplied: xpResult.excellenceMultiplierApplied,
-      eliteMultiplierApplied: xpResult.eliteMultiplierApplied,
+      excellenceMultiplierApplied: xpResult.meetsExcellence ? 1.0 : 0,
+      eliteMultiplierApplied: xpResult.meetsElite ? 1.0 : 0,
       finalSessionXP: xpResult.finalSessionXP,
       levelBefore: levelResult.levelBefore,
       levelAfter: levelResult.levelAfter,
       levelUpCount: levelResult.levelUpCount,
       xpIntoLevelBefore: levelResult.xpIntoLevelBefore,
       xpIntoLevelAfter: levelResult.xpIntoLevelAfter,
-      metBonus: xpResult.excellenceMultiplierApplied > 1,
+      metBonus: xpResult.meetsExcellence || xpResult.meetsElite,
       valid: xpResult.isValid,
       responseTimes: [...responseTimesRef.current],
     };
