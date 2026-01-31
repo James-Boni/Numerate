@@ -1,0 +1,235 @@
+This is a FOUNDATION LOCK task.
+Do NOT add new features, game modes, sounds, animations, or redesign layouts.
+This task is about making Numerate provably coherent, deterministic, and trustworthy.
+
+CORE REQUIREMENTS (NON-NEGOTIABLE)
+1) Assessment placement is deterministic: identical performance → identical starting level every time.
+2) user.level is the single source of truth for gameplay difficulty and progression.
+3) Question difficulty is provably derived from user.level (operations + number ranges).
+4) XP shown in the UI == XP applied to leveling == XP stored in session data.
+5) Internal mechanics (groups, debug metrics) must not be shown to users.
+
+You must implement logging, dev-only diagnostics, and unit tests to PROVE correctness.
+
+--------------------------------------------------------------------
+SECTION A — SINGLE SOURCE OF TRUTH (STATE SANITY)
+--------------------------------------------------------------------
+1) Search the entire codebase for “level-like” variables:
+   startingLevel, currentLevel, difficultyTier, tier, placementLevel, etc.
+
+2) Declare ONE authoritative value:
+   store.user.level (integer ≥ 1)
+
+3) Rules:
+   - All gameplay, generators, difficulty logic, and progression MUST read from store.user.level.
+   - startingLevel may exist ONLY as an assessment output, then must be written into store.user.level once.
+   - Group (G1–G10) must NEVER be used outside assessment logic.
+
+4) Add dev assertion:
+   If any generator or difficulty function receives a level ≠ store.user.level, log an error.
+
+Deliverable:
+- List files changed
+- Which duplicate variables were removed or redirected
+
+--------------------------------------------------------------------
+SECTION B — ASSESSMENT: PURE, RESET, DETERMINISTIC
+--------------------------------------------------------------------
+Goal: Assessment placement must be explainable and repeatable.
+
+1) Implement a PURE function:
+   computeAssessmentPlacement({
+     attemptedN,
+     correctC,
+     responseTimesMs[],
+     durationSeconds
+   }) → {
+     accuracyA,
+     cpm,
+     medianMs,
+     G0,
+     Gcap,
+     Gfinal,
+     startingLevel
+   }
+This function must NOT access global state.
+
+2) On assessment start:
+   - Reset assessment-only counters:
+     attemptedN=0, correctC=0, responseTimesMs=[]
+   - assessmentStartTimestamp = now()
+   - Ensure no data leaks from Daily or prior runs.
+
+3) On assessment end:
+   - durationSeconds = real elapsed time
+   - accuracyA = correctC / max(attemptedN,1)
+   - cpm = correctC / max(durationSeconds/60, 0.001)
+   - medianMs = median(responseTimesMs)
+
+4) Placement logic (deterministic):
+   - Base group from CPM bands
+   - Accuracy cap
+   - Speed adjustment
+   - Final group = clamp
+   - Group → startingLevel mapping:
+     G1→1, G2→2, G3→4, G4→6, G5→8, G6→10, G7→12, G8→16, G9→22, G10→30
+   Cap startingLevel within [1..30].
+
+5) Apply placement ONCE:
+   store.user.level = startingLevel
+   store.user.xpIntoLevel = 0
+   store.user.competenceGroup = Gfinal
+   store.user.hasCompletedAssessment = true
+   Assessment grants NO XP and MUST NOT trigger leveling.
+
+6) Unit tests:
+   - Same inputs → same output
+   - Counters reset between runs
+   - Boundary CPM values map correctly
+   - Accuracy caps enforced
+
+--------------------------------------------------------------------
+SECTION C — DIFFICULTY MUST DERIVE FROM user.level
+--------------------------------------------------------------------
+Goal: Level = difficulty. No silent defaults.
+
+1) Implement:
+   getDifficultyProfile(level) → {
+     opWeights,
+     operandRanges,
+     rules
+   }
+This function must depend ONLY on level.
+
+2) Daily sessions MUST use Mixed Ops.
+   No addition-only defaults.
+
+Operation weights baseline:
+- L1–5: add 80%, sub 20%
+- L6–12: add 55%, sub 45%
+- L13–20: add 40%, sub 35%, mul 25%
+- L21–30: add 30%, sub 30%, mul 25%, div 15%
+- L31+: add 25%, sub 25%, mul 30%, div 20%
+
+3) Operand scaling:
+- add/sub max ≈ 10 + level*4
+- mul only if level ≥13 (bounded operands)
+- div only if level ≥21 (exact integer division)
+
+4) Track per-session:
+   - operation counts
+   - operand min/max
+   - level used for generation
+
+5) Dev-only gameplay overlay (guarded):
+   - sessionType
+   - user.level used
+   - opWeights snapshot
+   - live op distribution
+   - operand range
+
+6) Unit tests:
+   - Level 10 → not 100% addition
+   - Level 25 → all four ops appear
+   - Division always integer
+
+--------------------------------------------------------------------
+SECTION D — XP: ONE CANONICAL VALUE
+--------------------------------------------------------------------
+Goal: XP must never disagree.
+
+1) Implement a single XP pipeline:
+   computeSessionXP(...) → {
+     baseSessionXP,
+     modeMultiplier,
+     xpAfterMode,
+     excellenceMultiplier,
+     eliteMultiplier,
+     finalSessionXP
+   }
+
+2) Rules:
+   - finalSessionXP is the ONLY value:
+     • shown in UI
+     • applied to leveling
+     • stored in session record
+   - Assessment always returns finalSessionXP = 0
+
+3) Add dev assertions:
+   XP_SHOWN == XP_APPLIED == XP_STORED
+   Log error if mismatch.
+
+4) Leveling:
+   - Carryover XP
+   - Multi-level ups
+   - Infinite levels
+   - xpRequiredToAdvance(level) deterministic and increasing (with spikes ≥15)
+
+5) Unit tests:
+   - XP determinism
+   - Multi-level up correctness
+   - No XP loss ever
+
+--------------------------------------------------------------------
+SECTION E — UI CLEANUP (NO INTERNALS EXPOSED)
+--------------------------------------------------------------------
+This is UI-only. Do NOT alter logic.
+
+1) Remove ALL user-facing references to Groups.
+   - Do not show “Group X” anywhere.
+   - Groups are backend-only.
+
+2) Remove the “Assessment Debug Block” from the UI.
+   - Debug metrics may exist in logs or behind a dev-only flag.
+   - Default user view must never show raw internals.
+
+3) KEEP these user-facing stats:
+   - Correct
+   - Attempted
+   - Accuracy
+   - Median Time
+
+--------------------------------------------------------------------
+SECTION F — PLACEMENT CONFIDENCE MESSAGE (USER-FACING)
+--------------------------------------------------------------------
+Keep a placement confidence line below the stats that:
+- Explains the starting level was intentionally chosen
+- Is encouraging and adult in tone
+- Is relevant to the assigned LEVEL
+- Never mentions groups or internal mechanics
+
+Implement copy selection by level range:
+
+L1–3:
+“Everyone starts somewhere. This level is designed to help you build confidence and accuracy.”
+
+L4–6:
+“Your foundations are solid. This level will help you sharpen accuracy and begin building fluency.”
+
+L7–10:
+“You’re showing strong fundamentals. This level will challenge your speed and consistency.”
+
+L11–15:
+“You’ve demonstrated good mental fluency. This level focuses on sustaining speed and precision.”
+
+L16+:
+“Your performance shows advanced fluency. This level is designed to push speed and adaptability.”
+
+--------------------------------------------------------------------
+SECTION G — FINAL PROOF REQUIREMENTS
+--------------------------------------------------------------------
+Before moving on, confirm with evidence:
+1) Assessment produces identical placement for identical performance.
+2) Daily session at Level 10 shows mixed ops and scaled numbers.
+3) XP shown == XP applied == XP stored.
+4) UI shows:
+   - Starting Level only
+   - Performance stats
+   - Placement confidence message
+   - No debug block
+   - No group reference
+
+Report:
+- Files changed
+- Assertions added
+- Sample dev logs from one assessment + one daily session

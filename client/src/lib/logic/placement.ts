@@ -123,18 +123,20 @@ export const computeStartingPlacement = (metrics: AssessmentMetrics): PlacementR
   };
 };
 
-export const getPlacementMessage = (group: number): string => {
-  if (group <= 2) {
-    return "We've identified a good starting point for you. Consistent practice will build your confidence and speed. Let's begin.";
+export const getPlacementMessageByLevel = (level: number): string => {
+  if (level <= 3) {
+    return "Everyone starts somewhere. This level is designed to help you build confidence and accuracy.";
   }
-  if (group <= 4) {
-    return "Your foundations are solid. With focused practice, you'll develop reliable fluency. Ready when you are.";
+  if (level <= 6) {
+    return "Your foundations are solid. This level will help you sharpen accuracy and begin building fluency.";
   }
-  if (group <= 6) {
-    return "You've demonstrated capable arithmetic skills. We'll help you refine your speed and consistency.";
+  if (level <= 10) {
+    return "You're showing strong fundamentals. This level will challenge your speed and consistency.";
   }
-  if (group <= 8) {
-    return "Strong performance. You're ready for challenging problems that will push your limits.";
+  if (level <= 15) {
+    return "You've demonstrated good mental fluency. This level focuses on sustaining speed and precision.";
   }
-  return "Excellent results. You'll start at an advanced level with complex problems suited to your abilities.";
+  return "Your performance shows advanced fluency. This level is designed to push speed and adaptability.";
 };
+
+export const getPlacementMessage = getPlacementMessageByLevel;

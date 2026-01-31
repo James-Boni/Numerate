@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ClipboardCheck, Zap, Target, TrendingUp } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { clsx } from 'clsx';
-import { computeStartingPlacement, getPlacementMessage, PlacementResult } from '@/lib/logic/placement';
+import { computeStartingPlacement, getPlacementMessageByLevel, PlacementResult } from '@/lib/logic/placement';
 
 function CountUp({ value, duration = 1, delay = 0, onTick, prefix = '', suffix = '' }: { 
   value: number, 
@@ -199,7 +199,6 @@ export default function Assessment() {
               duration={0.8} 
             />
           </div>
-          <span className="text-xs text-slate-400 mt-1 block">Group {placement?.competenceGroup || 1}</span>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -245,7 +244,7 @@ export default function Assessment() {
 
         <div className="bg-white border border-slate-100 rounded-2xl p-4 text-center shadow-sm">
           <p className="text-slate-600 leading-relaxed text-sm">
-            {placement ? getPlacementMessage(placement.competenceGroup) : ''}
+            {placement ? getPlacementMessageByLevel(placement.startingLevel) : ''}
           </p>
           {!placement?.debug.isValidPlacement && (
             <p className="text-amber-600 text-xs mt-2">
@@ -254,10 +253,10 @@ export default function Assessment() {
           )}
         </div>
 
-        {/* Assessment Debug Block - ALWAYS visible for debugging */}
-        {placement && (
+        {/* Assessment Debug Block - DEV ONLY (gated behind showDebugOverlay) */}
+        {showDebug && placement && (
           <div className="bg-slate-800 text-slate-200 rounded-xl p-4 text-xs font-mono space-y-1">
-            <div className="font-bold text-primary mb-2">Assessment Debug Block</div>
+            <div className="font-bold text-primary mb-2">Assessment Debug (Dev Only)</div>
             <div className="grid grid-cols-2 gap-x-4">
               <div>N (attempted):</div><div>{placement.debug.N}</div>
               <div>C (correct):</div><div>{placement.debug.C}</div>
