@@ -76,6 +76,10 @@ export interface UserState {
   streakCount: number;
   lastStreakDate: string | null; // ISO string
   
+  // Quick Fire
+  quickFireIntroSeen: boolean;
+  quickFireHighScore: number;
+  
   // New Progression Engine State
   progression: ProgressionState;
 
@@ -98,6 +102,10 @@ export interface UserState {
   // Progression Actions
   recordAnswer: (correct: boolean, timeMs: number, templateId: string, currentTargetTimeMs: number) => void;
   toggleDebugOverlay: () => void;
+  
+  // Quick Fire Actions
+  setQuickFireIntroSeen: () => void;
+  updateQuickFireHighScore: (score: number) => boolean;
   
   // Sync Actions
   syncWithBackend: () => Promise<void>;
@@ -123,6 +131,9 @@ export const useStore = create<UserState>()(
       lifetimeXP: 0,
       streakCount: 0,
       lastStreakDate: null,
+      
+      quickFireIntroSeen: false,
+      quickFireHighScore: 0,
       
       progression: { ...INITIAL_PROGRESSION_STATE },
       
@@ -333,6 +344,17 @@ export const useStore = create<UserState>()(
       toggleDebugOverlay: () => set(state => ({
         settings: { ...state.settings, showDebugOverlay: !state.settings.showDebugOverlay }
       })),
+      
+      setQuickFireIntroSeen: () => set({ quickFireIntroSeen: true }),
+      
+      updateQuickFireHighScore: (score: number) => {
+        const state = get();
+        if (score > state.quickFireHighScore) {
+          set({ quickFireHighScore: score });
+          return true; // New high score
+        }
+        return false;
+      },
       
       syncWithBackend: async () => {
         const state = get();

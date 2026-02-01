@@ -87,4 +87,31 @@ export class AudioManager {
     // Digital zap for speed reveal
     this.playSynth(2000, 'square', 0.1, 0.1, true, 1000);
   }
+
+  static playCountdownHorn() {
+    // Game-like horn for countdown (3, 2, 1)
+    this.playSynth(440, 'triangle', 0.15, 0.4, true, 550);
+  }
+
+  static playGoHorn() {
+    // Higher-pitch horn signaling "GO / game has begun"
+    this.playSynth(660, 'triangle', 0.2, 0.5, true, 880);
+  }
+
+  static playQuickTick() {
+    // Quiet tick for Quick Fire timer
+    this.playSynth(800, 'square', 0.02, 0.03);
+  }
+
+  static playCheer() {
+    // Short uplifting cheer for new high score
+    if (!this.context) return;
+    if (this.context.state === 'suspended') this.context.resume();
+    
+    // Play a quick ascending arpeggio
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+    notes.forEach((freq, i) => {
+      setTimeout(() => this.playSynth(freq, 'sine', 0.15, 0.25), i * 80);
+    });
+  }
 }
