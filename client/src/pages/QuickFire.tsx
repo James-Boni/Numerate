@@ -304,8 +304,7 @@ export default function QuickFire() {
       scoreRef.current += 1;
       inGameXPRef.current += 2;
       
-      remainingTimeRef.current = remainingTimeRef.current - timeSpent + 5.0;
-      remainingTimeRef.current = Math.max(0, remainingTimeRef.current);
+      remainingTimeRef.current = remainingTimeRef.current + 5.0;
       
       setScore(scoreRef.current);
       setInGameXP(inGameXPRef.current);
