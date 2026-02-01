@@ -84,7 +84,7 @@ export default function Train() {
                 </div>
 
                 <div className="flex gap-2">
-                  <span className="bg-white/80 text-slate-600 px-3 py-1 rounded-full text-xs font-medium border border-orange-100">4s per Q</span>
+                  <span className="bg-white/80 text-slate-600 px-3 py-1 rounded-full text-xs font-medium border border-orange-100">5s + 5s/correct</span>
                   <span className="bg-white/80 text-slate-600 px-3 py-1 rounded-full text-xs font-medium border border-orange-100">1 Mistake = Done</span>
                 </div>
 

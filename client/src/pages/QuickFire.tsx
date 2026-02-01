@@ -6,10 +6,10 @@ import { useStore, SessionStats } from '@/lib/store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Zap, Target, Clock, Trophy, Flame } from 'lucide-react';
+import { X, Clock, Trophy, Flame, Plus, AlertTriangle } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { clsx } from 'clsx';
-import { generateQuestionForLevel, GeneratedQuestionMeta } from '@/lib/logic/generator_adapter';
+import { generateQuestionForLevel } from '@/lib/logic/generator_adapter';
 import { KeypadModern } from '@/components/game/Keypad';
 import { computeFluency } from '@/lib/logic/xp-system';
 
@@ -18,6 +18,18 @@ interface Question {
   text: string;
   answer: number;
   operation: string;
+}
+
+interface QuickFireResult {
+  score: number;
+  attemptedN: number;
+  correctC: number;
+  accuracy: number;
+  medianMs: number;
+  remainingTimeAtEnd: number;
+  inGameXP: number;
+  bonusXP: number;
+  finalSessionXP: number;
 }
 
 type GameStep = 'intro' | 'countdown' | 'active' | 'results';
@@ -95,11 +107,11 @@ export default function QuickFire() {
   const [countdownNumber, setCountdownNumber] = useState(3);
   const [question, setQuestion] = useState<Question | null>(null);
   const [input, setInput] = useState('');
-  const [timeLeft, setTimeLeft] = useState(4.0);
+  const [remainingTime, setRemainingTime] = useState(5.0);
   const [score, setScore] = useState(0);
   const [inGameXP, setInGameXP] = useState(0);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<QuickFireResult | null>(null);
   const [isNewHighScore, setIsNewHighScore] = useState(false);
   
   const [_, setLocation] = useLocation();
@@ -119,12 +131,15 @@ export default function QuickFire() {
   const correctCountRef = useRef(0);
   const totalCountRef = useRef(0);
   const responseTimesRef = useRef<number[]>([]);
-  const questionStartTimeRef = useRef<number>(Date.now());
-  const startTimeRef = useRef<number>(Date.now());
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const tickIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const questionStartTimeRef = useRef<number>(performance.now());
+  const startTimeRef = useRef<number>(performance.now());
+  const remainingTimeRef = useRef(5.0);
+  const lastTickRef = useRef<number>(performance.now());
+  const timerRef = useRef<number | null>(null);
+  const tickSoundRef = useRef<NodeJS.Timeout | null>(null);
   const isSubmittingRef = useRef(false);
   const gameActiveRef = useRef(false);
+  const hasEndedRef = useRef(false);
 
   useEffect(() => {
     AudioManager.init();
@@ -132,7 +147,6 @@ export default function QuickFire() {
       setLocation('/train');
     }
   }, [hasCompletedAssessment, setLocation]);
-
 
   const generateNextQuestion = useCallback(() => {
     const result = generateQuestionForLevel(level);
@@ -145,31 +159,33 @@ export default function QuickFire() {
     setQuestion(newQuestion);
     setInput('');
     setFeedback(null);
-    questionStartTimeRef.current = Date.now();
-    setTimeLeft(4.0);
+    questionStartTimeRef.current = performance.now();
     isSubmittingRef.current = false;
   }, [level]);
 
   const stopAllTimers = useCallback(() => {
     if (timerRef.current) {
-      clearInterval(timerRef.current);
+      cancelAnimationFrame(timerRef.current);
       timerRef.current = null;
     }
-    if (tickIntervalRef.current) {
-      clearInterval(tickIntervalRef.current);
-      tickIntervalRef.current = null;
+    if (tickSoundRef.current) {
+      clearInterval(tickSoundRef.current);
+      tickSoundRef.current = null;
     }
   }, []);
 
   const endRun = useCallback((reason: 'wrong' | 'timeout') => {
+    if (hasEndedRef.current) return;
+    hasEndedRef.current = true;
     gameActiveRef.current = false;
     stopAllTimers();
     
-    const durationSeconds = (Date.now() - startTimeRef.current) / 1000;
+    const durationSeconds = (performance.now() - startTimeRef.current) / 1000;
     const finalScore = scoreRef.current;
     const finalInGameXP = inGameXPRef.current;
     const correctC = correctCountRef.current;
     const attemptedN = totalCountRef.current;
+    const remainingTimeAtEnd = Math.max(0, remainingTimeRef.current);
     
     const accuracy = attemptedN > 0 ? correctC / attemptedN : 0;
     const fluencyMetrics = computeFluency(
@@ -179,20 +195,14 @@ export default function QuickFire() {
       responseTimesRef.current
     );
     
+    const computedBonusXP = Math.floor(fluencyMetrics.fluencyScore * 0.5);
     const bonusXP = Math.min(
       Math.floor(finalInGameXP * 0.25),
-      Math.floor(fluencyMetrics.fluencyScore * 0.5)
+      computedBonusXP
     );
     const finalSessionXP = finalInGameXP + bonusXP;
     
-    console.log("[XP_SUMMARY]", {
-      mode: 'quick_fire',
-      inGameXP: finalInGameXP,
-      bonusXP,
-      finalSessionXP,
-      appliedToLeveling: finalSessionXP,
-      storedFinal: finalSessionXP
-    });
+    console.log("[XP_SUMMARY]", `mode=quick_fire inGameXP=${finalInGameXP} bonusXP=${bonusXP} final=${finalSessionXP}`);
 
     const isNewBest = updateQuickFireHighScore(finalScore);
     setIsNewHighScore(isNewBest);
@@ -201,11 +211,23 @@ export default function QuickFire() {
       setTimeout(() => AudioManager.playCheer(), 300);
     }
 
+    const resultObj: QuickFireResult = {
+      score: finalScore,
+      attemptedN,
+      correctC,
+      accuracy,
+      medianMs: fluencyMetrics.medianMs,
+      remainingTimeAtEnd,
+      inGameXP: finalInGameXP,
+      bonusXP,
+      finalSessionXP
+    };
+
     const sessionStats: SessionStats = {
       id: Math.random().toString(36).substring(7),
       date: new Date().toISOString(),
       sessionType: 'quick_fire',
-      durationMode: 60,
+      durationMode: 'unlimited',
       durationSecondsActual: Math.round(durationSeconds),
       totalQuestions: attemptedN,
       correctQuestions: correctC,
@@ -225,58 +247,54 @@ export default function QuickFire() {
     };
 
     saveSession(sessionStats);
-    
-    setResults({
-      score: finalScore,
-      attempted: attemptedN,
-      correct: correctC,
-      accuracy,
-      medianMs: fluencyMetrics.medianMs,
-      xpEarned: finalSessionXP,
-      inGameXP: finalInGameXP,
-      bonusXP,
-      reason
-    });
-    
+    setResults(resultObj);
     setStep('results');
   }, [settings.soundOn, updateQuickFireHighScore, saveSession, stopAllTimers]);
 
-  const startTimer = useCallback(() => {
-    stopAllTimers();
+  const startTimerLoop = useCallback(() => {
+    lastTickRef.current = performance.now();
     
-    const startTime = Date.now();
-    const endTime = startTime + 4000;
-    
-    timerRef.current = setInterval(() => {
-      const remaining = (endTime - Date.now()) / 1000;
-      if (remaining <= 0) {
-        stopAllTimers();
-        if (gameActiveRef.current) {
-          totalCountRef.current += 1;
-          endRun('timeout');
-        }
-      } else {
-        setTimeLeft(remaining);
+    const tick = () => {
+      if (!gameActiveRef.current) return;
+      
+      const now = performance.now();
+      const delta = (now - lastTickRef.current) / 1000;
+      lastTickRef.current = now;
+      
+      remainingTimeRef.current = Math.max(0, remainingTimeRef.current - delta);
+      setRemainingTime(remainingTimeRef.current);
+      
+      if (remainingTimeRef.current <= 0) {
+        totalCountRef.current += 1;
+        if (settings.soundOn) AudioManager.playWrong();
+        endRun('timeout');
+        return;
       }
-    }, 50);
+      
+      timerRef.current = requestAnimationFrame(tick);
+    };
     
-    tickIntervalRef.current = setInterval(() => {
+    timerRef.current = requestAnimationFrame(tick);
+    
+    tickSoundRef.current = setInterval(() => {
       if (settings.soundOn && gameActiveRef.current) {
         AudioManager.playQuickTick();
       }
-    }, 500);
-  }, [settings.soundOn, endRun, stopAllTimers]);
+    }, 800);
+  }, [settings.soundOn, endRun]);
 
   const handleSubmit = useCallback(() => {
     if (!question || isSubmittingRef.current || !gameActiveRef.current) return;
     if (!input) return;
     
     isSubmittingRef.current = true;
-    stopAllTimers();
+    
+    const now = performance.now();
+    const timeSpent = (now - questionStartTimeRef.current) / 1000;
+    const responseTime = now - questionStartTimeRef.current;
     
     const val = parseFloat(input);
     const isCorrect = Math.abs(val - question.answer) < 0.001;
-    const responseTime = Date.now() - questionStartTimeRef.current;
     
     totalCountRef.current += 1;
     responseTimesRef.current.push(responseTime);
@@ -286,8 +304,12 @@ export default function QuickFire() {
       scoreRef.current += 1;
       inGameXPRef.current += 2;
       
+      remainingTimeRef.current = remainingTimeRef.current - timeSpent + 5.0;
+      remainingTimeRef.current = Math.max(0, remainingTimeRef.current);
+      
       setScore(scoreRef.current);
       setInGameXP(inGameXPRef.current);
+      setRemainingTime(remainingTimeRef.current);
       setFeedback('correct');
       
       if (settings.soundOn) AudioManager.playCorrect();
@@ -295,26 +317,33 @@ export default function QuickFire() {
       setTimeout(() => {
         if (gameActiveRef.current) {
           generateNextQuestion();
-          startTimer();
         }
-      }, 150);
+      }, 100);
     } else {
       setFeedback('wrong');
       if (settings.soundOn) AudioManager.playWrong();
       
       setTimeout(() => {
         endRun('wrong');
-      }, 300);
+      }, 200);
     }
-  }, [question, input, settings.soundOn, generateNextQuestion, startTimer, endRun, stopAllTimers]);
+  }, [question, input, settings.soundOn, generateNextQuestion, endRun]);
 
   const handleKeypadPress = useCallback((key: string) => {
+    if (feedback) return;
     setInput(prev => prev + key);
-  }, []);
+  }, [feedback]);
 
   const handleKeypadDelete = useCallback(() => {
+    if (feedback) return;
     setInput(prev => prev.slice(0, -1));
-  }, []);
+  }, [feedback]);
+
+  const handleAreaTap = useCallback(() => {
+    if (input && !feedback && gameActiveRef.current) {
+      handleSubmit();
+    }
+  }, [input, feedback, handleSubmit]);
 
   const startCountdown = useCallback(() => {
     if (!quickFireIntroSeen) {
@@ -337,21 +366,29 @@ export default function QuickFire() {
     
     setTimeout(() => {
       if (settings.soundOn) AudioManager.playGoHorn();
+      
+      hasEndedRef.current = false;
       gameActiveRef.current = true;
-      startTimeRef.current = Date.now();
+      startTimeRef.current = performance.now();
       scoreRef.current = 0;
       inGameXPRef.current = 0;
       correctCountRef.current = 0;
       totalCountRef.current = 0;
       responseTimesRef.current = [];
+      remainingTimeRef.current = 5.0;
       
       setScore(0);
       setInGameXP(0);
+      setRemainingTime(5.0);
       generateNextQuestion();
-      startTimer();
+      startTimerLoop();
       setStep('active');
     }, 3000);
-  }, [settings.soundOn, generateNextQuestion, startTimer, setQuickFireIntroSeen, quickFireIntroSeen]);
+  }, [settings.soundOn, generateNextQuestion, startTimerLoop, setQuickFireIntroSeen, quickFireIntroSeen]);
+
+  const handleCancelIntro = useCallback(() => {
+    setLocation('/train');
+  }, [setLocation]);
 
   const hasStartedRef = useRef(false);
   useEffect(() => {
@@ -371,29 +408,36 @@ export default function QuickFire() {
     return (
       <MobileLayout className="bg-white">
         <Dialog open={true} onOpenChange={() => {}}>
-          <DialogContent className="max-w-sm mx-auto rounded-3xl">
+          <DialogContent className="max-w-sm mx-auto rounded-3xl relative">
+            <button
+              onClick={handleCancelIntro}
+              className="absolute right-4 top-4 rounded-full p-1 hover:bg-slate-100 transition-colors"
+              data-testid="button-quickfire-cancel"
+            >
+              <X size={20} className="text-slate-400" />
+            </button>
             <DialogHeader>
               <div className="flex items-center justify-center mb-4">
-                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                  <Flame size={32} className="text-primary" />
+                <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
+                  <Flame size={32} className="text-orange-500" />
                 </div>
               </div>
               <DialogTitle className="text-center text-2xl font-bold">Quick Fire</DialogTitle>
               <DialogDescription className="text-center space-y-3 pt-4">
                 <p className="flex items-center justify-center gap-2">
                   <Clock size={16} className="text-primary" />
-                  You have 4 seconds per question.
+                  You start with 5 seconds.
                 </p>
                 <p className="flex items-center justify-center gap-2">
-                  <Target size={16} className="text-primary" />
-                  Each correct answer increases your score.
+                  <Plus size={16} className="text-green-500" />
+                  Each correct answer adds 5 more seconds.
                 </p>
                 <p className="flex items-center justify-center gap-2">
-                  <Zap size={16} className="text-red-500" />
-                  One mistake ends the run.
+                  <AlertTriangle size={16} className="text-red-500" />
+                  One mistake or running out of time ends the run.
                 </p>
                 <p className="text-slate-500 text-sm pt-2">
-                  This is speed training to make Daily challenges feel easier.
+                  This is speed training for Daily challenges.
                 </p>
               </DialogDescription>
             </DialogHeader>
@@ -431,7 +475,7 @@ export default function QuickFire() {
     );
   }
 
-  if (step === 'results') {
+  if (step === 'results' && results) {
     return (
       <MobileLayout className="bg-white">
         {isNewHighScore && <Confetti />}
@@ -446,7 +490,7 @@ export default function QuickFire() {
               <Flame size={32} />
             </motion.div>
             <h1 className="text-3xl font-bold text-slate-900">Quick Fire Complete</h1>
-            <p className="text-slate-500">Speed training to strengthen Daily sessions.</p>
+            <p className="text-slate-500">Speed training for Daily challenges.</p>
           </div>
 
           {isNewHighScore && (
@@ -472,15 +516,16 @@ export default function QuickFire() {
               animate={{ scale: [1, 1.06, 1] }}
               transition={{ delay: 0.2, duration: 0.8 }}
               className="text-7xl font-black text-primary"
+              data-testid="text-quickfire-score"
             >
               <CountUp 
-                value={results?.score || 0} 
+                value={results.score} 
                 duration={0.8} 
                 delay={0.2} 
                 onTick={() => settings.soundOn && AudioManager.playTallyTick()} 
               />
             </motion.div>
-            {!isNewHighScore && (
+            {!isNewHighScore && quickFireHighScore > 0 && (
               <p className="text-slate-400 text-sm">Personal best: {quickFireHighScore}</p>
             )}
           </motion.div>
@@ -492,9 +537,9 @@ export default function QuickFire() {
             className="bg-slate-50 border-none rounded-3xl p-6 text-center"
           >
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">XP Earned</span>
-            <div className="text-4xl font-bold text-primary mt-2">
+            <div className="text-4xl font-bold text-primary mt-2" data-testid="text-quickfire-xp">
               <CountUp 
-                value={results?.xpEarned || 0} 
+                value={results.finalSessionXP} 
                 duration={0.6} 
                 delay={0.5} 
                 onTick={() => settings.soundOn && AudioManager.playTallyTick()} 
@@ -509,7 +554,7 @@ export default function QuickFire() {
               transition={{ delay: 0.6 }}
             >
               <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-slate-50 border-none shadow-none rounded-2xl">
-                <span className="text-lg font-bold text-slate-900">{results?.attempted || 0}</span>
+                <span className="text-lg font-bold text-slate-900" data-testid="text-quickfire-attempted">{results.attemptedN}</span>
                 <span className="text-[10px] text-slate-400 uppercase font-bold">Attempted</span>
               </Card>
             </motion.div>
@@ -520,7 +565,7 @@ export default function QuickFire() {
               transition={{ delay: 0.7 }}
             >
               <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-slate-50 border-none shadow-none rounded-2xl">
-                <span className="text-lg font-bold text-slate-900">{Math.round((results?.accuracy || 0) * 100)}%</span>
+                <span className="text-lg font-bold text-slate-900" data-testid="text-quickfire-accuracy">{Math.round(results.accuracy * 100)}%</span>
                 <span className="text-[10px] text-slate-400 uppercase font-bold">Accuracy</span>
               </Card>
             </motion.div>
@@ -531,7 +576,7 @@ export default function QuickFire() {
               transition={{ delay: 0.8 }}
             >
               <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-slate-50 border-none shadow-none rounded-2xl">
-                <span className="text-lg font-bold text-slate-900">{((results?.medianMs || 0) / 1000).toFixed(1)}s</span>
+                <span className="text-lg font-bold text-slate-900" data-testid="text-quickfire-median">{(results.medianMs / 1000).toFixed(1)}s</span>
                 <span className="text-[10px] text-slate-400 uppercase font-bold">Median</span>
               </Card>
             </motion.div>
@@ -569,34 +614,40 @@ export default function QuickFire() {
               setLocation('/train');
             }}
             className="text-slate-400"
+            data-testid="button-quickfire-exit"
           >
             Exit
           </Button>
           
           <motion.div
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 0.5, repeat: Infinity }}
+            animate={remainingTime < 2 ? { scale: [1, 1.05, 1] } : {}}
+            transition={{ duration: 0.3, repeat: remainingTime < 2 ? Infinity : 0 }}
             className={clsx(
               "text-2xl font-bold tabular-nums px-4 py-2 rounded-xl",
-              timeLeft <= 1.5 ? "text-red-500 bg-red-50" : "text-red-400 bg-slate-50"
+              remainingTime <= 2 ? "text-red-500 bg-red-50" : "text-red-400 bg-slate-50"
             )}
+            data-testid="text-quickfire-timer"
           >
-            {timeLeft.toFixed(1)}s
+            {remainingTime.toFixed(1)}s
           </motion.div>
           
-          <div className="text-sm font-bold text-primary">
+          <div className="text-sm font-bold text-primary" data-testid="text-quickfire-ingame-xp">
             +{inGameXP} XP
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center px-8 relative">
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-[12rem] font-black text-primary/5 tabular-nums select-none">
+        <div 
+          className="flex-1 flex flex-col items-center justify-center px-8 relative cursor-pointer"
+          onClick={handleAreaTap}
+          data-testid="area-quickfire-submit"
+        >
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+            <span className="text-[12rem] font-black text-primary/5 tabular-nums">
               {score}
             </span>
           </div>
           
-          <div className="relative z-10 w-full space-y-8">
+          <div className="relative z-10 w-full space-y-8 pointer-events-none">
             <div className="text-center">
               <motion.div 
                 key={question?.id}
@@ -617,6 +668,9 @@ export default function QuickFire() {
               <div className="text-5xl font-bold tabular-nums text-slate-900 min-h-[4rem] flex items-center justify-center">
                 {input || <span className="text-slate-300">_</span>}
               </div>
+              {input && !feedback && (
+                <p className="text-xs text-slate-400 mt-2">Tap above to submit</p>
+              )}
             </div>
           </div>
         </div>

@@ -1,0 +1,323 @@
+Implement the Quick Fire game mode with full correctness across:
+- backend logic
+- timer mechanics
+- XP integrity
+- score accuracy
+- UX / UI polish
+- audio behavior
+- persistence
+
+This task is SURGICAL.
+Do NOT refactor unrelated systems.
+Do NOT introduce new debug UI.
+Do NOT invent new rules.
+Do NOT change Daily or Assessment behavior.
+
+If something is ambiguous, follow THIS SPEC exactly.
+
+====================================================================
+0) DEFINITIONS & INTENT (NON-NEGOTIABLE)
+====================================================================
+Quick Fire is a SPEED TRAINING drill.
+
+- It is NOT judgement.
+- It is NOT make-or-break.
+- It is NOT a progression shortcut.
+- It exists to:
+  • train speed
+  • build flow
+  • strengthen Daily performance
+  • provide a personal best (high score)
+  • generate clean speed data
+
+Tone throughout must be encouraging and training-focused.
+
+====================================================================
+1) AVAILABILITY & NAVIGATION
+====================================================================
+1.1 Gating
+- Quick Fire is available ONLY if:
+  store.user.hasCompletedAssessment === true
+- Same gating rules as Daily.
+
+1.2 Placement
+- On the main Play/Home screen:
+  - List “Quick Fire” directly BELOW “3 minute Daily Challenge”.
+  - Use consistent card/button styling.
+
+1.3 Routing
+- sessionType MUST be exactly: "quick_fire"
+- Never reuse "daily" or "assessment".
+
+====================================================================
+2) FIRST-TIME INTRO MODAL (WITH CANCEL)
+====================================================================
+2.1 Show intro modal ONLY the first time Quick Fire is tapped.
+- Persist flag: quickFireIntroSeen (per user/device).
+- If true, skip modal forever.
+
+2.2 Modal content (short, friendly):
+Title: “Quick Fire”
+Body:
+- “You start with 5 seconds.”
+- “Each correct answer adds 5 more seconds.”
+- “One mistake or running out of time ends the run.”
+- “This is speed training for Daily challenges.”
+
+Buttons:
+- “Okay” → start countdown
+- “X” (close icon) → CANCEL
+
+2.3 CANCEL behavior (CRITICAL FIX)
+- Clicking “X” MUST:
+  - close modal
+  - navigate back to the Play/Home screen
+  - NOT start Quick Fire
+  - NOT begin countdown
+
+Acceptance:
+- User can back out without playing.
+
+====================================================================
+3) PRE-GAME COUNTDOWN (3–2–1, EXACT)
+====================================================================
+After pressing “Okay”:
+
+3.1 Visual
+- Full-screen WHITE background overlay.
+- Centered large numbers: 3 → 2 → 1.
+- Each number:
+  - occupies large central area
+  - flashes in
+  - enlarges slightly
+- Total duration EXACTLY 3.0 seconds:
+  - 1000ms per number.
+
+3.2 Audio
+- Play a short, game-like horn sound on each number.
+- After “1”, play a slightly higher-pitch horn indicating GO.
+
+3.3 Transition
+- At exactly 3000ms:
+  - remove overlay
+  - render first question immediately
+  - start timer loop
+
+====================================================================
+4) QUICK FIRE TIMER MODEL (TIME POOL)
+====================================================================
+THIS IS CRITICAL. IMPLEMENT EXACTLY.
+
+There is ONE continuous time pool for the entire run.
+
+4.1 Initialization
+- remainingTimeSec = 5.0
+
+4.2 Countdown behavior
+- remainingTimeSec decreases continuously while the run is active.
+- Timer NEVER resets per question.
+
+4.3 CORRECT ANSWER BONUS LOGIC (NO AMBIGUITY)
+On correct answer:
+
+1) Compute timeSpent:
+   timeSpent = now - questionShownTimestamp
+
+2) Subtract time spent:
+   remainingTimeSec = remainingTimeSec - timeSpent
+
+3) Add bonus time:
+   remainingTimeSec = remainingTimeSec + 5.0
+
+4) Immediately render next question using this updated remainingTimeSec.
+
+EXAMPLE (INTENDED BEHAVIOR):
+- Start: 5.0s
+- Answer Q1 with 2.5s left → remaining = 2.5 + 5.0 = 7.5
+- Answer Q2 in 2.5s → remaining before bonus = 5.0 → after bonus = 10.0
+
+4.4 End conditions
+- Run ends immediately if:
+  - remainingTimeSec <= 0
+  - user answers incorrectly
+  - any fatal state error occurs
+
+4.5 Technical constraints
+- Use timestamp-based delta timing (performance.now).
+- DO NOT decrement by fixed intervals (no drift).
+- Clamp:
+  remainingTimeSec = max(0, remainingTimeSec)
+- Fully clean up timer loop on run end or navigation.
+
+====================================================================
+5) DIFFICULTY & QUESTION LOGIC
+====================================================================
+- Difficulty must be derived ONLY from:
+  store.user.level
+- Use EXACT same:
+  getDifficultyProfile(level)
+  generator logic
+  operation weighting
+as Daily.
+
+Quick Fire must NEVER default to easy addition unless the level dictates it.
+
+====================================================================
+6) INPUT & SUBMISSION (LOW FRICTION)
+====================================================================
+6.1 Input
+- Number pad inputs digits only.
+- Number pad NEVER submits.
+
+6.2 Submit behavior
+- User can submit by tapping ANYWHERE on screen
+  EXCEPT the number pad area.
+- Add a tap-to-submit listener for the upper screen region.
+
+6.3 Submission contract
+On submit:
+- Stop timer immediately.
+- Prevent double-submit.
+- Record responseTimeMs.
+- attemptedN++
+
+If correct:
+- correctC++
+- score++
+- inGameXP += 2
+- flash GREEN (same as Daily)
+- play Daily correct SFX
+- render next question
+
+If incorrect:
+- flash RED (same as Daily)
+- play Daily wrong SFX
+- end run immediately
+
+On timeout:
+- treat as incorrect
+- same red flash + wrong SFX
+- end run immediately
+
+====================================================================
+7) UI REQUIREMENTS (SHARPENED)
+====================================================================
+7.1 Answer area
+- Remove bulky answer box.
+- Entire area above number pad is one large answer display,
+  identical in structure to Daily.
+
+7.2 Score watermark
+- Display current score in LARGE text behind answer.
+- Same blue as app.
+- Low opacity.
+- Non-distracting but glanceable.
+
+7.3 Timer UI
+- Display remainingTimeSec (1 decimal).
+- Red text.
+- Pulse subtly when low (<2.0s), matching Daily urgency style.
+
+7.4 Timer sound
+- Quiet, soft ticking.
+- Non-intimidating.
+- One instance only.
+- Stops immediately on run end.
+
+====================================================================
+8) XP LOGIC (INTEGRITY LOCK)
+====================================================================
+8.1 In-game XP
+- inGameXP = 2 * correctC
+- NO multipliers of any kind.
+
+8.2 Bonus XP
+- Compute metric-based bonus using existing system BUT:
+  - force all multipliers = 1.0
+  - cap:
+    bonusXP = min(floor(inGameXP * 0.25), computedBonusXP)
+- If metrics unreliable:
+  bonusXP = 0 (acceptable fallback).
+
+8.3 Final XP
+- finalSessionXP = inGameXP + bonusXP
+
+8.4 DISPLAY / STORE / APPLY
+finalSessionXP must be:
+- shown in UI as ONE number: “X XP”
+- applied to leveling
+- stored in session record
+
+NO breakdown UI.
+
+Console log only:
+XP_SUMMARY mode=quick_fire inGameXP=__ bonusXP=__ final=__
+
+====================================================================
+9) SCORE BUG FIX (CRITICAL)
+====================================================================
+Score MUST equal correct answers.
+
+- score === correctC at all times.
+- Summary must read from a finalized result object,
+  not live mutable state.
+
+Before navigating to summary:
+- Construct QuickFireResult object.
+- Persist it.
+- THEN navigate.
+
+Never reset session state before summary reads data.
+
+====================================================================
+10) SUMMARY SCREEN
+====================================================================
+Show:
+- Score
+- Attempted
+- Accuracy
+- Median time
+- “X XP” (finalSessionXP)
+
+Tone:
+- “Quick Fire complete”
+- Training-focused
+- No “fail” language.
+
+====================================================================
+11) HIGH SCORE & CELEBRATION
+====================================================================
+- Persist quickFireHighScore (score-based).
+- If score > previous:
+  - update high score
+  - play short cheer sound
+  - subtle confetti in background
+  - show “New personal best!”
+- No celebration on ties.
+
+====================================================================
+12) STORAGE
+====================================================================
+Persist:
+- quickFireIntroSeen
+- quickFireHighScore
+- QuickFire session record:
+  { score, attemptedN, correctC, accuracy, medianMs,
+    remainingTimeAtEnd, inGameXP, bonusXP, finalSessionXP }
+
+====================================================================
+13) ACCEPTANCE CHECKLIST
+====================================================================
+- X closes modal and returns to menu.
+- Time pool logic behaves exactly as described.
+- Score is always accurate.
+- XP is summed correctly.
+- UI matches Daily quality.
+- Sounds are consistent and non-jarring.
+- High score persists and celebrates correctly.
+
+Return:
+- files changed
+- where timer logic lives
+- where score is finalized
+- confirmation of XP_SUMMARY log
