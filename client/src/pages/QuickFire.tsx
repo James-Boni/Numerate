@@ -133,11 +133,6 @@ export default function QuickFire() {
     }
   }, [hasCompletedAssessment, setLocation]);
 
-  useEffect(() => {
-    if (quickFireIntroSeen) {
-      setStep('countdown');
-    }
-  }, []);
 
   const generateNextQuestion = useCallback(() => {
     const result = generateQuestionForLevel(level);
@@ -321,8 +316,10 @@ export default function QuickFire() {
     setInput(prev => prev.slice(0, -1));
   }, []);
 
-  const startCountdown = () => {
-    setQuickFireIntroSeen();
+  const startCountdown = useCallback(() => {
+    if (!quickFireIntroSeen) {
+      setQuickFireIntroSeen();
+    }
     setStep('countdown');
     setCountdownNumber(3);
     
@@ -354,7 +351,15 @@ export default function QuickFire() {
       startTimer();
       setStep('active');
     }, 3000);
-  };
+  }, [settings.soundOn, generateNextQuestion, startTimer, setQuickFireIntroSeen, quickFireIntroSeen]);
+
+  const hasStartedRef = useRef(false);
+  useEffect(() => {
+    if (quickFireIntroSeen && !hasStartedRef.current) {
+      hasStartedRef.current = true;
+      startCountdown();
+    }
+  }, [quickFireIntroSeen, startCountdown]);
 
   useEffect(() => {
     return () => {
@@ -395,6 +400,7 @@ export default function QuickFire() {
             <Button 
               onClick={startCountdown}
               className="w-full h-12 rounded-2xl font-bold mt-4"
+              data-testid="button-quickfire-start"
             >
               Okay
             </Button>
@@ -540,6 +546,7 @@ export default function QuickFire() {
               size="lg" 
               className="w-full h-14 text-lg font-semibold rounded-2xl shadow-lg shadow-primary/10"
               onClick={() => setLocation('/train')}
+              data-testid="button-quickfire-continue"
             >
               Continue
             </Button>

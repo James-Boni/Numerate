@@ -91,6 +91,7 @@ export default function Train() {
                 <Button 
                   onClick={() => setLocation('/quickfire')}
                   className="w-full h-11 bg-orange-500 text-white hover:bg-orange-600 font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/10"
+                  data-testid="button-start-quickfire"
                 >
                   <Timer size={16} />
                   Start Quick Fire
