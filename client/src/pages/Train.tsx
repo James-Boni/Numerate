@@ -4,12 +4,12 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { useStore } from '@/lib/store';
 import { useLocation } from 'wouter';
-import { Zap, Play, Flame, Target } from 'lucide-react';
+import { Zap, Play, Flame, Target, Timer } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 export default function Train() {
-  const { level, lifetimeXP, streakCount } = useStore();
+  const { level, lifetimeXP, streakCount, hasCompletedAssessment, quickFireHighScore } = useStore();
   const [_, setLocation] = useLocation();
 
   return (
@@ -38,8 +38,8 @@ export default function Train() {
           </div>
         </div>
 
-        {/* Hero Card */}
-        <div className="px-6 pb-8">
+        {/* Hero Card - Daily */}
+        <div className="px-6 pb-4">
           <Card className="p-6 bg-slate-50 border-none shadow-none rounded-3xl overflow-hidden relative group">
             <div className="relative z-10 space-y-6">
               <div className="space-y-1">
@@ -62,6 +62,43 @@ export default function Train() {
             </div>
           </Card>
         </div>
+
+        {/* Quick Fire Card - Only shown after assessment */}
+        {hasCompletedAssessment && (
+          <div className="px-6 pb-6">
+            <Card className="p-5 bg-gradient-to-br from-amber-50 to-orange-50 border-none shadow-none rounded-3xl overflow-hidden relative group">
+              <div className="relative z-10 space-y-4">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-slate-900 font-bold text-lg">Quick Fire</h3>
+                      <Flame size={18} className="text-orange-500 fill-orange-500" />
+                    </div>
+                    <p className="text-slate-500 text-sm">Speed training drill.</p>
+                  </div>
+                  {quickFireHighScore > 0 && (
+                    <div className="bg-white/80 px-3 py-1 rounded-full text-xs font-bold text-orange-600 border border-orange-100">
+                      Best: {quickFireHighScore}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <span className="bg-white/80 text-slate-600 px-3 py-1 rounded-full text-xs font-medium border border-orange-100">4s per Q</span>
+                  <span className="bg-white/80 text-slate-600 px-3 py-1 rounded-full text-xs font-medium border border-orange-100">1 Mistake = Done</span>
+                </div>
+
+                <Button 
+                  onClick={() => setLocation('/quickfire')}
+                  className="w-full h-11 bg-orange-500 text-white hover:bg-orange-600 font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/10"
+                >
+                  <Timer size={16} />
+                  Start Quick Fire
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {/* Stats Grid */}
         <div className="px-6 grid grid-cols-2 gap-4">

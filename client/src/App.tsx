@@ -9,6 +9,7 @@ import Welcome from "@/pages/Welcome";
 import Assessment from "@/pages/Assessment";
 import Train from "@/pages/Train";
 import Game from "@/pages/Game";
+import QuickFire from "@/pages/QuickFire";
 import Progress from "@/pages/Progress";
 import Settings from "@/pages/Settings";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -42,6 +43,7 @@ function Router() {
       <Route path="/assessment" component={Assessment} />
       <Route path="/train" component={Train} />
       <Route path="/game" component={Game} />
+      <Route path="/quickfire" component={QuickFire} />
       <Route path="/progress" component={Progress} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
