@@ -1,0 +1,274 @@
+We are implementing the Progress Insight & Copy system for Numerate.
+
+This is a HIGH-ROI UX TASK.
+Do NOT change chart data.
+Do NOT change aggregation logic.
+Do NOT add new metrics.
+Do NOT add animations.
+
+The goal is to help users UNDERSTAND their progress, not overwhelm them.
+
+====================================================================
+0) CORE PRINCIPLES (LOCK THESE IN)
+====================================================================
+1) Progress insights must be RELATIONAL, not descriptive.
+2) Insights must explain WHY trends look the way they do.
+3) No insight should feel judgemental or discouraging.
+4) Dips and plateaus must be framed as NORMAL and EXPECTED.
+5) Only ONE insight line is shown at a time.
+
+Tone: calm, intelligent, coach-like.
+
+====================================================================
+1) INSIGHT PLACEMENT
+====================================================================
+Place ONE headline insight line:
+- Directly under the time-range selector on the Progress page.
+- Italic or lighter weight than headers.
+- Never longer than ONE sentence.
+
+This line updates dynamically based on progress patterns.
+
+====================================================================
+2) METRICS USED FOR INSIGHTS (DAILY ONLY)
+====================================================================
+Insights may ONLY reference:
+- Accuracy trend
+- Speed trend (median response time)
+- Throughput trend
+- Difficulty / level changes
+
+Quick Fire and Assessment data must NEVER be referenced.
+
+====================================================================
+3) TREND DEFINITIONS (IMPORTANT)
+====================================================================
+For the selected time window (7D / 30D):
+
+Define:
+- START value = first day in window
+- END value = last day in window
+
+Trend directions:
+- Accuracy:
+  - Improving: END >= START + 2%
+  - Stable: within ±2%
+  - Dipping: END <= START - 2%
+
+- Speed (lower is better):
+  - Improving: END <= START - 0.3s
+  - Stable: within ±0.3s
+  - Slower: END >= START + 0.3s
+
+- Throughput:
+  - Improving: END >= START + 5%
+  - Stable: within ±5%
+  - Dipping: END <= START - 5%
+
+- Difficulty:
+  - Increased if user.level increased at least once in window
+  - Stable otherwise
+
+These thresholds are heuristic and may be adjusted later, but must be explicit.
+
+====================================================================
+4) INSIGHT PRIORITY ORDER
+====================================================================
+When generating the headline insight, evaluate in this order and pick the FIRST matching rule:
+
+1) Accuracy ↑ while difficulty ↑
+2) Speed ↑ while accuracy stable
+3) Speed ↓ while difficulty ↑
+4) Throughput ↑
+5) Consistency improving (speed IQR narrowing)
+6) Plateau (all metrics stable)
+7) General improvement
+8) Fallback neutral insight
+
+Only ONE insight is shown.
+
+====================================================================
+5) INSIGHT COPY RULES (EXACT LANGUAGE)
+====================================================================
+
+--------------------------------------------------------------------
+5.1 Accuracy improving + difficulty increasing
+--------------------------------------------------------------------
+Condition:
+- Accuracy improving
+- Difficulty increased
+
+Insight:
+“Accuracy is improving, even as questions become harder.”
+
+--------------------------------------------------------------------
+5.2 Speed improving + accuracy stable
+--------------------------------------------------------------------
+Condition:
+- Speed improving
+- Accuracy stable or improving
+
+Insight:
+“You’re answering faster without sacrificing accuracy.”
+
+--------------------------------------------------------------------
+5.3 Speed dipping + difficulty increasing
+--------------------------------------------------------------------
+Condition:
+- Speed slower
+- Difficulty increased
+
+Insight:
+“A temporary slowdown is normal when difficulty increases.”
+
+--------------------------------------------------------------------
+5.4 Throughput improving
+--------------------------------------------------------------------
+Condition:
+- Throughput improving
+- No stronger rule matched above
+
+Insight:
+“You’re sustaining focus and answering more questions per session.”
+
+--------------------------------------------------------------------
+5.5 Consistency improving
+--------------------------------------------------------------------
+Condition:
+- Speed IQR narrowing noticeably
+- Median speed stable or improving
+
+Insight:
+“Your response times are becoming more consistent.”
+
+--------------------------------------------------------------------
+5.6 Plateau (all metrics stable)
+--------------------------------------------------------------------
+Condition:
+- Accuracy stable
+- Speed stable
+- Throughput stable
+
+Insight:
+“Stability is a sign you’re consolidating skills.”
+
+--------------------------------------------------------------------
+5.7 General improvement
+--------------------------------------------------------------------
+Condition:
+- Multiple metrics improving
+- No difficulty increase
+
+Insight:
+“You’re making steady progress across multiple areas.”
+
+--------------------------------------------------------------------
+5.8 Fallback
+--------------------------------------------------------------------
+Condition:
+- No clear signal
+- Sparse or mixed data
+
+Insight:
+“Keep training — patterns become clearer with more sessions.”
+
+====================================================================
+6) DELTA LABEL REFRAMING (CRITICAL UX FIX)
+====================================================================
+Replace blunt delta language with neutral framing.
+
+DO NOT display:
+- “-5% vs start”
+- “2.0s slower”
+
+Instead:
+
+Accuracy:
+- “Compared to the start of this period”
+
+Speed:
+- “Compared to earlier sessions”
+
+Throughput:
+- “Relative to earlier in the period”
+
+Numeric deltas may still be shown, but MUST be accompanied by neutral phrasing.
+
+====================================================================
+7) START VS NOW ANCHORS (SMALL BUT POWERFUL)
+====================================================================
+On the right side of each metric card, display:
+
+Accuracy:
+- “Start: X%”
+- “Now: Y%”
+
+Speed:
+- “Start: Xs”
+- “Now: Ys”
+
+Throughput:
+- “Start: X QPM”
+- “Now: Y QPM”
+
+These are informational anchors, not performance judgements.
+
+====================================================================
+8) PERSONAL BESTS MICRO-COPY
+====================================================================
+For the Personal Bests section:
+
+Add a subtle label:
+“Your best so far”
+
+Do NOT:
+- Add pressure language
+- Compare to averages
+- Suggest beating records
+
+Tone = quiet pride.
+
+====================================================================
+9) NEGATIVE SIGNAL SAFETY
+====================================================================
+Never:
+- Color negative deltas red
+- Use words like “worse”, “bad”, “decline”, “failed”
+
+Always:
+- Frame dips as temporary
+- Frame plateaus as consolidation
+
+====================================================================
+10) SPARSE DATA HANDLING
+====================================================================
+If fewer than 3 active days in the selected range:
+
+Insight must be:
+“More data will appear as you train.”
+
+Do NOT attempt pattern detection.
+
+====================================================================
+11) DEBUG (CONSOLE ONLY)
+====================================================================
+Log insight selection decisions:
+
+PROGRESS_INSIGHT
+range=__
+accuracyTrend=__
+speedTrend=__
+throughputTrend=__
+difficultyChange=__
+chosenRule=__
+
+No debug UI.
+
+====================================================================
+12) DELIVERABLES
+====================================================================
+After implementation, report:
+- Where insight rules live
+- How trend thresholds are applied
+- How deltas were reworded
+- Confirmation that only ONE insight appears at a time

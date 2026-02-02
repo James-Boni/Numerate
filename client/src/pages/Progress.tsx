@@ -3,10 +3,11 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { useStore, SessionStats } from '@/lib/store';
 import { Card } from '@/components/ui/card';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, ComposedChart, ReferenceArea } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, ComposedChart } from 'recharts';
 import { TrendingUp, Award, Clock, Target, Info } from 'lucide-react';
 
 type TimeRange = '7D' | '30D' | 'all';
+type TrendDirection = 'improving' | 'stable' | 'dipping';
 
 interface DailyAggregate {
   date: string;
@@ -22,6 +23,20 @@ interface DailyAggregate {
   totalActiveTimeMs: number;
   throughputQpm: number;
   levelAtEnd: number;
+}
+
+interface TrendAnalysis {
+  accuracyTrend: TrendDirection;
+  speedTrend: TrendDirection;
+  throughputTrend: TrendDirection;
+  difficultyChange: boolean;
+  consistencyImproving: boolean;
+  startAccuracy: number;
+  endAccuracy: number;
+  startSpeedSec: number;
+  endSpeedSec: number;
+  startThroughput: number;
+  endThroughput: number;
 }
 
 function getPercentile(arr: number[], p: number): number {
@@ -144,52 +159,107 @@ function aggregateByDay(sessions: SessionStats[], currentLevel: number): DailyAg
   return aggregates.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
-function generateAdaptiveInsight(
-  dailyData: DailyAggregate[],
-  startLevel: number,
-  endLevel: number
-): string {
+function analyzeTrends(dailyData: DailyAggregate[], startLevel: number, endLevel: number): TrendAnalysis {
   if (dailyData.length < 2) {
-    return "Keep training to see your improvement trends.";
+    return {
+      accuracyTrend: 'stable',
+      speedTrend: 'stable',
+      throughputTrend: 'stable',
+      difficultyChange: false,
+      consistencyImproving: false,
+      startAccuracy: 0,
+      endAccuracy: 0,
+      startSpeedSec: 0,
+      endSpeedSec: 0,
+      startThroughput: 0,
+      endThroughput: 0
+    };
   }
   
-  const firstHalf = dailyData.slice(0, Math.floor(dailyData.length / 2));
-  const secondHalf = dailyData.slice(Math.floor(dailyData.length / 2));
+  const first = dailyData[0];
+  const last = dailyData[dailyData.length - 1];
   
-  const avgSpeedFirst = firstHalf.reduce((a, d) => a + d.medianMs, 0) / firstHalf.length;
-  const avgSpeedSecond = secondHalf.reduce((a, d) => a + d.medianMs, 0) / secondHalf.length;
-  const avgAccFirst = firstHalf.reduce((a, d) => a + d.accuracy, 0) / firstHalf.length;
-  const avgAccSecond = secondHalf.reduce((a, d) => a + d.accuracy, 0) / secondHalf.length;
+  const startAccuracy = first.accuracy;
+  const endAccuracy = last.accuracy;
+  const startSpeedSec = first.medianMs / 1000;
+  const endSpeedSec = last.medianMs / 1000;
+  const startThroughput = first.throughputQpm;
+  const endThroughput = last.throughputQpm;
   
-  const speedImproved = avgSpeedSecond < avgSpeedFirst * 0.95;
-  const speedDeclined = avgSpeedSecond > avgSpeedFirst * 1.05;
-  const accImproved = avgAccSecond > avgAccFirst + 0.03;
-  const accDeclined = avgAccSecond < avgAccFirst - 0.03;
-  const levelIncreased = endLevel > startLevel;
+  let accuracyTrend: TrendDirection = 'stable';
+  const accDelta = (endAccuracy - startAccuracy) * 100;
+  if (accDelta >= 2) accuracyTrend = 'improving';
+  else if (accDelta <= -2) accuracyTrend = 'dipping';
   
-  if (speedImproved && levelIncreased) {
-    return "You're answering faster this week, even as difficulty increased.";
-  }
-  if (accDeclined && levelIncreased) {
-    return "Accuracy dipped slightly — normal when learning harder material.";
-  }
-  if (speedImproved && accImproved) {
-    return "Both speed and accuracy are improving — great progress!";
-  }
-  if (speedImproved) {
-    return "Your response times are getting faster.";
-  }
-  if (accImproved) {
-    return "Your accuracy is improving steadily.";
-  }
-  if (!speedDeclined && !accDeclined) {
-    return "Consistency is improving.";
-  }
-  if (levelIncreased) {
-    return "You've progressed to harder questions — temporary adjustments are normal.";
+  let speedTrend: TrendDirection = 'stable';
+  const speedDelta = startSpeedSec - endSpeedSec;
+  if (speedDelta >= 0.3) speedTrend = 'improving';
+  else if (speedDelta <= -0.3) speedTrend = 'dipping';
+  
+  let throughputTrend: TrendDirection = 'stable';
+  const throughputDeltaPct = startThroughput > 0 
+    ? ((endThroughput - startThroughput) / startThroughput) * 100 
+    : 0;
+  if (throughputDeltaPct >= 5) throughputTrend = 'improving';
+  else if (throughputDeltaPct <= -5) throughputTrend = 'dipping';
+  
+  const difficultyChange = endLevel > startLevel;
+  
+  const startIQR = first.p75Ms - first.p25Ms;
+  const endIQR = last.p75Ms - last.p25Ms;
+  const consistencyImproving = endIQR < startIQR * 0.85 && speedTrend !== 'dipping';
+  
+  return {
+    accuracyTrend,
+    speedTrend,
+    throughputTrend,
+    difficultyChange,
+    consistencyImproving,
+    startAccuracy,
+    endAccuracy,
+    startSpeedSec,
+    endSpeedSec,
+    startThroughput,
+    endThroughput
+  };
+}
+
+function generateInsight(trends: TrendAnalysis, sparseData: boolean, range: TimeRange): { text: string; rule: string } {
+  if (sparseData) {
+    return { text: "More data will appear as you train.", rule: "sparse_data" };
   }
   
-  return "Stability is a sign you're consolidating skills.";
+  const { accuracyTrend, speedTrend, throughputTrend, difficultyChange, consistencyImproving } = trends;
+  
+  if (accuracyTrend === 'improving' && difficultyChange) {
+    return { text: "Accuracy is improving, even as questions become harder.", rule: "accuracy_up_difficulty_up" };
+  }
+  
+  if (speedTrend === 'improving' && (accuracyTrend === 'stable' || accuracyTrend === 'improving')) {
+    return { text: "You're answering faster without sacrificing accuracy.", rule: "speed_up_accuracy_stable" };
+  }
+  
+  if (speedTrend === 'dipping' && difficultyChange) {
+    return { text: "A temporary slowdown is normal when difficulty increases.", rule: "speed_down_difficulty_up" };
+  }
+  
+  if (throughputTrend === 'improving') {
+    return { text: "You're sustaining focus and answering more questions per session.", rule: "throughput_up" };
+  }
+  
+  if (consistencyImproving) {
+    return { text: "Your response times are becoming more consistent.", rule: "consistency_up" };
+  }
+  
+  if (accuracyTrend === 'stable' && speedTrend === 'stable' && throughputTrend === 'stable') {
+    return { text: "Stability is a sign you're consolidating skills.", rule: "plateau" };
+  }
+  
+  if ((accuracyTrend === 'improving' || speedTrend === 'improving') && !difficultyChange) {
+    return { text: "You're making steady progress across multiple areas.", rule: "general_improvement" };
+  }
+  
+  return { text: "Keep training — patterns become clearer with more sessions.", rule: "fallback" };
 }
 
 export default function Progress() {
@@ -206,8 +276,6 @@ export default function Progress() {
     [filteredSessions, level]
   );
   
-  console.log(`PROGRESS_WINDOW range=${timeRange} days=${dailyData.length} dailySessions=${filteredSessions.length}`);
-  
   const startLevel = useMemo(() => {
     if (dailyData.length === 0) return level;
     const firstDay = dailyData[0];
@@ -216,23 +284,20 @@ export default function Progress() {
   }, [dailyData, filteredSessions, level, startingLevel]);
   
   const endLevel = level;
+  const sparseData = dailyData.length < 3;
   
-  const insight = useMemo(() => 
-    generateAdaptiveInsight(dailyData, startLevel, endLevel),
+  const trends = useMemo(() => 
+    analyzeTrends(dailyData, startLevel, endLevel),
     [dailyData, startLevel, endLevel]
   );
   
-  const startAccuracy = dailyData.length > 0 ? dailyData[0].accuracy : 0;
-  const endAccuracy = dailyData.length > 0 ? dailyData[dailyData.length - 1].accuracy : 0;
-  const accDelta = Math.round((endAccuracy - startAccuracy) * 100);
+  const { text: insight, rule: chosenRule } = useMemo(() => 
+    generateInsight(trends, sparseData, timeRange),
+    [trends, sparseData, timeRange]
+  );
   
-  const startSpeed = dailyData.length > 0 ? dailyData[0].medianMs / 1000 : 0;
-  const endSpeed = dailyData.length > 0 ? dailyData[dailyData.length - 1].medianMs / 1000 : 0;
-  const speedDelta = startSpeed - endSpeed;
-  
-  const avgThroughput = dailyData.length > 0
-    ? dailyData.reduce((a, d) => a + d.throughputQpm, 0) / dailyData.length
-    : 0;
+  console.log(`PROGRESS_WINDOW range=${timeRange} days=${dailyData.length} dailySessions=${filteredSessions.length}`);
+  console.log(`PROGRESS_INSIGHT range=${timeRange} accuracyTrend=${trends.accuracyTrend} speedTrend=${trends.speedTrend} throughputTrend=${trends.throughputTrend} difficultyChange=${trends.difficultyChange} chosenRule=${chosenRule}`);
   
   const personalBests = useMemo(() => {
     if (dailyData.length === 0) return null;
@@ -273,8 +338,6 @@ export default function Progress() {
     date: d.dateLabel,
     qpm: Math.round(d.throughputQpm * 10) / 10
   }));
-  
-  const sparseData = dailyData.length < 3;
 
   return (
     <MobileLayout className="bg-slate-50">
@@ -300,7 +363,7 @@ export default function Progress() {
           ))}
         </div>
         
-        <p className="text-sm text-slate-600 italic" data-testid="text-insight">
+        <p className="text-sm text-slate-500 italic" data-testid="text-insight">
           {insight}
         </p>
         
@@ -341,10 +404,16 @@ export default function Progress() {
                   <h3 className="font-bold text-slate-800">Accuracy</h3>
                   <p className="text-xs text-slate-400">Percentage correct per day</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-primary">{Math.round(endAccuracy * 100)}%</p>
-                  <p className={`text-xs font-medium ${accDelta >= 0 ? 'text-green-600' : 'text-slate-500'}`}>
-                    {accDelta >= 0 ? '+' : ''}{accDelta}% vs start
+                <div className="text-right space-y-1">
+                  <div className="flex items-center justify-end gap-2 text-xs text-slate-400">
+                    <span>Start: {Math.round(trends.startAccuracy * 100)}%</span>
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <span className="text-xs text-slate-400">Now:</span>
+                    <span className="text-lg font-bold text-primary">{Math.round(trends.endAccuracy * 100)}%</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Compared to the start of this period
                   </p>
                 </div>
               </div>
@@ -376,10 +445,16 @@ export default function Progress() {
                   <h3 className="font-bold text-slate-800">Speed</h3>
                   <p className="text-xs text-slate-400">Median response time (seconds)</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-primary">{endSpeed.toFixed(1)}s</p>
-                  <p className={`text-xs font-medium ${speedDelta > 0 ? 'text-green-600' : 'text-slate-500'}`}>
-                    {speedDelta > 0 ? `${speedDelta.toFixed(1)}s faster` : speedDelta < 0 ? `${Math.abs(speedDelta).toFixed(1)}s slower` : 'No change'}
+                <div className="text-right space-y-1">
+                  <div className="flex items-center justify-end gap-2 text-xs text-slate-400">
+                    <span>Start: {trends.startSpeedSec.toFixed(1)}s</span>
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <span className="text-xs text-slate-400">Now:</span>
+                    <span className="text-lg font-bold text-primary">{trends.endSpeedSec.toFixed(1)}s</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Compared to earlier sessions
                   </p>
                 </div>
               </div>
@@ -431,9 +506,17 @@ export default function Progress() {
                   <h3 className="font-bold text-slate-800">Throughput</h3>
                   <p className="text-xs text-slate-400">Questions per minute</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-primary">{avgThroughput.toFixed(1)}</p>
-                  <p className="text-xs text-slate-400">Average QPM</p>
+                <div className="text-right space-y-1">
+                  <div className="flex items-center justify-end gap-2 text-xs text-slate-400">
+                    <span>Start: {trends.startThroughput.toFixed(1)} QPM</span>
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <span className="text-xs text-slate-400">Now:</span>
+                    <span className="text-lg font-bold text-primary">{trends.endThroughput.toFixed(1)}</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Relative to earlier in the period
+                  </p>
                 </div>
               </div>
               <div className="h-40 w-full">
@@ -467,11 +550,14 @@ export default function Progress() {
             
             {personalBests && (
               <Card className="p-5 bg-white border-none shadow-sm rounded-2xl" data-testid="card-personal-bests">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
-                    <Award className="text-amber-500" size={20} />
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+                      <Award className="text-amber-500" size={20} />
+                    </div>
+                    <h3 className="font-bold text-slate-800">Personal Bests</h3>
                   </div>
-                  <h3 className="font-bold text-slate-800">Personal Bests</h3>
+                  <span className="text-xs text-slate-400 italic">Your best so far</span>
                 </div>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
