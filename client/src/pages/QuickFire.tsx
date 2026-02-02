@@ -4,7 +4,6 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { useLocation } from 'wouter';
 import { useStore, SessionStats } from '@/lib/store';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { X, Clock, Trophy, Flame, Plus, AlertTriangle } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { clsx } from 'clsx';
@@ -418,42 +417,51 @@ export default function QuickFire() {
   if (step === 'intro') {
     return (
       <MobileLayout className="bg-white">
-        <Dialog open={true} onOpenChange={(open) => { if (!open) handleCancelIntro(); }}>
-          <DialogContent className="max-w-sm mx-auto rounded-3xl relative" data-testid="modal-quickfire-intro">
-            <DialogHeader>
-              <div className="flex items-center justify-center mb-4">
-                <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
-                  <Flame size={32} className="text-orange-500" />
-                </div>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full relative shadow-2xl" data-testid="modal-quickfire-intro">
+            <button
+              onClick={handleCancelIntro}
+              className="absolute right-4 top-4 w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 active:bg-slate-200 transition-colors"
+              data-testid="button-quickfire-cancel"
+            >
+              <X size={20} className="text-slate-400" />
+            </button>
+            
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
+                <Flame size={32} className="text-orange-500" />
               </div>
-              <DialogTitle className="text-center text-2xl font-bold">Quick Fire</DialogTitle>
-              <DialogDescription className="text-center space-y-3 pt-4">
-                <p className="flex items-center justify-center gap-2">
-                  <Clock size={16} className="text-primary" />
-                  You start with 5 seconds.
-                </p>
-                <p className="flex items-center justify-center gap-2">
-                  <Plus size={16} className="text-green-500" />
-                  Each correct answer adds 5 more seconds.
-                </p>
-                <p className="flex items-center justify-center gap-2">
-                  <AlertTriangle size={16} className="text-red-500" />
-                  One mistake or running out of time ends the run.
-                </p>
-                <p className="text-slate-500 text-sm pt-2">
-                  This is speed training for Daily challenges.
-                </p>
-              </DialogDescription>
-            </DialogHeader>
+            </div>
+            
+            <h2 className="text-center text-2xl font-bold text-slate-900">Quick Fire</h2>
+            
+            <div className="text-center space-y-3 pt-4 text-slate-600">
+              <p className="flex items-center justify-center gap-2">
+                <Clock size={16} className="text-primary" />
+                You start with 5 seconds.
+              </p>
+              <p className="flex items-center justify-center gap-2">
+                <Plus size={16} className="text-green-500" />
+                Each correct answer adds 5 more seconds.
+              </p>
+              <p className="flex items-center justify-center gap-2">
+                <AlertTriangle size={16} className="text-red-500" />
+                One mistake or running out of time ends the run.
+              </p>
+              <p className="text-slate-500 text-sm pt-2">
+                This is speed training for Daily challenges.
+              </p>
+            </div>
+            
             <Button 
               onClick={startCountdown}
-              className="w-full h-12 rounded-2xl font-bold mt-4"
+              className="w-full h-12 rounded-2xl font-bold mt-6"
               data-testid="button-quickfire-start"
             >
               Okay
             </Button>
-          </DialogContent>
-        </Dialog>
+          </div>
+        </div>
       </MobileLayout>
     );
   }
@@ -609,8 +617,8 @@ export default function QuickFire() {
     <MobileLayout className="bg-white">
       {showFlash && <FullScreenFlash type={showFlash} />}
       
-      <div className="flex-1 flex flex-col">
-        <div className="px-4 pt-4 pb-2 flex justify-between items-center relative z-50" style={{ pointerEvents: 'auto' }}>
+      <div className="flex-1 flex flex-col pointer-events-none">
+        <div className="px-4 pt-4 pb-2 flex justify-between items-center relative z-50 pointer-events-auto">
           <button
             onClick={() => {
               stopAllTimers();
@@ -641,7 +649,7 @@ export default function QuickFire() {
         </div>
 
         <div 
-          className="flex-1 flex flex-col items-center justify-center px-8 relative cursor-pointer"
+          className="flex-1 flex flex-col items-center justify-center px-8 relative cursor-pointer pointer-events-auto"
           onClick={handleAreaTap}
           data-testid="area-quickfire-submit"
         >
@@ -671,7 +679,7 @@ export default function QuickFire() {
           </div>
         </div>
 
-        <div className="px-4 pb-8">
+        <div className="px-4 pb-8 pointer-events-auto">
           <KeypadModern 
             onPress={handleKeypadPress}
             onDelete={handleKeypadDelete}
