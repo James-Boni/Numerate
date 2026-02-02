@@ -1,0 +1,182 @@
+We are implementing a major UX/UI polish pass focused on perceived quality, clarity, and reward. This is NOT optional polish — these are core experiential features.
+
+Do NOT introduce new product logic.
+Do NOT change difficulty or XP formulas.
+Do NOT break existing flows.
+All changes must respect Numerate’s existing colour scheme, typography, and tone.
+
+====================================================================
+A) LOGO BACKGROUND FIX (GLOBAL)
+====================================================================
+Problem:
+The Numerate logo currently renders with a white rounded-square background, making the app feel unpolished.
+
+Requirement:
+- Remove the white box background entirely.
+- The logo must render as JUST the brain shape with transparency.
+- Background behind the logo should be whatever the screen background is (e.g. app background colour).
+- This applies to:
+  - loading/splash screen
+  - any in-app logo usage
+  - any placement / celebration screens
+
+Implementation notes:
+- Use a transparent PNG/SVG if available.
+- Do NOT simulate transparency by matching background colour.
+- Confirm no white bounding box remains.
+
+Acceptance:
+- Logo visually “floats” cleanly on any background.
+
+====================================================================
+B) INITIAL ASSESSMENT RETRY FEATURE (CRITICAL UX FIX)
+====================================================================
+Problem:
+If a user answers fewer than 12 questions, the app recommends retrying for accuracy — but there is no retry mechanism.
+
+Requirements:
+1) Retry eligibility:
+- If attemptedQuestions < 12:
+  - Assessment is considered incomplete.
+  - Placement is NOT locked.
+  - User may retry freely.
+
+2) Retry UI:
+When <12 questions are answered, show a clear message:
+“Answer a few more questions for a more accurate placement.”
+
+Buttons:
+- “Retry Assessment” (primary)
+- “Continue Anyway” (secondary, optional — only if you think placement can still work)
+
+3) Retry behavior:
+- “Retry Assessment” restarts the assessment immediately.
+- Clear all assessment-specific state:
+  - questions
+  - counters
+  - timers
+- Do NOT write placement results to user profile until a valid attempt.
+
+4) Retry limits:
+- No hard cap on retries while attemptedQuestions < 12.
+- Once attemptedQuestions ≥ 12, retry is no longer offered automatically.
+
+Acceptance:
+- Users are never told to retry without having a way to do so.
+- Placement only locks after a valid attempt.
+
+====================================================================
+C) CINEMATIC PLACEMENT MOMENT (HIGH IMPACT)
+====================================================================
+Problem:
+Placement currently works logically but lacks emotional weight.
+
+Goal:
+Make placement feel important, earned, and motivating — without being gimmicky.
+
+Requirements:
+1) Placement screen structure:
+- Full-screen moment.
+- Dimmed or soft background.
+- Logo (transparent, no white box) subtly present.
+
+2) Visual sequencing (fast, ~1.5–2s total):
+- “Assessment Complete” appears.
+- Short pause.
+- Level number animates in (scale + fade).
+- Confidence message appears below.
+
+3) Audio:
+- Soft, satisfying “success” sound on placement reveal.
+- No loud fanfare.
+- One clean sound only.
+
+4) Copy rules:
+- Confidence message must be relevant to placement level.
+- Tone:
+  - encouraging
+  - forward-looking
+  - never condescending
+
+Example tone (not exact copy):
+“Your foundations are solid. With focused practice, your fluency will grow quickly.”
+
+Acceptance:
+- Placement feels like a meaningful milestone.
+- User feels optimistic, not judged.
+
+====================================================================
+D) XP → LEVEL PROGRESSION BAR (TRAIN MENU + POST-GAME)
+====================================================================
+Problem:
+Users can’t clearly see how close they are to the next level, and leveling up lacks impact.
+
+--------------------------------------------------------------------
+D1) Progress bar in Train menu (persistent)
+--------------------------------------------------------------------
+Requirements:
+- At the top of the Train screen, near Level + XP.
+- Horizontal bar showing:
+  - current XP progress within current level
+  - distance to next level
+- Colour must match Numerate palette.
+- Smooth animation on XP changes.
+
+Acceptance:
+- User can always answer: “How close am I to leveling up?”
+
+--------------------------------------------------------------------
+D2) Level-up celebration flow (post-game)
+--------------------------------------------------------------------
+Trigger:
+- If a game causes the user to reach a new level.
+
+Flow:
+1) Game summary screen finishes.
+2) Transition to a dedicated “Level Up” screen.
+
+Level Up screen requirements:
+- XP bar animates rapidly from previous state → fills → crosses threshold.
+- Level number increments visually.
+- Bar resets into new level state if applicable.
+- Animation must be smooth, fast, and satisfying (not slow).
+
+Audio:
+- One clean, rewarding level-up sound.
+- Louder and more celebratory than normal XP gain.
+- No overlapping sounds.
+
+Visuals:
+- Subtle glow or accent animation.
+- No confetti overload.
+- Respect Numerate’s clean aesthetic.
+
+Acceptance:
+- Leveling up feels unquestionably rewarding.
+- Users instantly understand what just happened.
+
+--------------------------------------------------------------------
+D3) Multi-level gains (edge case)
+--------------------------------------------------------------------
+If a single session causes multiple level-ups:
+- Animate through levels quickly.
+- Do NOT skip the feedback.
+- Keep total animation under ~3 seconds.
+
+====================================================================
+E) COHERENCE & SAFETY
+====================================================================
+- All XP shown must equal XP applied and stored.
+- user.level remains the single source of truth.
+- No duplicate bars or conflicting indicators.
+- No new settings or toggles added.
+
+====================================================================
+F) REPORTING
+====================================================================
+After implementation, report:
+- Files modified
+- Where assessment retry logic lives
+- How placement lock is prevented until valid
+- How XP bar calculates fill %
+- Where level-up animation is triggered

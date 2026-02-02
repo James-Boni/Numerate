@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { SessionScreen } from '@/components/game/SessionScreen';
@@ -6,11 +6,173 @@ import { useLocation } from 'wouter';
 import { useStore, SessionStats } from '@/lib/store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ClipboardCheck, Zap, Target, TrendingUp, Clock } from 'lucide-react';
+import { ClipboardCheck, Zap, Target, TrendingUp, Clock, Star, ChevronUp } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { motion, animate, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { xpRequiredToAdvance } from '@/lib/logic/xp-system';
+
+function LevelUpCelebration({ 
+  levelBefore, 
+  levelAfter, 
+  xpIntoLevelBefore,
+  xpIntoLevelAfter,
+  levelUpCount,
+  onComplete,
+  soundOn
+}: {
+  levelBefore: number;
+  levelAfter: number;
+  xpIntoLevelBefore: number;
+  xpIntoLevelAfter: number;
+  levelUpCount: number;
+  onComplete: () => void;
+  soundOn: boolean;
+}) {
+  const [displayLevel, setDisplayLevel] = useState(levelBefore);
+  const [barProgress, setBarProgress] = useState(0);
+  const [animationPhase, setAnimationPhase] = useState<'filling' | 'leveling' | 'complete'>('filling');
+  const animatedRef = useRef(false);
+
+  useEffect(() => {
+    if (animatedRef.current) return;
+    animatedRef.current = true;
+
+    let currentLevel = levelBefore;
+    let totalDuration = 0;
+    const baseStepDuration = levelUpCount > 1 ? 400 : 600;
+
+    const animateLevel = (lvl: number, isLast: boolean) => {
+      const xpNeeded = xpRequiredToAdvance(lvl);
+      const startXp = lvl === levelBefore ? xpIntoLevelBefore : 0;
+      const endXp = isLast ? xpIntoLevelAfter : xpNeeded;
+      const startPercent = (startXp / xpNeeded) * 100;
+      const endPercent = isLast ? ((xpIntoLevelAfter / xpRequiredToAdvance(levelAfter)) * 100) : 100;
+
+      setTimeout(() => {
+        setDisplayLevel(lvl);
+        setBarProgress(startPercent);
+        setAnimationPhase('filling');
+        
+        setTimeout(() => {
+          setBarProgress(isLast ? endPercent : 100);
+          
+          if (!isLast) {
+            setTimeout(() => {
+              if (soundOn) AudioManager.playLevelUp();
+              setAnimationPhase('leveling');
+              setBarProgress(0);
+            }, baseStepDuration * 0.6);
+          } else {
+            setTimeout(() => {
+              if (soundOn) AudioManager.playLevelUp();
+              setAnimationPhase('complete');
+            }, baseStepDuration * 0.4);
+          }
+        }, 50);
+      }, totalDuration);
+
+      totalDuration += baseStepDuration;
+    };
+
+    for (let i = 0; i <= levelUpCount; i++) {
+      const lvl = levelBefore + i;
+      const isLast = i === levelUpCount;
+      if (lvl <= levelAfter) {
+        animateLevel(lvl, isLast);
+      }
+    }
+
+    setTimeout(() => {
+      setDisplayLevel(levelAfter);
+    }, totalDuration);
+
+  }, [levelBefore, levelAfter, xpIntoLevelBefore, xpIntoLevelAfter, levelUpCount, soundOn]);
+
+  return (
+    <MobileLayout className="bg-gradient-to-b from-primary/5 to-white">
+      <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center space-y-2"
+        >
+          <motion.div
+            animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+            transition={{ duration: 0.6, repeat: animationPhase === 'leveling' ? Infinity : 0 }}
+          >
+            <ChevronUp size={48} className="text-primary mx-auto" />
+          </motion.div>
+          <h1 className="text-3xl font-bold text-slate-900">Level Up!</h1>
+        </motion.div>
+
+        <motion.div 
+          className="w-full max-w-xs bg-white rounded-3xl p-8 shadow-lg shadow-primary/10 text-center"
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.2 }}
+        >
+          <motion.div 
+            className="text-8xl font-black text-primary mb-4"
+            key={displayLevel}
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+          >
+            {displayLevel}
+          </motion.div>
+
+          <div className="space-y-2">
+            <div className="relative h-4 bg-slate-100 rounded-full overflow-hidden">
+              <motion.div 
+                className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-primary/80 rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${barProgress}%` }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+              />
+              {animationPhase === 'leveling' && (
+                <motion.div
+                  className="absolute inset-0 bg-primary/30"
+                  animate={{ opacity: [0, 1, 0] }}
+                  transition={{ duration: 0.3 }}
+                />
+              )}
+            </div>
+            <p className="text-sm text-slate-500">
+              {animationPhase === 'complete' ? `Level ${levelAfter} unlocked!` : 'Leveling up...'}
+            </p>
+          </div>
+        </motion.div>
+
+        {levelUpCount > 1 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="bg-amber-50 text-amber-700 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2"
+          >
+            <Star size={16} className="fill-amber-500 text-amber-500" />
+            {levelUpCount} levels gained!
+          </motion.div>
+        )}
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: animationPhase === 'complete' ? 1 : 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Button 
+            size="lg" 
+            className="w-full h-14 px-12 text-lg font-semibold rounded-2xl shadow-lg shadow-primary/10"
+            onClick={onComplete}
+          >
+            Continue
+          </Button>
+        </motion.div>
+      </div>
+    </MobileLayout>
+  );
+}
 
 function CountUp({ value, duration = 1, delay = 0, onTick, suffix = '' }: { 
   value: number, 
@@ -50,11 +212,12 @@ function CountUp({ value, duration = 1, delay = 0, onTick, suffix = '' }: {
 }
 
 export default function Game() {
-  const [step, setStep] = useState<'active' | 'results'>('active');
+  const [step, setStep] = useState<'active' | 'results' | 'levelup'>('active');
   const [results, setResults] = useState<SessionStats | null>(null);
   const [_, setLocation] = useLocation();
   const { currentTier, saveSession, settings } = useStore();
   const revealRun = React.useRef(false);
+  const levelUpShownRef = React.useRef(false);
 
   // Pre-initialize audio context on mount
   useEffect(() => {
@@ -109,6 +272,22 @@ export default function Game() {
       />
     );
   }
+
+  if (step === 'levelup' && results && (results.levelUpCount ?? 0) > 0) {
+    return (
+      <LevelUpCelebration
+        levelBefore={results.levelBefore ?? 1}
+        levelAfter={results.levelAfter ?? 1}
+        xpIntoLevelBefore={results.xpIntoLevelBefore ?? 0}
+        xpIntoLevelAfter={results.xpIntoLevelAfter ?? 0}
+        levelUpCount={results.levelUpCount ?? 1}
+        onComplete={() => setLocation('/train')}
+        soundOn={settings.soundOn}
+      />
+    );
+  }
+
+  const hasLevelUp = results && (results.levelUpCount ?? 0) > 0;
 
   return (
     <MobileLayout className="bg-white">
@@ -203,9 +382,16 @@ export default function Game() {
           <Button 
             size="lg" 
             className="w-full h-14 text-lg font-semibold rounded-2xl shadow-lg shadow-primary/10 mt-4"
-            onClick={() => setLocation('/train')}
+            onClick={() => {
+              if (hasLevelUp && !levelUpShownRef.current) {
+                levelUpShownRef.current = true;
+                setStep('levelup');
+              } else {
+                setLocation('/train');
+              }
+            }}
           >
-            Continue
+            {hasLevelUp && !levelUpShownRef.current ? 'View Level Up!' : 'Continue'}
           </Button>
         </motion.div>
 
@@ -321,6 +507,3 @@ export default function Game() {
   );
 }
 
-function useRef(arg0: boolean) {
-    return React.useRef(arg0);
-}

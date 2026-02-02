@@ -46,7 +46,15 @@ export default function Welcome() {
             transition={{ duration: 0.5 }}
             className="w-36 h-36 flex items-center justify-center"
         >
-            <img src={logo} alt="Numerate Logo" className="w-full h-full object-contain mix-blend-multiply drop-shadow-2xl" />
+            <img 
+              src={logo} 
+              alt="Numerate Logo" 
+              className="w-full h-full object-contain" 
+              style={{ 
+                mixBlendMode: 'multiply',
+                filter: 'drop-shadow(0 8px 20px rgba(0, 166, 153, 0.25))'
+              }} 
+            />
         </motion.div>
 
         <div className="space-y-4 max-w-[280px]">

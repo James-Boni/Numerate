@@ -24,14 +24,22 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
   }, [onFinish]);
 
   return (
-    <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-gradient-to-b from-slate-50 to-white z-50 flex items-center justify-center">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="w-48 h-48 flex items-center justify-center"
       >
-        <img src={logo} alt="Numerate Logo" className="w-full h-full object-contain mix-blend-multiply drop-shadow-2xl" />
+        <img 
+          src={logo} 
+          alt="Numerate Logo" 
+          className="w-full h-full object-contain" 
+          style={{ 
+            mixBlendMode: 'multiply',
+            filter: 'drop-shadow(0 10px 25px rgba(0, 166, 153, 0.3))'
+          }} 
+        />
       </motion.div>
     </div>
   );

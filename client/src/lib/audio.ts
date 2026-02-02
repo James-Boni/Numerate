@@ -114,4 +114,26 @@ export class AudioManager {
       setTimeout(() => this.playSynth(freq, 'sine', 0.15, 0.25), i * 80);
     });
   }
+
+  static playPlacementReveal() {
+    // Soft, satisfying reveal sound - warm and encouraging
+    if (!this.context) return;
+    if (this.context.state === 'suspended') this.context.resume();
+    
+    // Gentle ascending shimmer
+    this.playSynth(523.25, 'sine', 0.3, 0.2, true, 784);
+    setTimeout(() => this.playSynth(659.25, 'sine', 0.25, 0.15), 100);
+  }
+
+  static playLevelUp() {
+    // Celebratory level-up sound - rewarding and clear
+    if (!this.context) return;
+    if (this.context.state === 'suspended') this.context.resume();
+    
+    // Quick triumphant arpeggio
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+    notes.forEach((freq, i) => {
+      setTimeout(() => this.playSynth(freq, 'sine', 0.12, 0.3), i * 60);
+    });
+  }
 }

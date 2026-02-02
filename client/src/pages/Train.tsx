@@ -4,13 +4,18 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { useStore } from '@/lib/store';
 import { useLocation } from 'wouter';
-import { Zap, Play, Flame, Timer, Trophy } from 'lucide-react';
+import { Zap, Play, Flame, Timer, Trophy, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { xpRequiredToAdvance } from '@/lib/logic/xp-system';
 
 export default function Train() {
-  const { level, lifetimeXP, streakCount, hasCompletedAssessment, quickFireHighScore, sessions } = useStore();
+  const { level, lifetimeXP, streakCount, hasCompletedAssessment, quickFireHighScore, sessions, xpIntoLevel } = useStore();
   const [_, setLocation] = useLocation();
+  
+  const xpNeeded = xpRequiredToAdvance(level);
+  const progressPercent = Math.min(100, (xpIntoLevel / xpNeeded) * 100);
+  const xpRemaining = Math.max(0, xpNeeded - xpIntoLevel);
 
   const quickFireAttempts = sessions.filter(s => s.sessionType === 'quick_fire').length;
 
@@ -18,7 +23,7 @@ export default function Train() {
     <MobileLayout className="bg-white">
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="px-6 pt-12 pb-6 space-y-6">
+        <div className="px-6 pt-12 pb-4 space-y-4">
           <div className="flex justify-between items-start">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-primary/10">
@@ -36,6 +41,30 @@ export default function Train() {
             <div className="flex items-center gap-1 bg-slate-50 px-3 py-2 rounded-2xl border border-slate-100">
               <Flame size={18} className="text-primary fill-primary" />
               <span className="font-bold text-slate-700">{streakCount}</span>
+            </div>
+          </div>
+
+          {/* XP Progress Bar */}
+          <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
+            <div className="flex justify-between items-center text-sm">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-700">Level {level}</span>
+                <ChevronRight size={14} className="text-slate-400" />
+                <span className="text-slate-500">Level {level + 1}</span>
+              </div>
+              <span className="text-primary font-medium">{xpRemaining} XP to go</span>
+            </div>
+            <div className="relative h-3 bg-slate-200 rounded-full overflow-hidden">
+              <motion.div 
+                className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-primary/80 rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${progressPercent}%` }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-slate-400">
+              <span>{xpIntoLevel} XP</span>
+              <span>{xpNeeded} XP</span>
             </div>
           </div>
         </div>

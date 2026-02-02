@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { motion, useSpring, useTransform, animate } from 'framer-motion';
+import { motion, useSpring, useTransform, animate, AnimatePresence } from 'framer-motion';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { SessionScreen } from '@/components/game/SessionScreen';
 import { useStore, SessionStats } from '@/lib/store';
@@ -10,6 +10,7 @@ import { ClipboardCheck, Zap, Target, TrendingUp } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { clsx } from 'clsx';
 import { computeStartingPlacement, getPlacementMessageByLevel, PlacementResult } from '@/lib/logic/placement';
+import logo from "@assets/14e70c85-398b-4621-bc62-abe9331510f8_1769016302023.png";
 
 function CountUp({ value, duration = 1, delay = 0, onTick, prefix = '', suffix = '' }: { 
   value: number, 
@@ -47,6 +48,8 @@ function CountUp({ value, duration = 1, delay = 0, onTick, prefix = '', suffix =
   return <span>{prefix}{displayValue}{suffix}</span>;
 }
 
+const MIN_QUESTIONS_FOR_VALID_ASSESSMENT = 12;
+
 export default function Assessment() {
   const [step, setStep] = useState<'intro' | 'active' | 'results'>('intro');
   const [results, setResults] = useState<SessionStats | null>(null);
@@ -55,6 +58,19 @@ export default function Assessment() {
   const completeAssessment = useStore(s => s.completeAssessment);
   const settings = useStore(s => s.settings);
   const revealRun = React.useRef(false);
+  const [assessmentKey, setAssessmentKey] = useState(0);
+  const [revealPhase, setRevealPhase] = useState<'title' | 'level' | 'stats' | 'complete'>('title');
+
+  const isValidAssessment = results ? results.totalQuestions >= MIN_QUESTIONS_FOR_VALID_ASSESSMENT : false;
+
+  const handleRetry = () => {
+    setResults(null);
+    setPlacement(null);
+    revealRun.current = false;
+    setRevealPhase('title');
+    setAssessmentKey(prev => prev + 1);
+    setStep('active');
+  };
 
   useEffect(() => {
     AudioManager.init();
@@ -94,8 +110,10 @@ export default function Assessment() {
     setPlacement(placementResult);
     setStep('results');
     
-    // Single source of truth: completeAssessment sets user.level
-    completeAssessment(placementResult.competenceGroup, placementResult.startingLevel, stats);
+    // Only lock placement if assessment is valid (>= 12 questions)
+    if (stats.totalQuestions >= MIN_QUESTIONS_FOR_VALID_ASSESSMENT) {
+      completeAssessment(placementResult.competenceGroup, placementResult.startingLevel, stats);
+    }
   };
 
   useEffect(() => {
@@ -108,24 +126,27 @@ export default function Assessment() {
     if (step === 'results' && results && !revealRun.current) {
       revealRun.current = true;
       console.log(`[SESSION_FLOW] Reveal sequence started: ${Date.now()}`);
-      console.log("[XP_SUMMARY_RENDER]", {
-        xpDisplayed: results.xpEarned,
-        xpSourceValue: results.xpEarned,
-        sourceField: "results.xpEarned",
-      });
       
-      if (settings.soundOn) {
-        AudioManager.playCompletion();
-        setTimeout(() => AudioManager.playEnergyRise(0.8), 200);
-        
-        // Accuracy reveal overlap
-        setTimeout(() => {
-          AudioManager.playThud();
-          if (results.accuracy >= 0.95) {
-            setTimeout(() => AudioManager.playSuccessBell(), 600);
-          }
-        }, 900);
-      }
+      // Cinematic reveal sequence (total ~1.5-2s)
+      setRevealPhase('title');
+      
+      // After 400ms, reveal the level
+      setTimeout(() => {
+        setRevealPhase('level');
+        if (settings.soundOn) {
+          AudioManager.playPlacementReveal();
+        }
+      }, 400);
+      
+      // After 1200ms, show stats
+      setTimeout(() => {
+        setRevealPhase('stats');
+      }, 1200);
+      
+      // After 1800ms, complete reveal
+      setTimeout(() => {
+        setRevealPhase('complete');
+      }, 1800);
     }
   }, [step, results, settings.soundOn]);
 
@@ -169,6 +190,7 @@ export default function Assessment() {
   if (step === 'active') {
     return (
       <SessionScreen 
+        key={assessmentKey}
         mode="assessment"
         durationSeconds={180}
         initialTier={1}
@@ -181,56 +203,90 @@ export default function Assessment() {
   const showDebug = settings.showDebugOverlay;
 
   return (
-    <MobileLayout className="bg-slate-50">
+    <MobileLayout className="bg-gradient-to-b from-slate-50 to-white">
       <div className="flex-1 p-6 space-y-6 flex flex-col justify-center overflow-y-auto">
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full mb-4">
-            <ClipboardCheck size={32} />
-          </div>
-          <h1 className="text-3xl font-bold">Assessment Complete</h1>
-          <p className="text-slate-500">Your personalised training plan is ready.</p>
-        </div>
-
-        <div className="bg-white border border-slate-100 rounded-3xl p-6 text-center shadow-sm">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Starting Level</span>
-          <div className="text-6xl font-black text-primary mt-2">
-            <CountUp 
-              value={placement?.startingLevel || 1} 
-              duration={0.8} 
+        {/* Cinematic Header with Logo */}
+        <motion.div 
+          className="text-center space-y-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <motion.div 
+            className="w-16 h-16 mx-auto mb-2"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 0.8 }}
+            transition={{ duration: 0.3 }}
+          >
+            <img 
+              src={logo} 
+              alt="" 
+              className="w-full h-full object-contain" 
+              style={{ mixBlendMode: 'multiply', opacity: 0.5 }} 
             />
-          </div>
-        </div>
+          </motion.div>
+          <h1 className="text-2xl font-bold text-slate-800">Assessment Complete</h1>
+        </motion.div>
 
-        <div className="grid grid-cols-2 gap-3">
+        {/* Level Reveal Card - Cinematic */}
+        <motion.div 
+          className="bg-white border border-slate-100 rounded-3xl p-8 text-center shadow-lg shadow-slate-100/50"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ 
+            opacity: revealPhase !== 'title' ? 1 : 0.3, 
+            scale: revealPhase !== 'title' ? 1 : 0.95 
+          }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+        >
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Starting Level</span>
+          <motion.div 
+            className="text-7xl font-black text-primary mt-3"
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ 
+              scale: revealPhase !== 'title' ? 1 : 0.5, 
+              opacity: revealPhase !== 'title' ? 1 : 0 
+            }}
+            transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+          >
+            {placement?.startingLevel || 1}
+          </motion.div>
+          <motion.p 
+            className="text-slate-500 text-sm mt-3 leading-relaxed max-w-xs mx-auto"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ 
+              opacity: revealPhase === 'stats' || revealPhase === 'complete' ? 1 : 0,
+              y: revealPhase === 'stats' || revealPhase === 'complete' ? 0 : 10
+            }}
+            transition={{ duration: 0.3 }}
+          >
+            {isValidAssessment && placement ? getPlacementMessageByLevel(placement.startingLevel) : ''}
+          </motion.p>
+        </motion.div>
+
+        {/* Stats Grid - Reveals with phase */}
+        <motion.div 
+          className="grid grid-cols-2 gap-3"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ 
+            opacity: revealPhase === 'stats' || revealPhase === 'complete' ? 1 : 0,
+            y: revealPhase === 'stats' || revealPhase === 'complete' ? 0 : 20
+          }}
+          transition={{ duration: 0.4 }}
+        >
           <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm rounded-2xl">
-            <span className="text-2xl font-bold">
-              <CountUp 
-                value={results?.correctQuestions || 0} 
-                duration={0.7} 
-                delay={0.2} 
-                onTick={() => settings.soundOn && AudioManager.playTallyTick()}
-              />
-            </span>
+            <span className="text-2xl font-bold">{results?.correctQuestions || 0}</span>
             <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider text-center">Correct</span>
           </Card>
           <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm rounded-2xl">
-            <span className="text-2xl font-bold">
-              {results?.totalQuestions || 0}
-            </span>
+            <span className="text-2xl font-bold">{results?.totalQuestions || 0}</span>
             <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider text-center">Attempted</span>
           </Card>
           <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-white border-none shadow-sm rounded-2xl">
             <span className={clsx(
-              "text-2xl font-bold transition-colors duration-300",
+              "text-2xl font-bold",
               (results?.accuracy || 0) >= 0.95 ? "text-primary" : "text-slate-900"
             )}>
-              <CountUp 
-                value={Math.round((results?.accuracy || 0) * 100)} 
-                duration={0.7} 
-                delay={0.3} 
-                onTick={() => settings.soundOn && AudioManager.playTallyTick()}
-                suffix="%"
-              />
+              {Math.round((results?.accuracy || 0) * 100)}%
             </span>
             <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider text-center">Accuracy</span>
           </Card>
@@ -240,18 +296,24 @@ export default function Assessment() {
             </span>
             <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider text-center">Median Time</span>
           </Card>
-        </div>
+        </motion.div>
 
-        <div className="bg-white border border-slate-100 rounded-2xl p-4 text-center shadow-sm">
-          <p className="text-slate-600 leading-relaxed text-sm">
-            {placement ? getPlacementMessageByLevel(placement.startingLevel) : ''}
-          </p>
-          {!placement?.debug.isValidPlacement && (
-            <p className="text-amber-600 text-xs mt-2">
-              Minimum 12 answers required for accurate placement. Consider retaking the assessment.
+        {/* Message section - only shows for incomplete assessments */}
+        {!isValidAssessment && (
+          <motion.div 
+            className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: revealPhase === 'complete' ? 1 : 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <p className="text-amber-700 text-sm font-medium">
+              Answer a few more questions for a more accurate placement.
             </p>
-          )}
-        </div>
+            <p className="text-amber-600/70 text-xs mt-1">
+              You answered {results?.totalQuestions || 0} of {MIN_QUESTIONS_FOR_VALID_ASSESSMENT} recommended questions.
+            </p>
+          </motion.div>
+        )}
 
         {/* Assessment Debug Block - DEV ONLY (gated behind showDebugOverlay) */}
         {showDebug && placement && (
@@ -279,14 +341,51 @@ export default function Assessment() {
           </div>
         )}
 
-        <Button 
-          size="lg" 
-          className="w-full h-14 text-lg font-semibold rounded-xl shadow-lg shadow-primary/20"
-          onClick={() => setLocation('/train')}
-          data-testid="button-start-training"
+        {/* Action Buttons - Animate in last */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ 
+            opacity: revealPhase === 'complete' ? 1 : 0,
+            y: revealPhase === 'complete' ? 0 : 20
+          }}
+          transition={{ duration: 0.4 }}
         >
-          Start Daily Training
-        </Button>
+          {isValidAssessment ? (
+            <Button 
+              size="lg" 
+              className="w-full h-14 text-lg font-semibold rounded-xl shadow-lg shadow-primary/20"
+              onClick={() => setLocation('/train')}
+              data-testid="button-start-training"
+            >
+              Start Daily Training
+            </Button>
+          ) : (
+            <div className="space-y-3">
+              <Button 
+                size="lg" 
+                className="w-full h-14 text-lg font-semibold rounded-xl shadow-lg shadow-primary/20"
+                onClick={handleRetry}
+                data-testid="button-retry-assessment"
+              >
+                Retry Assessment
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline"
+                className="w-full h-12 text-base font-medium rounded-xl border-slate-200"
+                onClick={() => {
+                  if (placement) {
+                    completeAssessment(placement.competenceGroup, placement.startingLevel, results!);
+                  }
+                  setLocation('/train');
+                }}
+                data-testid="button-continue-anyway"
+              >
+                Continue Anyway
+              </Button>
+            </div>
+          )}
+        </motion.div>
       </div>
     </MobileLayout>
   );
