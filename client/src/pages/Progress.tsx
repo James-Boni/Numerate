@@ -3,7 +3,7 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { useStore, SessionStats } from '@/lib/store';
 import { Card } from '@/components/ui/card';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, ComposedChart } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, ComposedChart, ReferenceArea } from 'recharts';
 import { TrendingUp, Award, Clock, Target, Info } from 'lucide-react';
 
 type TimeRange = '7D' | '30D' | 'all';
@@ -38,7 +38,7 @@ function getDateKey(dateStr: string): string {
   return new Date(dateStr).toISOString().split('T')[0];
 }
 
-function getDateRange(range: TimeRange): { start: Date; end: Date } {
+function getDateRange(range: TimeRange, sessions?: SessionStats[]): { start: Date; end: Date } {
   const end = new Date();
   end.setHours(23, 59, 59, 999);
   
@@ -50,6 +50,16 @@ function getDateRange(range: TimeRange): { start: Date; end: Date } {
   } else if (range === '30D') {
     start.setDate(start.getDate() - 29);
   } else {
+    if (sessions && sessions.length > 0) {
+      const dailySessions = sessions.filter(s => s.sessionType === 'daily');
+      if (dailySessions.length > 0) {
+        const earliest = dailySessions.reduce((min, s) => 
+          new Date(s.date) < new Date(min.date) ? s : min, dailySessions[0]);
+        const earliestDate = new Date(earliest.date);
+        earliestDate.setHours(0, 0, 0, 0);
+        return { start: earliestDate, end };
+      }
+    }
     start.setFullYear(2020);
   }
   
@@ -57,7 +67,7 @@ function getDateRange(range: TimeRange): { start: Date; end: Date } {
 }
 
 function filterDailySessions(sessions: SessionStats[], range: TimeRange): SessionStats[] {
-  const { start, end } = getDateRange(range);
+  const { start, end } = getDateRange(range, sessions);
   
   return sessions.filter(s => {
     if (s.sessionType !== 'daily') return false;
@@ -255,7 +265,8 @@ export default function Progress() {
     date: d.dateLabel,
     median: Math.round(d.medianMs) / 1000,
     p25: Math.round(d.p25Ms) / 1000,
-    p75: Math.round(d.p75Ms) / 1000
+    p75: Math.round(d.p75Ms) / 1000,
+    iqrRange: [Math.round(d.p25Ms) / 1000, Math.round(d.p75Ms) / 1000] as [number, number]
   }));
   
   const throughputChartData = dailyData.map(d => ({
@@ -375,29 +386,29 @@ export default function Progress() {
               <div className="h-40 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={speedChartData}>
+                    <defs>
+                      <linearGradient id="iqrGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.15} />
+                        <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
                     <YAxis hide reversed />
                     <Tooltip
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                      formatter={(value: number, name: string) => {
+                      formatter={(value: number | [number, number], name: string) => {
+                        if (name === 'iqrRange') return null;
                         const labels: Record<string, string> = { median: 'Median', p25: '25th %ile', p75: '75th %ile' };
-                        return [`${value.toFixed(1)}s`, labels[name] || name];
+                        const val = typeof value === 'number' ? value : value[0];
+                        return [`${val.toFixed(1)}s`, labels[name] || name];
                       }}
                     />
                     <Area
                       type="monotone"
-                      dataKey="p75"
+                      dataKey="iqrRange"
                       stroke="none"
-                      fill="var(--color-primary)"
-                      fillOpacity={0.1}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="p25"
-                      stroke="none"
-                      fill="#fff"
-                      fillOpacity={1}
+                      fill="url(#iqrGradient)"
                     />
                     <Line
                       type="monotone"
