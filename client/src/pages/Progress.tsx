@@ -9,18 +9,20 @@ import { TrendingUp, Zap, Target, Flame } from 'lucide-react';
 export default function Progress() {
   const { sessions, level, streakCount } = useStore();
 
-  const chartData = sessions.slice(0, 14).reverse().map(s => ({
+  const dailySessions = sessions.filter(s => s.sessionType !== 'quick_fire');
+
+  const chartData = dailySessions.slice(0, 14).reverse().map(s => ({
     date: new Date(s.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
     accuracy: Math.round(s.accuracy * 100),
     speed: Math.round(s.avgResponseTimeMs / 100) / 10,
   }));
 
-  const avgAccuracy = sessions.length > 0 
-    ? Math.round((sessions.reduce((acc, s) => acc + s.accuracy, 0) / sessions.length) * 100)
+  const avgAccuracy = dailySessions.length > 0 
+    ? Math.round((dailySessions.reduce((acc, s) => acc + s.accuracy, 0) / dailySessions.length) * 100)
     : 0;
 
-  const avgSpeed = sessions.length > 0
-    ? (sessions.reduce((acc, s) => acc + s.avgResponseTimeMs, 0) / sessions.length / 1000).toFixed(1)
+  const avgSpeed = dailySessions.length > 0
+    ? (dailySessions.reduce((acc, s) => acc + s.avgResponseTimeMs, 0) / dailySessions.length / 1000).toFixed(1)
     : "0.0";
 
   return (
@@ -112,7 +114,7 @@ export default function Progress() {
 
         <div className="space-y-4 pt-4">
           <h3 className="font-bold text-slate-800">Recent Sessions</h3>
-          {sessions.slice(0, 5).map((session, i) => (
+          {dailySessions.slice(0, 5).map((session, i) => (
             <div key={session.id} className="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-slate-50">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
@@ -129,7 +131,7 @@ export default function Progress() {
               </div>
             </div>
           ))}
-          {sessions.length === 0 && (
+          {dailySessions.length === 0 && (
             <div className="text-center py-12 text-slate-400 space-y-2">
               <Target className="mx-auto opacity-20" size={48} />
               <p>No sessions recorded yet.</p>

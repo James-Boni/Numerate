@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { useLocation } from 'wouter';
 import { useStore, SessionStats } from '@/lib/store';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { X, Clock, Trophy, Flame, Plus, AlertTriangle } from 'lucide-react';
@@ -12,6 +11,7 @@ import { clsx } from 'clsx';
 import { generateQuestionForLevel } from '@/lib/logic/generator_adapter';
 import { KeypadModern } from '@/components/game/Keypad';
 import { computeFluency } from '@/lib/logic/xp-system';
+import { Card } from '@/components/ui/card';
 
 interface Question {
   id: string;
@@ -102,6 +102,20 @@ function Confetti() {
   );
 }
 
+function FullScreenFlash({ type }: { type: 'correct' | 'wrong' }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0.6 }}
+      animate={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+      className={clsx(
+        "fixed inset-0 z-40 pointer-events-none",
+        type === 'correct' ? "bg-green-400" : "bg-red-400"
+      )}
+    />
+  );
+}
+
 export default function QuickFire() {
   const [step, setStep] = useState<GameStep>('intro');
   const [countdownNumber, setCountdownNumber] = useState(3);
@@ -113,14 +127,13 @@ export default function QuickFire() {
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [results, setResults] = useState<QuickFireResult | null>(null);
   const [isNewHighScore, setIsNewHighScore] = useState(false);
+  const [showFlash, setShowFlash] = useState<'correct' | 'wrong' | null>(null);
   
   const [_, setLocation] = useLocation();
   const { 
     level, 
     settings, 
-    quickFireIntroSeen, 
     quickFireHighScore,
-    setQuickFireIntroSeen,
     updateQuickFireHighScore,
     saveSession,
     hasCompletedAssessment 
@@ -202,7 +215,13 @@ export default function QuickFire() {
     );
     const finalSessionXP = finalInGameXP + bonusXP;
     
-    console.log("[XP_SUMMARY]", `mode=quick_fire inGameXP=${finalInGameXP} bonusXP=${bonusXP} final=${finalSessionXP}`);
+    console.log("QUICKFIRE_SUMMARY", 
+      `score=${finalScore}`,
+      `attempts=${attemptedN}`,
+      `correct=${correctC}`,
+      `finalSessionXP=${finalSessionXP}`,
+      `appliedXP=${finalSessionXP}`
+    );
 
     const isNewBest = updateQuickFireHighScore(finalScore);
     setIsNewHighScore(isNewBest);
@@ -266,6 +285,7 @@ export default function QuickFire() {
       
       if (remainingTimeRef.current <= 0) {
         totalCountRef.current += 1;
+        setShowFlash('wrong');
         if (settings.soundOn) AudioManager.playWrong();
         endRun('timeout');
         return;
@@ -290,7 +310,6 @@ export default function QuickFire() {
     isSubmittingRef.current = true;
     
     const now = performance.now();
-    const timeSpent = (now - questionStartTimeRef.current) / 1000;
     const responseTime = now - questionStartTimeRef.current;
     
     const val = parseFloat(input);
@@ -310,16 +329,19 @@ export default function QuickFire() {
       setInGameXP(inGameXPRef.current);
       setRemainingTime(remainingTimeRef.current);
       setFeedback('correct');
+      setShowFlash('correct');
       
       if (settings.soundOn) AudioManager.playCorrect();
       
       setTimeout(() => {
+        setShowFlash(null);
         if (gameActiveRef.current) {
           generateNextQuestion();
         }
-      }, 100);
+      }, 150);
     } else {
       setFeedback('wrong');
+      setShowFlash('wrong');
       if (settings.soundOn) AudioManager.playWrong();
       
       setTimeout(() => {
@@ -345,9 +367,6 @@ export default function QuickFire() {
   }, [input, feedback, handleSubmit]);
 
   const startCountdown = useCallback(() => {
-    if (!quickFireIntroSeen) {
-      setQuickFireIntroSeen();
-    }
     setStep('countdown');
     setCountdownNumber(3);
     
@@ -379,23 +398,16 @@ export default function QuickFire() {
       setScore(0);
       setInGameXP(0);
       setRemainingTime(5.0);
+      setShowFlash(null);
       generateNextQuestion();
       startTimerLoop();
       setStep('active');
     }, 3000);
-  }, [settings.soundOn, generateNextQuestion, startTimerLoop, setQuickFireIntroSeen, quickFireIntroSeen]);
+  }, [settings.soundOn, generateNextQuestion, startTimerLoop]);
 
   const handleCancelIntro = useCallback(() => {
     setLocation('/train');
   }, [setLocation]);
-
-  const hasStartedRef = useRef(false);
-  useEffect(() => {
-    if (quickFireIntroSeen && !hasStartedRef.current) {
-      hasStartedRef.current = true;
-      startCountdown();
-    }
-  }, [quickFireIntroSeen, startCountdown]);
 
   useEffect(() => {
     return () => {
@@ -602,6 +614,8 @@ export default function QuickFire() {
 
   return (
     <MobileLayout className="bg-white">
+      {showFlash && <FullScreenFlash type={showFlash} />}
+      
       <div className="flex-1 flex flex-col">
         <div className="px-6 pt-6 pb-4 flex justify-between items-center">
           <Button
@@ -658,18 +672,10 @@ export default function QuickFire() {
               </motion.div>
             </div>
 
-            <div className={clsx(
-              "relative bg-slate-50 rounded-3xl p-6 text-center border-2 transition-colors",
-              feedback === 'correct' && "border-green-400 bg-green-50",
-              feedback === 'wrong' && "border-red-400 bg-red-50",
-              !feedback && "border-slate-100"
-            )}>
+            <div className="text-center bg-white">
               <div className="text-5xl font-bold tabular-nums text-slate-900 min-h-[4rem] flex items-center justify-center">
                 {input || <span className="text-slate-300">_</span>}
               </div>
-              {input && !feedback && (
-                <p className="text-xs text-slate-400 mt-2">Tap above to submit</p>
-              )}
             </div>
           </div>
         </div>

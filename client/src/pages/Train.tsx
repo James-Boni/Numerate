@@ -4,13 +4,15 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { useStore } from '@/lib/store';
 import { useLocation } from 'wouter';
-import { Zap, Play, Flame, Target, Timer } from 'lucide-react';
+import { Zap, Play, Flame, Timer, Trophy } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 export default function Train() {
-  const { level, lifetimeXP, streakCount, hasCompletedAssessment, quickFireHighScore } = useStore();
+  const { level, lifetimeXP, streakCount, hasCompletedAssessment, quickFireHighScore, sessions } = useStore();
   const [_, setLocation] = useLocation();
+
+  const quickFireAttempts = sessions.filter(s => s.sessionType === 'quick_fire').length;
 
   return (
     <MobileLayout className="bg-white">
@@ -76,17 +78,23 @@ export default function Train() {
                     </div>
                     <p className="text-slate-500 text-sm">Speed training drill.</p>
                   </div>
-                  {quickFireHighScore > 0 && (
-                    <div className="bg-white/80 px-3 py-1 rounded-full text-xs font-bold text-orange-600 border border-orange-100">
-                      Best: {quickFireHighScore}
-                    </div>
-                  )}
                 </div>
 
-                <div className="flex gap-2">
-                  <span className="bg-white/80 text-slate-600 px-3 py-1 rounded-full text-xs font-medium border border-orange-100">5s + 5s/correct</span>
-                  <span className="bg-white/80 text-slate-600 px-3 py-1 rounded-full text-xs font-medium border border-orange-100">1 Mistake = Done</span>
-                </div>
+                {(quickFireHighScore > 0 || quickFireAttempts > 0) && (
+                  <div className="flex gap-3">
+                    {quickFireHighScore > 0 && (
+                      <div className="flex items-center gap-1 bg-white/80 px-3 py-1.5 rounded-xl border border-orange-100">
+                        <Trophy size={14} className="text-orange-500" />
+                        <span className="text-xs font-bold text-orange-600">Best: {quickFireHighScore}</span>
+                      </div>
+                    )}
+                    {quickFireAttempts > 0 && (
+                      <div className="bg-white/80 px-3 py-1.5 rounded-xl border border-orange-100">
+                        <span className="text-xs font-medium text-slate-600">{quickFireAttempts} attempts</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <Button 
                   onClick={() => setLocation('/quickfire')}
@@ -100,53 +108,9 @@ export default function Train() {
             </Card>
           </div>
         )}
-
-        {/* Stats Grid */}
-        <div className="px-6 grid grid-cols-2 gap-4">
-          <Card className="p-4 border-none shadow-sm space-y-2 bg-white">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-              <Target size={18} className="text-emerald-500" />
-            </div>
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Accuracy</h4>
-            <p className="text-xl font-bold">
-              {useStore.getState().sessions.length > 0 
-                ? `${Math.round((useStore.getState().sessions.reduce((acc, s) => acc + s.accuracy, 0) / useStore.getState().sessions.length) * 100)}%`
-                : "--"}
-            </p>
-          </Card>
-          <Card className="p-4 border-none shadow-sm space-y-2 bg-white">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-              <Zap size={18} className="text-blue-500" />
-            </div>
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Speed</h4>
-            <p className="text-xl font-bold">
-              {useStore.getState().sessions.length > 0
-                ? `${(useStore.getState().sessions.reduce((acc, s) => acc + s.avgResponseTimeMs, 0) / useStore.getState().sessions.length / 1000).toFixed(1)}s`
-                : "--"}
-            </p>
-          </Card>
-        </div>
       </div>
       
       <BottomNav />
     </MobileLayout>
-  );
-}
-
-function DumbbellIcon({ size, className }: any) {
-  return (
-    <svg 
-      width={size} 
-      height={size} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      className={className}
-    >
-      <path d="M6.5 6.5h11" /><path d="M6.5 17.5h11" /><path d="m3 21 18-18" /><path d="m3 3 18 18" /><circle cx="6.5" cy="6.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /><circle cx="6.5" cy="17.5" r="2.5" /><circle cx="17.5" cy="6.5" r="2.5" />
-    </svg>
   );
 }

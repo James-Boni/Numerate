@@ -1,0 +1,166 @@
+We are correcting Quick Fire integration issues. These are NOT feature additions; they are structural fixes. Do NOT add new UI beyond what is explicitly requested. Do NOT leave partial behavior in place.
+
+====================================================================
+A) METRICS SEPARATION (CRITICAL)
+====================================================================
+Quick Fire statistics MUST NOT affect global user performance metrics.
+
+Rules:
+1) Quick Fire sessions must NEVER contribute to:
+   - overall accuracy
+   - overall speed
+   - overall consistency
+   - progress page trends
+2) Only Daily sessions contribute to:
+   - Progress page graphs
+   - Global accuracy/speed metrics
+3) Quick Fire exists to encourage experimentation and speed training.
+   - High failure rate is expected
+   - User must never be penalized for failing Quick Fire
+
+Implementation:
+- Tag all Quick Fire sessions strictly as sessionType = "quick_fire"
+- When computing:
+   - progress metrics
+   - global averages
+   - trend lines
+  explicitly FILTER OUT sessionType === "quick_fire"
+
+Acceptance:
+- Playing Quick Fire does not lower or change progress metrics shown on Progress page.
+
+====================================================================
+B) QUICK FIRE STATS LOCATION (TRAIN MENU ONLY)
+====================================================================
+Quick Fire statistics must live ONLY under Quick Fire in the Train menu.
+
+Under the Quick Fire button/card in Train:
+- Show:
+  - Personal Best (highest score)
+  - Number of attempts
+- Do NOT show:
+  - accuracy
+  - speed
+  - global metrics
+
+These stats are informational, not evaluative.
+
+Acceptance:
+- User can see Quick Fire personal best + attempts in Train menu.
+- No Quick Fire data appears in Progress page metrics.
+
+====================================================================
+C) REMOVE TRAIN MENU METRICS (GLOBAL)
+====================================================================
+The Train menu must not show accuracy or speed at all.
+
+Rules:
+- Train menu purpose = mode selection
+- Remove any display of:
+  - accuracy
+  - speed
+  - progress metrics
+from Train menu UI
+
+Acceptance:
+- Train menu shows only game modes.
+- No accuracy/speed text appears except inside specific game summaries.
+
+====================================================================
+D) REMOVE REDUNDANT QUICK FIRE LABELS
+====================================================================
+Under Quick Fire in the Train menu:
+- REMOVE the following static text:
+  - “5s + 5s / correct”
+  - “1 mistake = done”
+
+These rules are explained via the popup and do not belong in the menu.
+
+Acceptance:
+- Those two labels no longer appear anywhere.
+
+====================================================================
+E) QUICK FIRE EXPLANATION POPUP (EVERY TIME)
+====================================================================
+The Quick Fire explanation popup must appear EVERY TIME the user starts Quick Fire.
+
+Rules:
+- Remove any quickFireIntroSeen / first-time-only logic.
+- On every tap of Quick Fire:
+  - show explanation popup
+  - user must tap “Okay” to proceed
+  - “X” cancels and returns to Train menu
+
+Popup behavior:
+- “Okay” → start countdown
+- “X” → cancel and return to menu
+
+Acceptance:
+- Popup appears every time.
+- User can always back out safely.
+
+====================================================================
+F) QUICK FIRE UI PARITY WITH DAILY (NON-NEGOTIABLE)
+====================================================================
+Quick Fire answer input and feedback must behave EXACTLY like Daily.
+
+Required behavior:
+1) NO answer box UI
+2) White background answer display
+3) User taps anywhere outside keypad to submit
+4) Correct answer:
+   - full-screen GREEN flash
+   - same correct SFX as Daily
+5) Incorrect answer / timeout:
+   - full-screen RED flash
+   - same wrong SFX as Daily
+
+Remove any Quick Fire–specific answer UI that differs from Daily.
+
+Acceptance:
+- Visually and interactively indistinguishable from Daily input experience.
+
+====================================================================
+G) XP SUMMARY DISPLAY BUG FIX
+====================================================================
+Bug:
+- Quick Fire summary shows “0 XP”
+- But XP is actually applied to level correctly
+
+Fix:
+- Quick Fire summary MUST display finalSessionXP
+- The value shown must be EXACTLY the same number that:
+  - was applied to user XP
+  - appears under the user’s level
+
+Rules:
+- finalSessionXP = inGameXP + bonusXP
+- Summary screen must display finalSessionXP
+- Do NOT recompute XP inside summary UI
+- Read from the stored session result
+
+Acceptance:
+- If XP increases under the level indicator, the same number appears in the Quick Fire summary.
+
+====================================================================
+H) DATA INTEGRITY CHECK (CONSOLE ONLY)
+====================================================================
+At the end of a Quick Fire session, log:
+
+QUICKFIRE_SUMMARY
+score=__
+attempts=__
+correct=__
+finalSessionXP=__
+appliedXP=__
+
+No new debug UI.
+
+====================================================================
+DELIVERABLES
+====================================================================
+After completing changes, report:
+- Which files were modified
+- Where Quick Fire is filtered out of global metrics
+- Where Quick Fire stats are stored and rendered in Train menu
+- Confirmation that XP summary now matches applied XP
