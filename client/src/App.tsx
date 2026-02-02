@@ -12,6 +12,7 @@ import Game from "@/pages/Game";
 import QuickFire from "@/pages/QuickFire";
 import Progress from "@/pages/Progress";
 import Settings from "@/pages/Settings";
+import DevMenu from "@/pages/DevMenu";
 import { motion, AnimatePresence } from 'framer-motion';
 
 import logo from "@assets/14e70c85-398b-4621-bc62-abe9331510f8_1769016302023.png";
@@ -46,6 +47,7 @@ function Router() {
       <Route path="/quickfire" component={QuickFire} />
       <Route path="/progress" component={Progress} />
       <Route path="/settings" component={Settings} />
+      <Route path="/dev" component={DevMenu} />
       <Route component={NotFound} />
     </Switch>
   );

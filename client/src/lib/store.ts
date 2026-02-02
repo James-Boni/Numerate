@@ -110,6 +110,13 @@ export interface UserState {
   // Sync Actions
   syncWithBackend: () => Promise<void>;
   loadFromBackend: () => Promise<void>;
+  
+  // Dev Menu Actions (dev only)
+  devSetLevel: (level: number) => void;
+  devSetStartingLevel: (level: number) => void;
+  devSetHasCompletedAssessment: (value: boolean) => void;
+  devClearDailySessions: () => void;
+  devClearQuickFireStats: () => void;
 }
 
 // --- Store ---
@@ -495,6 +502,44 @@ export const useStore = create<UserState>()(
           console.error('Load error:', error);
           set({ isSyncing: false, lastSyncError: 'Failed to load from backend' });
         }
+      },
+      
+      // Dev Menu Actions
+      devSetLevel: (newLevel) => {
+        const targetBand = getBandFromLevel(newLevel);
+        console.log(`DEV_MENU: Setting level to ${newLevel}`);
+        set((state) => ({
+          level: newLevel,
+          progression: { ...state.progression, level: newLevel, band: targetBand }
+        }));
+      },
+      
+      devSetStartingLevel: (newStartingLevel) => {
+        console.log(`DEV_MENU: Setting startingLevel to ${newStartingLevel}`);
+        set({ startingLevel: newStartingLevel });
+      },
+      
+      devSetHasCompletedAssessment: (value) => {
+        console.log(`DEV_MENU: Setting hasCompletedAssessment to ${value}`);
+        set({ hasCompletedAssessment: value });
+      },
+      
+      devClearDailySessions: () => {
+        console.log('DEV_MENU: Clearing daily sessions');
+        set((state) => ({
+          sessions: state.sessions.filter(s => s.sessionType !== 'daily'),
+          streakCount: 0,
+          lastStreakDate: null
+        }));
+      },
+      
+      devClearQuickFireStats: () => {
+        console.log('DEV_MENU: Clearing Quick Fire stats');
+        set((state) => ({
+          quickFireHighScore: 0,
+          quickFireIntroSeen: false,
+          sessions: state.sessions.filter(s => s.sessionType !== 'quick_fire')
+        }));
       }
     }),
     {

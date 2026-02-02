@@ -1,0 +1,99 @@
+Add a DEV-ONLY “Dev Menu” to speed up testing without replaying the assessment. This must be implemented safely and must NOT affect production builds or break existing flows.
+
+CRITICAL SAFETY REQUIREMENTS
+1) Dev Menu must ONLY exist in development:
+- It must not render in production builds.
+- It must not alter any production behavior.
+- Use a single central boolean like:
+  const SHOW_DEV_MENU = __DEV__ (React Native/Expo)
+  OR (import.meta.env.MODE !== "production") (Vite)
+  OR (process.env.NODE_ENV !== "production")
+Pick the correct one for this codebase, and use it consistently.
+
+2) No refactors:
+- Do not refactor navigation or state architecture.
+- Only add the minimum code needed.
+- Reuse existing store/persistence helpers.
+
+3) All Dev Menu actions must use the same setters/actions the app normally uses:
+- No duplicate state systems.
+- No direct mutation.
+- Ensure changes persist and reflect immediately.
+
+ENTRY POINT (SAFE)
+Add a “Dev Menu” row/button at the bottom of Settings, inside a “Developer” section.
+- Visible ONLY when SHOW_DEV_MENU is true.
+- In production, this row must not exist at all.
+
+DEV MENU SCREEN / MODAL
+Create a simple Dev Menu screen (or modal) with these controls:
+
+A) QUICK NAVIGATION (buttons)
+- Go to Train
+- Go to Daily Challenge
+- Go to Quick Fire
+- Go to Progress
+- Go to Settings/Home (whatever is appropriate)
+Use the existing navigation method.
+
+B) STATE TOGGLES / SETTERS (write-through to persistence)
+1) Toggle: hasCompletedAssessment (true/false)
+- This controls gating for Daily/Quick Fire.
+- Add confirmation when turning it OFF (since it can hide modes).
+
+2) Set initialAssessmentLevel (number input + “Apply”)
+- Validate integer range (1–100).
+- Store as user.initialAssessmentLevel.
+
+3) Set current level (user.level) (number input + “Apply”)
+- Validate integer range (1–200 allowed; the game is effectively unbounded but keep it sane).
+- user.level remains the single source of truth for difficulty.
+
+4) Button: “Clear Daily History”
+- Deletes only stored session records where sessionType === "daily".
+- Must not delete assessment or user profile.
+
+5) Button: “Clear Quick Fire Stats”
+- Clears only quick fire fields:
+  - quickFireHighScore
+  - quickFireAttempts
+  - any quick_fire session records (if stored)
+- Must not affect daily history.
+
+6) Button: “Reset All Progress”
+- Calls the REAL reset function you implemented (returns user.level to initialAssessmentLevel, clears progress charts, streaks, PBs, etc.).
+- Confirmation required.
+
+C) CONFIRMATIONS (MANDATORY)
+For destructive actions, show a confirmation modal:
+- Clear Daily History
+- Clear Quick Fire Stats
+- Reset All Progress
+Modal must have:
+- Cancel (default)
+- Confirm (destructive)
+
+PERSISTENCE + UI COHERENCE (MANDATORY)
+- After any Dev Menu change:
+  - Update in-memory store
+  - Update persistent storage (same mechanism the app already uses)
+  - UI must reflect changes immediately
+- If the app uses a query cache, invalidate/recompute derived values as needed so Progress updates.
+
+GUARDRAILS / FAIL SAFELY
+- If user.initialAssessmentLevel is missing, disable Reset All Progress and show hint:
+  “Complete assessment first.”
+- If a user enters invalid levels, show a small inline validation message and do nothing.
+
+DELIVERABLES
+After implementing, report:
+- Files added/modified
+- Where SHOW_DEV_MENU is defined
+- How production hiding is enforced
+- Which store actions are used for each control
+- What keys are cleared by each destructive action
+
+IMPORTANT:
+- Do not change any existing UI unless needed to add the single “Dev Menu” row in Settings.
+- Do not introduce new libraries.
+- Keep this feature completely isolated and easy to remove later.

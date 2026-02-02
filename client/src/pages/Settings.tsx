@@ -5,11 +5,15 @@ import { useStore } from '@/lib/store';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { Volume2, Zap, LogOut, Trash2, ChevronRight, User, AlertTriangle, X } from 'lucide-react';
+import { Volume2, Zap, LogOut, Trash2, ChevronRight, User, AlertTriangle, X, Code } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'wouter';
+
+const SHOW_DEV_MENU = import.meta.env.MODE !== 'production';
 
 export default function Settings() {
+  const [, navigate] = useLocation();
   const { settings, updateSettings, logout, resetProgress, email, hasCompletedAssessment, startingLevel } = useStore();
   const [showResetModal, setShowResetModal] = useState(false);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
@@ -154,6 +158,28 @@ export default function Settings() {
             </button>
           </Card>
         </div>
+
+        {SHOW_DEV_MENU && (
+          <div className="space-y-3">
+            <h3 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest px-1">Developer</h3>
+            <Card className="border-none shadow-sm overflow-hidden border border-amber-200">
+              <button 
+                onClick={() => navigate('/dev')}
+                className="w-full p-4 flex items-center justify-between bg-amber-50 hover:bg-amber-100 transition-colors"
+                data-testid="button-dev-menu"
+              >
+                <div className="flex items-center gap-3 text-amber-700">
+                  <Code size={20} />
+                  <div className="text-left">
+                    <span className="font-medium text-sm block">Dev Menu</span>
+                    <span className="text-xs text-amber-600">Testing tools (dev only)</span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-amber-400" />
+              </button>
+            </Card>
+          </div>
+        )}
 
         <div className="pt-4 text-center space-y-1">
           <p className="text-[10px] text-slate-400 font-medium">Numerate v1.0.0</p>
