@@ -64,7 +64,36 @@ Preferred communication style: Simple, everyday language.
 ### Application Flow
 1. Welcome → Assessment (3-minute placement test) → Starting level assignment
 2. Daily Training → Timed sessions (1, 2, or 3 minutes) → Session summary with animated results
-3. Progress tracking → 7-day rolling averages, streak tracking, level progression
+3. Progress tracking → Time-bound metrics, level journey, performance insights
+
+### Progress Page System (Core System - Locked)
+**Foundational Principles**:
+- Progress shows EVIDENCE OF IMPROVEMENT, not raw stats
+- Daily sessions are the ONLY source of global progress metrics
+- Quick Fire and Assessment NEVER pollute progress metrics
+- All views are TIME-BOUND (7D default, 30D, All time)
+
+**Session Filtering**:
+- Include ONLY: sessionType === "daily"
+- Exclude ALWAYS: quick_fire, assessment
+
+**Daily Aggregation**:
+- Accuracy: weighted (totalCorrect / totalAttempted per day)
+- Speed: median response time with IQR band (25th-75th percentile)
+- Throughput: questions per minute (active time only)
+
+**UI Sections**:
+1. Time Range Selector (7D default, 30D, All time)
+2. Adaptive Insight Line (one explanatory sentence)
+3. Level Journey Card (start vs current level)
+4. Performance Cards: Accuracy, Speed (with IQR), Throughput
+5. Difficulty Context Copy (static reassurance about dips)
+6. Personal Bests (quiet, no pressure)
+
+**Exclusions**:
+- No Quick Fire data, no Assessment data
+- No XP charts, no raw session lists
+- No streak pressure
 
 ## External Dependencies
 
