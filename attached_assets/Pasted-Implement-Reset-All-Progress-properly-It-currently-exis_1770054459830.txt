@@ -1,0 +1,121 @@
+Implement “Reset All Progress” properly. It currently exists in Settings but does nothing. Make it fully functional with correct UX, correct data integrity, and strict scoping.
+
+DO NOT change assessment logic or rerun assessment automatically.
+DO NOT affect account identity, entitlements/subscription, or user preferences.
+This is a destructive action and must require confirmation.
+
+====================================================================
+A) PRODUCT INTENT (LOCKED)
+====================================================================
+- Users can reset progress/history/stats, but NOT their assessed ability.
+- Reset returns the user to the level determined by their initial assessment.
+- Assessment placement (and any backend grouping) remains unchanged.
+- Reset must be reversible only by future play (no undo needed, but must confirm before doing it).
+
+====================================================================
+B) UI / UX REQUIREMENTS
+====================================================================
+1) Settings placement:
+- Keep “Reset All Progress” inside a “Danger Zone” section in Settings.
+- Style as destructive (red icon/text).
+
+2) Confirmation modal (MANDATORY):
+When user taps “Reset All Progress”, show a confirmation dialog:
+
+Title:
+“Reset all progress?”
+
+Body:
+“This will erase your progress and statistics. Your level will return to the one determined by your initial assessment.”
+
+Buttons:
+- “Cancel” (default/secondary)
+- “Reset Progress” (destructive/red)
+
+3) Behavior:
+- Tapping Cancel closes dialog and does nothing.
+- Tapping Reset Progress executes the reset immediately and reliably.
+
+4) Post-action feedback:
+- After reset completes, show a short, calm toast/banner:
+  “Progress reset. You’re back at Level X.”
+- Then return to a sensible screen (Settings remains fine, or optionally navigate to Train).
+
+====================================================================
+C) EXACT BACKEND / STATE CHANGES
+====================================================================
+Reset MUST do the following (and only the following):
+
+✅ RESET THESE (progress/history/stats):
+- user.level  -> set to user.initialAssessmentLevel
+- user.xp / xpIntoLevel / xpTotal -> reset to the baseline for that assessment level
+- progress history used by Progress page charts -> clear
+- streaks -> reset (e.g. dayStreak = 0)
+- Personal Bests (daily records) -> reset
+- Quick Fire stats (PB, attempts, any quickfire history) -> reset
+- Recent sessions list -> clear (or clear only “daily/quick_fire” session records if that’s how it’s stored)
+
+❌ DO NOT RESET THESE (must remain untouched):
+- initial assessment result metrics (starting placement)
+- starting group (if stored)
+- account/user id
+- entitlements / subscription state
+- preferences (sound, haptics, reminders, UI settings)
+- any auth session / tokens
+
+Important: Reset must NOT re-run the assessment. It must simply restore the initialAssessmentLevel.
+
+If user.initialAssessmentLevel is missing or invalid:
+- Fail safely: show an error toast:
+  “Reset unavailable until you complete the assessment.”
+- Do not partially reset anything.
+
+====================================================================
+D) SINGLE SOURCE OF TRUTH + PERSISTENCE
+====================================================================
+- user.level must remain the single source of truth after reset.
+- Ensure ALL persistent stores are updated consistently:
+  - in-memory store
+  - local persistence (AsyncStorage/localStorage/etc.)
+  - backend DB (if present)
+- The Progress page should immediately reflect empty history after reset (no stale cached values).
+
+====================================================================
+E) DATA MODEL REQUIREMENTS (IF NOT ALREADY PRESENT)
+====================================================================
+If the app does not already store these, add them:
+
+- user.initialAssessmentLevel: number
+  - set once at assessment completion
+  - never overwritten by reset
+
+- user.hasCompletedAssessment: boolean
+  - required for gating and for reset eligibility
+
+Ensure assessment completion writes initialAssessmentLevel deterministically.
+
+====================================================================
+F) ACCEPTANCE TESTS (MUST PASS)
+====================================================================
+1) User completes assessment and gets placed at Level N.
+2) User plays Daily sessions, levels up, generates history, PBs, streaks.
+3) User goes to Settings -> Reset All Progress -> confirmation appears.
+4) Cancel does nothing.
+5) Reset Progress does all of:
+   - level becomes N again
+   - XP becomes baseline for Level N
+   - charts become empty / “More data will appear as you train.”
+   - streak = 0
+   - PBs cleared
+   - Quick Fire attempts/PB cleared
+   - subscription and preferences unchanged
+6) App reload / refresh: the reset persists (no old data returns).
+
+====================================================================
+G) REPORTING
+====================================================================
+After implementing, return:
+- which files were changed
+- where reset logic lives
+- which store keys are cleared
+- confirmation that entitlements/preferences are untouched

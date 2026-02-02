@@ -97,7 +97,7 @@ export interface UserState {
   completeAssessment: (competenceGroup: number, startingLevel: number, initialStats: any) => void;
   saveSession: (session: SessionStats) => void;
   updateSettings: (settings: Partial<UserSettings>) => void;
-  resetProgress: () => void;
+  resetProgress: () => { success: boolean; level?: number; error?: string };
   
   // Progression Actions
   recordAnswer: (correct: boolean, timeMs: number, templateId: string, currentTargetTimeMs: number) => void;
@@ -290,19 +290,37 @@ export const useStore = create<UserState>()(
         settings: { ...state.settings, ...newSettings }
       })),
 
-      resetProgress: () => set({
-        hasCompletedAssessment: false,
-        currentTier: 0,
-        competenceGroup: 1,
-        startingLevel: 1,
-        level: 1,
-        xpIntoLevel: 0,
-        lifetimeXP: 0,
-        sessions: [],
-        streakCount: 0,
-        lastStreakDate: null,
-        progression: { ...INITIAL_PROGRESSION_STATE }
-      }),
+      resetProgress: () => {
+        const state = get();
+        
+        if (!state.hasCompletedAssessment || !state.startingLevel) {
+          console.error('RESET_PROGRESS: Cannot reset - assessment not completed');
+          return { success: false, error: 'Assessment not completed' };
+        }
+        
+        const targetLevel = state.startingLevel;
+        const targetBand = getBandFromLevel(targetLevel);
+        
+        console.log(`RESET_PROGRESS: Resetting to level ${targetLevel} (startingLevel preserved)`);
+        
+        set({
+          level: targetLevel,
+          xpIntoLevel: 0,
+          lifetimeXP: 0,
+          sessions: [],
+          streakCount: 0,
+          lastStreakDate: null,
+          quickFireHighScore: 0,
+          quickFireIntroSeen: false,
+          progression: {
+            ...INITIAL_PROGRESSION_STATE,
+            level: targetLevel,
+            band: targetBand
+          }
+        });
+        
+        return { success: true, level: targetLevel };
+      },
       
       recordAnswer: (correct, timeMs, templateId, currentTargetTimeMs) => set((state) => {
         const { progression } = state;

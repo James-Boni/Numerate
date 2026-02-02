@@ -1,15 +1,40 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { useStore } from '@/lib/store';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { Volume2, Zap, Shield, LogOut, Trash2, ChevronRight, User } from 'lucide-react';
+import { Volume2, Zap, LogOut, Trash2, ChevronRight, User, AlertTriangle, X } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Settings() {
-  const { settings, updateSettings, logout, resetProgress, email } = useStore();
+  const { settings, updateSettings, logout, resetProgress, email, hasCompletedAssessment, startingLevel } = useStore();
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+
+  const handleResetClick = () => {
+    if (!hasCompletedAssessment) {
+      setToast({ message: 'Reset unavailable until you complete the assessment.', visible: true });
+      setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+      return;
+    }
+    setShowResetModal(true);
+  };
+
+  const handleConfirmReset = () => {
+    const result = resetProgress();
+    setShowResetModal(false);
+    
+    if (result.success && result.level) {
+      setToast({ message: `Progress reset. You're back at Level ${result.level}.`, visible: true });
+    } else {
+      setToast({ message: result.error || 'Failed to reset progress.', visible: true });
+    }
+    
+    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+  };
 
   return (
     <MobileLayout className="bg-slate-50">
@@ -19,7 +44,6 @@ export default function Settings() {
           <p className="text-slate-500">Configure your experience.</p>
         </div>
 
-        {/* Account Section */}
         <div className="space-y-3">
           <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Account</h3>
           <Card className="p-4 border-none shadow-sm flex items-center justify-between">
@@ -36,7 +60,6 @@ export default function Settings() {
           </Card>
         </div>
 
-        {/* Preferences */}
         <div className="space-y-3">
           <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Preferences</h3>
           <Card className="divide-y divide-slate-50 border-none shadow-sm overflow-hidden">
@@ -63,7 +86,6 @@ export default function Settings() {
           </Card>
         </div>
 
-        {/* Sound Diagnostic */}
         <div className="space-y-3">
           <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sound Diagnostic</h3>
           <Card className="p-4 border-none shadow-sm space-y-4">
@@ -103,19 +125,22 @@ export default function Settings() {
           </Card>
         </div>
 
-        {/* Danger Zone */}
         <div className="space-y-3">
-          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Danger Zone</h3>
-          <Card className="divide-y divide-slate-50 border-none shadow-sm overflow-hidden">
+          <h3 className="text-[10px] font-bold text-rose-400 uppercase tracking-widest px-1">Danger Zone</h3>
+          <Card className="divide-y divide-slate-50 border-none shadow-sm overflow-hidden border border-rose-100">
             <button 
-              onClick={resetProgress}
-              className="w-full p-4 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors"
+              onClick={handleResetClick}
+              className="w-full p-4 flex items-center justify-between bg-white hover:bg-rose-50 transition-colors"
+              data-testid="button-reset-progress"
             >
               <div className="flex items-center gap-3 text-rose-500">
                 <Trash2 size={20} />
-                <span className="font-medium text-sm">Reset All Progress</span>
+                <div className="text-left">
+                  <span className="font-medium text-sm block">Reset All Progress</span>
+                  <span className="text-xs text-rose-400">Clear stats and return to Level {startingLevel || 1}</span>
+                </div>
               </div>
-              <ChevronRight size={16} className="text-slate-300" />
+              <ChevronRight size={16} className="text-rose-300" />
             </button>
             <button 
               onClick={() => { logout(); window.location.href = '/'; }}
@@ -131,13 +156,86 @@ export default function Settings() {
         </div>
 
         <div className="pt-4 text-center space-y-1">
-          <p className="text-[10px] text-slate-400 font-medium">Maths Trainer v1.0.0</p>
+          <p className="text-[10px] text-slate-400 font-medium">Numerate v1.0.0</p>
           <div className="flex justify-center gap-4">
             <button className="text-[10px] text-primary font-bold uppercase tracking-widest">Privacy Policy</button>
             <button className="text-[10px] text-primary font-bold uppercase tracking-widest">Support</button>
           </div>
         </div>
       </div>
+      
+      <AnimatePresence>
+        {showResetModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowResetModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl"
+              data-testid="modal-reset-confirm"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center">
+                  <AlertTriangle size={24} className="text-rose-500" />
+                </div>
+                <h2 className="text-xl font-bold text-slate-900">Reset all progress?</h2>
+              </div>
+              
+              <p className="text-slate-600 text-sm mb-6">
+                This will erase your progress and statistics. Your level will return to the one determined by your initial assessment (Level {startingLevel || 1}).
+              </p>
+              
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowResetModal(false)}
+                  data-testid="button-reset-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1 bg-rose-500 hover:bg-rose-600"
+                  onClick={handleConfirmReset}
+                  data-testid="button-reset-confirm"
+                >
+                  Reset Progress
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      <AnimatePresence>
+        {toast.visible && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-24 left-4 right-4 z-50"
+          >
+            <div className="bg-slate-800 text-white rounded-xl px-4 py-3 shadow-lg flex items-center justify-between">
+              <span className="text-sm">{toast.message}</span>
+              <button 
+                onClick={() => setToast(prev => ({ ...prev, visible: false }))}
+                className="p-1 hover:bg-slate-700 rounded"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
       <BottomNav />
     </MobileLayout>
   );
