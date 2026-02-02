@@ -162,7 +162,8 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       setQuestion(q);
       currentQuestionMetaRef.current = { targetTimeMs: q.targetTimeMs, dp: q.dp, id: q.id };
       
-      opCountsRef.current[q.meta.operation]++;
+      const opForCount = q.meta.operation === 'percent' || q.meta.operation === 'multi' ? 'mul' : q.meta.operation;
+      opCountsRef.current[opForCount]++;
       setCurrentOpCounts({ ...opCountsRef.current });
       
       const maxOp = Math.max(q.meta.operandA, q.meta.operandB);
@@ -173,7 +174,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       operandStatsRef.current.count += 2;
       
       if (!difficultyParams) {
-        setDifficultyParams(q.meta.difficultyParams);
+        setDifficultyParams(getDifficultyParams(currentLevel));
       }
       
       recentQuestionsRef.current = [
@@ -181,14 +182,15 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
         ...recentQuestionsRef.current
       ].slice(0, 10);
       
+      const profile = q.meta.difficultyProfile;
       console.log("[GEN_OUTPUT]", {
         question: q.text,
         operation: q.meta.operation,
         operandA: q.meta.operandA,
         operandB: q.meta.operandB,
         level: currentLevel,
-        opWeights: q.meta.difficultyParams.opWeights,
-        maxAddSub: q.meta.difficultyParams.maxAddSub
+        opWeights: profile?.opWeights ?? { add: 0, sub: 0, mul: 0, div: 0, percent: 0 },
+        profileDesc: profile?.description ?? 'unknown'
       });
     } else {
        setQuestion(generateQuestion(tier));
