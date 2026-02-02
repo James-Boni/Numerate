@@ -1,0 +1,101 @@
+We have a critical mobile UI bug in Quick Fire:
+
+- The Quick Fire tab/button in the Train menu displays in a central position on mobile and is unreadable.
+- There are TWO exit buttons overlapping each other in Quick Fire.
+- Only one exit works, and it works unreliably (touch sometimes doesn’t register).
+
+This must be fixed properly (layout + stacking + touch interception). Do NOT add new features.
+
+====================================================================
+A) FIX TRAIN MENU QUICK FIRE CARD/TAB ON MOBILE
+====================================================================
+Goal: Quick Fire entry must be readable and properly laid out on mobile.
+
+1) Inspect Train menu layout on small screens:
+- Ensure Quick Fire card/tab follows the same layout rules as Daily card.
+- Ensure text wraps properly and does not render centered in an unreadable way.
+- Use responsive constraints:
+  - consistent padding
+  - left-aligned text where appropriate
+  - font size not shrinking too far
+  - no absolute positioning that causes center overlap
+
+2) Fix style issues causing unreadable center positioning:
+- Remove any absolute positioning or transform that anchors it to center incorrectly.
+- Ensure card height adapts to content.
+- Ensure labels and stats under Quick Fire (PB / attempts) are readable and aligned.
+
+Acceptance:
+- On mobile viewport, Quick Fire card is readable with no overlapping text and consistent alignment with other modes.
+
+====================================================================
+B) REMOVE DUPLICATE EXIT BUTTONS (OVERLAP FIX)
+====================================================================
+Goal: There must be EXACTLY ONE exit/back button visible in Quick Fire.
+
+1) Find why two exit buttons exist:
+Common causes:
+- A screen header back button PLUS an in-screen close button
+- A modal overlay close icon PLUS a navigation header
+- Two components rendering headers simultaneously
+
+2) Choose ONE canonical exit control:
+Recommended:
+- A single top-left back arrow/button OR a single “X” close button (pick one consistent with Daily screens).
+- Do NOT render both.
+
+3) Ensure the removed button is not still present but invisible (touch-blocking).
+- Search for overlays with opacity 0 or transparent views intercepting touches.
+
+Acceptance:
+- Only one exit control exists visually AND in the view tree.
+
+====================================================================
+C) MAKE EXIT BUTTON 100% RELIABLE (TOUCH + Z-INDEX)
+====================================================================
+Goal: Tap always works, instantly.
+
+1) Fix stacking and touch interception:
+- Ensure the exit button is on top (zIndex / elevation).
+- Ensure no overlapping View is intercepting touches:
+  - check pointerEvents
+  - check absolute-positioned overlays
+  - check full-screen Pressable used for tap-to-submit that might cover header
+
+2) If Quick Fire uses “tap anywhere to submit”:
+- The full-screen Pressable must EXCLUDE the header area.
+- The header (exit button area) must not be inside the tap-to-submit overlay.
+- Use a layout split:
+  - Header region (non-intercepted by submit overlay)
+  - Gameplay region (tap-to-submit active)
+  - Keypad region (digits only)
+
+3) Increase touch target:
+- Add hitSlop to exit button.
+- Ensure minimum 44x44dp tap area.
+- Respect Safe Area / notch (top padding).
+
+Acceptance:
+- Exit button works every tap on mobile.
+- No missed taps, no needing multiple presses.
+- Works on iOS safe-area devices.
+
+====================================================================
+D) VERIFY QUICK FIRE POPUP “X” CANCEL ALSO WORKS
+====================================================================
+If you show the Quick Fire explanation popup each time:
+- Its “X” must cancel back to Train menu
+- It must not be overlapped by another exit control
+- Ensure only one close control is active at a time (modal close OR screen exit, never both stacked)
+
+Acceptance:
+- Modal X always closes modal and returns to menu reliably.
+
+====================================================================
+E) DELIVERABLES
+====================================================================
+After fixing:
+- List which components contained duplicate exit buttons
+- Explain which one you kept and where it lives
+- Confirm the tap-to-submit overlay no longer covers the header
+- Provide a short note on what caused the unreadable Quick Fire card and how it was fixed

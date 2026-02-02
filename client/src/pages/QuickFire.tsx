@@ -418,15 +418,8 @@ export default function QuickFire() {
   if (step === 'intro') {
     return (
       <MobileLayout className="bg-white">
-        <Dialog open={true} onOpenChange={() => {}}>
-          <DialogContent className="max-w-sm mx-auto rounded-3xl relative">
-            <button
-              onClick={handleCancelIntro}
-              className="absolute right-4 top-4 rounded-full p-1 hover:bg-slate-100 transition-colors"
-              data-testid="button-quickfire-cancel"
-            >
-              <X size={20} className="text-slate-400" />
-            </button>
+        <Dialog open={true} onOpenChange={(open) => { if (!open) handleCancelIntro(); }}>
+          <DialogContent className="max-w-sm mx-auto rounded-3xl relative" data-testid="modal-quickfire-intro">
             <DialogHeader>
               <div className="flex items-center justify-center mb-4">
                 <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
@@ -617,20 +610,18 @@ export default function QuickFire() {
       {showFlash && <FullScreenFlash type={showFlash} />}
       
       <div className="flex-1 flex flex-col">
-        <div className="px-6 pt-6 pb-4 flex justify-between items-center">
-          <Button
-            variant="ghost"
-            size="sm"
+        <div className="px-4 pt-4 pb-2 flex justify-between items-center relative z-50" style={{ pointerEvents: 'auto' }}>
+          <button
             onClick={() => {
               stopAllTimers();
               gameActiveRef.current = false;
               setLocation('/train');
             }}
-            className="text-slate-400"
+            className="w-11 h-11 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 active:bg-slate-200"
             data-testid="button-quickfire-exit"
           >
-            Exit
-          </Button>
+            <X size={20} />
+          </button>
           
           <motion.div
             animate={remainingTime < 2 ? { scale: [1, 1.05, 1] } : {}}
@@ -644,8 +635,8 @@ export default function QuickFire() {
             {remainingTime.toFixed(1)}s
           </motion.div>
           
-          <div className="text-sm font-bold text-primary" data-testid="text-quickfire-ingame-xp">
-            +{inGameXP} XP
+          <div className="text-sm font-bold text-primary w-11 text-right" data-testid="text-quickfire-ingame-xp">
+            +{inGameXP}
           </div>
         </div>
 
