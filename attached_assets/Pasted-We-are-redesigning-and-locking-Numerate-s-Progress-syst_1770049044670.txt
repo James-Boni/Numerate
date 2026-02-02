@@ -1,0 +1,298 @@
+We are redesigning and locking Numerate’s Progress system.
+
+This is a CORE SYSTEM TASK.
+Do NOT add experimental features.
+Do NOT simplify logic.
+Do NOT merge unrelated systems.
+Do NOT include Quick Fire in global progress metrics.
+
+The goal is to make progress:
+- accurate
+- time-bound
+- interpretable
+- psychologically safe
+- mathematically honest
+
+If there is ambiguity, follow THIS SPEC exactly.
+
+====================================================================
+0) FOUNDATIONAL PRINCIPLES (NON-NEGOTIABLE)
+====================================================================
+1) Progress must show EVIDENCE OF IMPROVEMENT, not raw stats.
+2) Daily sessions are the ONLY source of global progress.
+3) Quick Fire and Assessment must NEVER pollute progress metrics.
+4) All progress views must be TIME-BOUND.
+5) Users must clearly see:
+   - where they were
+   - where they are
+   - why changes happened
+
+====================================================================
+1) SESSION FILTERING (CRITICAL)
+====================================================================
+For ALL progress calculations:
+
+INCLUDE ONLY:
+- sessionType === "daily"
+
+EXCLUDE ALWAYS:
+- sessionType === "quick_fire"
+- sessionType === "assessment"
+
+This rule applies to:
+- charts
+- averages
+- trends
+- insights
+- summaries
+
+Add explicit filters in all progress aggregation code.
+
+Acceptance:
+- Playing Quick Fire does not affect Progress page metrics in any way.
+
+====================================================================
+2) TIME RANGE CONTROLS
+====================================================================
+Add a time range selector at the top of the Progress page.
+
+Options:
+- 7D (default)
+- 30D
+- All time (secondary / less prominent)
+
+Rules:
+- Default MUST be 7D.
+- Changing the range recomputes all charts and summaries.
+- Ranges are CALENDAR-BASED, not “last N sessions”.
+
+Acceptance:
+- 7D shows last 7 calendar days with data.
+- 30D shows last 30 calendar days with data.
+
+====================================================================
+3) DAILY AGGREGATION RULE (GLOBAL)
+====================================================================
+Sessions are noisy. Aggregate by DAY.
+
+For each calendar day:
+- Collect all Daily sessions completed that day.
+- Compute DAILY aggregates.
+
+NEVER display raw session-level dots on Progress charts.
+
+====================================================================
+4) OVERVIEW SECTION (PAST → PRESENT ANCHOR)
+====================================================================
+Add a top Overview section that answers:
+“How far have I come?”
+
+--------------------------------------------------------------------
+4.1 Level Journey Card
+--------------------------------------------------------------------
+Show:
+- “Level at start of period: X”
+- “Current level: Y”
+
+Rules:
+- Start level = level at beginning of selected time window.
+- Current level = current user.level.
+- If no change, say “Level stable”.
+
+Acceptance:
+- Users can see level progression at a glance.
+
+--------------------------------------------------------------------
+4.2 Adaptive Insight Line
+--------------------------------------------------------------------
+Under the time selector, show ONE sentence only.
+
+Examples:
+- “You’re answering faster this week, even as difficulty increased.”
+- “Accuracy dipped slightly — normal when learning harder material.”
+- “Consistency is improving.”
+
+Rules:
+- Never judgemental.
+- Never instructive.
+- Explanatory only.
+- Generated from Daily-only metrics.
+
+====================================================================
+5) PERFORMANCE SECTION (CORE OF PROGRESS)
+====================================================================
+Each metric gets its own card, always in the same order.
+
+--------------------------------------------------------------------
+5.1 ACCURACY
+--------------------------------------------------------------------
+Definition:
+Accuracy = totalCorrect / totalAttempted
+
+Daily aggregation:
+- Sum correct across all Daily sessions that day.
+- Sum attempted across all Daily sessions that day.
+- Daily accuracy = sumCorrect / sumAttempted.
+(Weighted accuracy; DO NOT average percentages.)
+
+Chart:
+- Line chart of DAILY accuracy (%).
+- X-axis = days.
+- Y-axis = % accuracy.
+
+Optional:
+- Daily PEAK accuracy shown as small dot or halo.
+
+Summary (right side):
+- Start-of-window accuracy
+- End-of-window accuracy
+- Delta phrased in plain language (e.g. “+4%”).
+
+Acceptance:
+- Short perfect sessions do not skew daily accuracy.
+
+--------------------------------------------------------------------
+5.2 SPEED (RESPONSE TIME)
+--------------------------------------------------------------------
+Definition:
+Speed = MEDIAN response time per question.
+
+Daily aggregation:
+- Collect ALL response times for Daily sessions that day.
+- Compute:
+  - Daily median
+  - 25th percentile
+  - 75th percentile
+
+Chart:
+- Line = daily median response time.
+- Shaded band = interquartile range (25–75%).
+- Lower is better.
+
+Summary:
+- Start-of-window median
+- End-of-window median
+- Improvement phrased as “X seconds faster”.
+
+Acceptance:
+- Outliers do not distort the chart.
+- Consistency is visually apparent via band width.
+
+--------------------------------------------------------------------
+5.3 THROUGHPUT
+--------------------------------------------------------------------
+Definition:
+Throughput = questions per minute.
+
+Daily aggregation:
+- Total questions attempted that day
+- Divided by total ACTIVE time (minutes).
+- Exclude pauses and result screens.
+
+Chart:
+- Line chart.
+- X-axis = days.
+- Y-axis = QPM.
+
+Summary:
+- Plain-language insight (“You’re answering more questions in the same time.”)
+
+--------------------------------------------------------------------
+5.4 CONSISTENCY (IMPLICIT)
+--------------------------------------------------------------------
+Do NOT show a separate consistency chart in V1.
+
+Consistency is communicated via:
+- Narrowing/widening of speed IQR band.
+
+No additional explanation needed.
+
+====================================================================
+6) DIFFICULTY CONTEXT (TRUST PROTECTION)
+====================================================================
+Users must understand WHY dips happen.
+
+--------------------------------------------------------------------
+6.1 Level Context
+--------------------------------------------------------------------
+For each day:
+- Store user.level at end of day.
+
+On charts:
+- Annotate level increases OR
+- Show subtle background gradient indicating rising difficulty.
+
+--------------------------------------------------------------------
+6.2 Static Context Copy
+--------------------------------------------------------------------
+Include this sentence somewhere visible:
+“As difficulty increases, temporary dips in speed or accuracy are normal.”
+
+This copy must NEVER be removed.
+
+====================================================================
+7) PERSONAL RECORDS (OPTIONAL, QUIET)
+====================================================================
+Add a small “Personal Bests” section.
+
+Examples:
+- Fastest median response time
+- Highest accuracy at ≥ current level
+- Best throughput day
+
+Rules:
+- No comparison.
+- No pressure.
+- No “beat this” language.
+
+Tone = pride, not obligation.
+
+====================================================================
+8) EXCLUSIONS (VERY IMPORTANT)
+====================================================================
+The Progress page must NOT show:
+- Quick Fire data
+- Assessment data
+- XP charts
+- Raw session lists
+- Streak pressure
+
+Quick Fire lives ONLY under Train → Quick Fire.
+
+====================================================================
+9) SPARSE DATA HANDLING
+====================================================================
+If fewer than 3 days of data in selected range:
+- Do NOT draw misleading charts.
+- Show message:
+  “More data will appear as you train.”
+
+====================================================================
+10) COLOR & PSYCHOLOGY RULES
+====================================================================
+- Never color “bad days” red.
+- Neutral tones only.
+- Let trends communicate meaning.
+
+Plateaus:
+- Copy should say:
+  “Stability is a sign you’re consolidating skills.”
+
+====================================================================
+11) DATA INTEGRITY & DEBUG (CONSOLE ONLY)
+====================================================================
+For each progress computation, log (console only):
+
+PROGRESS_WINDOW range=7D days=__ dailySessions=__
+
+No debug UI added.
+
+====================================================================
+12) DELIVERABLES
+====================================================================
+After implementation, report:
+- Files modified
+- Where session filtering is enforced
+- How daily aggregation is computed
+- How speed IQR is calculated
+- Confirmation that Quick Fire is fully excluded
