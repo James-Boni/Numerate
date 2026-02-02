@@ -1,4 +1,6 @@
 import { PROGRESSION_CONFIG } from '@/config/progression';
+import { getDifficultyProfile } from './difficulty-profile';
+import type { DifficultyProfile } from './difficulty-profile';
 
 export interface ProgressionState {
   level: number;
@@ -134,46 +136,34 @@ export interface DifficultyParams {
 }
 
 export const getOperationWeights = (level: number): OperationWeights => {
-  if (level <= 5) {
-    return { add: 0.80, sub: 0.20, mul: 0, div: 0 };
-  }
-  if (level <= 12) {
-    return { add: 0.55, sub: 0.45, mul: 0, div: 0 };
-  }
-  if (level <= 20) {
-    return { add: 0.40, sub: 0.35, mul: 0.25, div: 0 };
-  }
-  if (level <= 30) {
-    return { add: 0.30, sub: 0.30, mul: 0.25, div: 0.15 };
-  }
-  return { add: 0.25, sub: 0.25, mul: 0.30, div: 0.20 };
+  const profile = getDifficultyProfile(level);
+  return {
+    add: profile.opWeights.add,
+    sub: profile.opWeights.sub,
+    mul: profile.opWeights.mul,
+    div: profile.opWeights.div
+  };
 };
 
 export const getDifficultyParams = (level: number): DifficultyParams => {
-  const band = getBandFromLevel(level);
-  const opWeights = getOperationWeights(level);
-  
-  const maxAddSub = Math.round(10 + level * 4);
-  
-  const allowMul = level >= 13;
-  const maxMulA = allowMul ? Math.min(40, Math.round(5 + (level - 13) * 0.6)) : 0;
-  const maxMulB = allowMul ? Math.min(20, Math.round(5 + (level - 13) * 0.4)) : 0;
-  
-  const allowDiv = level >= 21;
-  const maxDivDivisor = allowDiv ? Math.min(12, Math.round(2 + (level - 21) * 0.3)) : 0;
-  const maxDivQuotient = allowDiv ? Math.min(15, Math.round(3 + (level - 21) * 0.4)) : 0;
+  const profile = getDifficultyProfile(level);
   
   return {
-    level,
-    band,
-    opWeights,
-    maxAddSub,
-    maxMulA,
-    maxMulB,
-    maxDivDivisor,
-    maxDivQuotient,
-    allowMul,
-    allowDiv,
+    level: profile.level,
+    band: profile.band,
+    opWeights: {
+      add: profile.opWeights.add,
+      sub: profile.opWeights.sub,
+      mul: profile.opWeights.mul,
+      div: profile.opWeights.div
+    },
+    maxAddSub: profile.addSub.max,
+    maxMulA: profile.mul.aMax,
+    maxMulB: profile.mul.bMax,
+    maxDivDivisor: profile.div.divisorMax,
+    maxDivQuotient: Math.floor(profile.div.dividendMax / Math.max(1, profile.div.divisorMin)),
+    allowMul: profile.mul.enabled,
+    allowDiv: profile.div.enabled,
   };
 };
 
@@ -192,3 +182,5 @@ export const selectOperation = (weights: OperationWeights): 'add' | 'sub' | 'mul
   
   return 'div';
 };
+
+export type { DifficultyProfile };

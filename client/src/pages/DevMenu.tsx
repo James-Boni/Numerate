@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useLocation } from 'wouter';
-import { ArrowLeft, Navigation, Database, Trash2, AlertTriangle, X, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Navigation, Database, Trash2, AlertTriangle, X, CheckCircle, BarChart3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getDifficultyProfile } from '@/lib/logic/difficulty-profile';
+import { generateQuestionForLevel } from '@/lib/logic/generator_adapter';
 
 const SHOW_DEV_MENU = import.meta.env.MODE !== 'production';
 
@@ -200,6 +202,61 @@ export default function DevMenu() {
             {levelError && <p className="text-rose-400 text-xs">{levelError}</p>}
             <p className="text-slate-500 text-xs">Current: {level}</p>
           </div>
+        </Card>
+
+        <Card className="bg-slate-800 border-slate-700 p-4 space-y-4">
+          <div className="flex items-center gap-2 text-emerald-400 mb-2">
+            <BarChart3 size={16} />
+            <h3 className="text-sm font-bold uppercase tracking-wider">Difficulty Audit</h3>
+          </div>
+          
+          <Button
+            variant="outline"
+            className="w-full bg-slate-700 border-slate-600 text-white hover:bg-emerald-700"
+            onClick={() => {
+              console.log('=== DIFFICULTY AUDIT STARTING ===');
+              const levels = [1, 5, 10, 15, 20, 30, 50, 70, 85, 100];
+              const samplesPerLevel = 50;
+              
+              for (const lvl of levels) {
+                const profile = getDifficultyProfile(lvl);
+                const stats = {
+                  opCounts: { add: 0, sub: 0, mul: 0, div: 0, percent: 0, multi: 0 },
+                  complexityScores: [] as number[],
+                  operandDigits: { a: [] as number[], b: [] as number[] }
+                };
+                
+                for (let i = 0; i < samplesPerLevel; i++) {
+                  const q = generateQuestionForLevel(lvl, []);
+                  const meta = q.meta;
+                  stats.opCounts[meta.operation as keyof typeof stats.opCounts]++;
+                  stats.complexityScores.push(meta.complexityScore);
+                  
+                  const dA = Math.max(1, Math.floor(Math.log10(Math.abs(meta.operandA) || 1)) + 1);
+                  const dB = Math.max(1, Math.floor(Math.log10(Math.abs(meta.operandB) || 1)) + 1);
+                  stats.operandDigits.a.push(dA);
+                  stats.operandDigits.b.push(dB);
+                }
+                
+                const meanComplexity = stats.complexityScores.reduce((a, b) => a + b, 0) / stats.complexityScores.length;
+                const meanDigitsA = stats.operandDigits.a.reduce((a, b) => a + b, 0) / stats.operandDigits.a.length;
+                const meanDigitsB = stats.operandDigits.b.reduce((a, b) => a + b, 0) / stats.operandDigits.b.length;
+                
+                console.log(`\n--- LEVEL ${lvl} ---`);
+                console.log(`Profile: ${profile.description}`);
+                console.log(`Op Distribution: Add=${((stats.opCounts.add/samplesPerLevel)*100).toFixed(0)}% Sub=${((stats.opCounts.sub/samplesPerLevel)*100).toFixed(0)}% Mul=${((stats.opCounts.mul/samplesPerLevel)*100).toFixed(0)}% Div=${((stats.opCounts.div/samplesPerLevel)*100).toFixed(0)}%`);
+                console.log(`Mean Complexity: ${meanComplexity.toFixed(1)} (min required: ${profile.minComplexityScore})`);
+                console.log(`Mean Operand Digits: A=${meanDigitsA.toFixed(1)} B=${meanDigitsB.toFixed(1)}`);
+              }
+              
+              console.log('\n=== AUDIT COMPLETE ===');
+              showToast('Difficulty audit logged to console');
+            }}
+          >
+            Run Difficulty Audit (Console)
+          </Button>
+          
+          <p className="text-slate-500 text-xs">Generates 50 questions per level and logs analysis to browser console.</p>
         </Card>
 
         <Card className="bg-slate-800 border-slate-700 p-4 space-y-4">

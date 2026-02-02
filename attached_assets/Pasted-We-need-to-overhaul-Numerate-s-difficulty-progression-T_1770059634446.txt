@@ -1,0 +1,244 @@
+We need to overhaul Numerate’s difficulty progression. The current curve is too flat after ~level 10: level 10 and level 20 feel nearly identical (e.g., L20 still produces easy questions like 27-25). This is unacceptable. Level 100 must be genuinely hard — very few users should function there with high accuracy and speed.
+
+This task must:
+- keep user.level as the single source of truth
+- make question difficulty provably derived from user.level
+- produce a monotonic, meaningful increase in difficulty across 1–100
+- add an automated audit harness to prove output changes by level
+
+Do NOT change XP, progress, charts, or UI. This is difficulty + generator only.
+
+====================================================================
+A) DIFFICULTY DESIGN GOAL (LOCKED)
+====================================================================
+1) Levels 1–10: beginner-safe ramp; user learns flow and confidence.
+2) Levels 10–30: noticeable ramp; each +5 levels should feel meaningfully harder.
+3) Levels 30–70: advanced mental arithmetic; high load; mixed operations common.
+4) Levels 70–100: elite; multi-step / larger operands / decimals & fractions appear; accuracy becomes hard to maintain.
+
+Constraint:
+- Difficulty must not jump so fast that users are overwhelmed, but it MUST ramp clearly.
+- Level 100 should rarely be sustainable for most users.
+
+====================================================================
+B) IMPLEMENT A NEW PIECEWISE DIFFICULTY LADDER (1–100)
+====================================================================
+Update the difficulty profile generator (e.g., getDifficultyProfile(level)) so that it returns:
+
+- operand ranges
+- operation mix weights
+- constraints (carry/borrow frequency targets)
+- inclusion rules (negatives/decimals/fractions/multi-step)
+- optional “complexity score” for auditing
+
+Use this banding (exact intent):
+
+--------------------------------------------------------------------
+B1) Levels 1–5 (Foundation)
+--------------------------------------------------------------------
+Ops:
+- Mostly addition/subtraction (no negatives)
+Operands:
+- 0–10 (then 0–20 by level 5)
+Constraints:
+- Minimal carry/borrow early
+- Single-step only
+Goal: build confidence & speed.
+
+--------------------------------------------------------------------
+B2) Levels 6–10 (Carry/Borrow Begins)
+--------------------------------------------------------------------
+Ops:
+- add/sub dominate; introduce a small amount of multiplication by level 9–10
+Operands:
+- add/sub: up to 0–50 by level 10
+- mult: 0–12 tables (single-digit x single-digit)
+Constraints:
+- Borrow/carry becomes common by level 10
+Goal: make level 10 clearly harder than level 5.
+
+--------------------------------------------------------------------
+B3) Levels 11–20 (MUST FEEL HARDER THAN 10)
+--------------------------------------------------------------------
+This is where the current system fails. Fix it.
+
+Ops:
+- Mixed add/sub/mult/div (div is easy early: clean divisibility)
+Operands:
+- add/sub: up to 0–100
+- mult: 2-digit x 1-digit begins (e.g., 17×6)
+- div: 2-digit ÷ 1-digit (exact division; then remainders by 18–20)
+Constraints:
+- Borrow/carry frequent
+- Mixed operations introduced (but still single-step per question)
+Rules:
+- By level 20, questions like “27-25” should be rare.
+- L20 should include meaningful borrow/carry and 2-digit operations routinely.
+
+--------------------------------------------------------------------
+B4) Levels 21–30 (Two-digit multiplication, harder division)
+--------------------------------------------------------------------
+Ops:
+- Balanced add/sub/mult/div
+Operands:
+- add/sub: up to 0–200
+- mult: 2-digit x 1-digit common; introduce 2-digit x 2-digit (low end) by 28–30
+- div: 3-digit ÷ 1-digit; then 3-digit ÷ 2-digit (easy) near 30
+Constraints:
+- Remainders allowed
+Goal: user must actively think; speed starts to drop unless they’re trained.
+
+--------------------------------------------------------------------
+B5) Levels 31–40 (Advanced mental arithmetic)
+--------------------------------------------------------------------
+Ops:
+- Mixed operations; more multiplication/division weight
+Operands:
+- add/sub: include negatives occasionally by ~35 (e.g., -12 + 27)
+- mult: 2-digit x 2-digit becomes routine
+- div: 3–4 digit ÷ 1–2 digit; remainders common
+Constraints:
+- Require mental decomposition strategies (e.g., 48×17)
+Goal: clear step up from 30.
+
+--------------------------------------------------------------------
+B6) Levels 41–50 (Hard)
+Ops:
+- Mixed, with proportionally more mult/div than add/sub
+Operands:
+- add/sub: up to 500 with carry/borrow + negatives sometimes
+- mult: 3-digit x 1-digit and 2-digit x 2-digit harder range
+- div: 4-digit ÷ 2-digit (manageable), include remainder
+Add:
+- simple percentages by ~50 (e.g., 15% of 80)
+Goal: challenging for most casual users.
+
+--------------------------------------------------------------------
+B7) Levels 51–60 (Very Hard)
+Ops:
+- Mixed, include percent/ratio style single-step
+Operands:
+- mult: 3-digit x 2-digit begins
+- div: 4-digit ÷ 2-digit routine; 5-digit ÷ 2-digit begins
+Add:
+- decimals begin (1 decimal place) by ~55 (e.g., 12.5 + 7.8)
+Goal: cognitive load clearly high.
+
+--------------------------------------------------------------------
+B8) Levels 61–70 (Elite entry)
+Ops:
+- Mixed; decimals + percent + harder division
+Operands:
+- mult: 3-digit x 2-digit routine
+- div: 5-digit ÷ 2-digit routine; some 4-digit ÷ 3-digit
+Add:
+- fractions begin by ~70 (simple: 1/2, 1/4, 3/4; add/sub only)
+Goal: most users will struggle to maintain accuracy.
+
+--------------------------------------------------------------------
+B9) Levels 71–80 (Elite)
+Ops:
+- Mixed; more decimals/fractions; fewer easy add/sub freebies
+Operands:
+- mult: 3-digit x 2-digit harder range
+- div: 5-digit ÷ 2-digit harder, 4-digit ÷ 3-digit more common
+Add:
+- 2 decimal places sometimes
+- percent change begins (e.g., increase 240 by 15%)
+Goal: hard to do fast; requires training.
+
+--------------------------------------------------------------------
+B10) Levels 81–90 (Very Elite)
+Ops:
+- Mixed, include multi-step occasionally
+Multi-step rule:
+- At 85+, introduce 2-step expressions sometimes (e.g., 48×12 - 36)
+Operands:
+- mult: 4-digit x 1-digit sometimes, 3-digit x 2-digit common
+- div: 5-digit ÷ 3-digit sometimes
+Add:
+- decimals + simple fractions in same window (not in same question unless 90+)
+Goal: not many will be comfortable here.
+
+--------------------------------------------------------------------
+B11) Levels 91–100 (Rare / Peak Difficulty)
+--------------------------------------------------------------------
+Goal: Level 100 should be “really really hard.”
+
+Rules:
+- Multi-step becomes common (still bounded to 2 steps; occasionally 3 at 100 only)
+- No trivial single-digit freebies
+- Frequent decomposition-required multiplication/division
+- Decimals + fractions + percent appear (carefully, not chaotic)
+
+Operands:
+- mult: 3-digit x 3-digit occasionally; 4-digit x 2-digit occasionally
+- div: 6-digit ÷ 2–3 digit sometimes; remainders common
+- include: percent change + fractions of numbers + decimal operations
+
+Constraints:
+- Ensure generated questions are solvable mentally but require real skill.
+- Keep results within reasonable bounds (avoid absurd huge outputs that feel pointless).
+
+====================================================================
+C) OPERATION MIX WEIGHTS MUST SHIFT WITH LEVEL
+====================================================================
+Implement operation weights that evolve. Example intent (adjustable but must be monotonic):
+- L1–10: 70% add/sub, 20% sub, 10% mult/div by 10
+- L11–30: gradually increase mult/div to ~40–50%
+- L31–70: mult/div dominant (~55–65%)
+- L71–100: mixed with decimals/percent/fractions + some multi-step
+
+Ensure “random all-ops” doesn’t accidentally become “mostly easy addition.”
+
+====================================================================
+D) PREVENT EASY-QUESTION LEAKAGE AT HIGH LEVELS
+====================================================================
+Add rules to avoid “27-25” showing up at L20+ frequently:
+- Introduce minimum operand complexity by band:
+  - Example: at L20, at least one operand should typically be >= 2 digits AND borrow/carry likely.
+- Enforce a minimum “difficulty score” per question at each band.
+
+====================================================================
+E) ADD A DIFFICULTY AUDIT HARNESS (MANDATORY)
+====================================================================
+Create a dev-only script/function that:
+- Generates N=200 sample questions per chosen level (e.g., 1, 5, 10, 15, 20, 30, 50, 70, 85, 100)
+- Prints a report summarizing:
+  - operation distribution
+  - operand digit counts
+  - carry/borrow rate estimate for add/sub
+  - presence rates of negatives/decimals/fractions/multi-step
+  - mean/median estimated “difficulty score”
+- This report must clearly show that L20 > L10 in objective features.
+
+Add a simple “Run Difficulty Audit” button in Dev Menu (dev-only) that logs the report to console.
+No user-facing UI changes.
+
+====================================================================
+F) ACCEPTANCE TESTS (HARD REQUIREMENTS)
+====================================================================
+1) L10 and L20 must feel different:
+- L20 must regularly include 2-digit operations with borrow/carry and 2-digit x 1-digit multiplication.
+- Easy single-digit near-equalities like 27-25 should be rare at L20.
+
+2) L50 must routinely include:
+- 2-digit x 2-digit and/or 3-digit x 1-digit
+- 4-digit ÷ 2-digit with remainder sometimes
+- occasional percent of a number
+
+3) L100 must be extremely challenging:
+- multi-step is common
+- large operands and hard division exist
+- decimals/fractions/percent appear at meaningful rates
+- trivial questions must not appear
+
+4) Confirm: difficulty remains derived ONLY from user.level.
+
+====================================================================
+G) REPORT BACK
+====================================================================
+Return:
+- which files were changed
+- the new difficulty profile definition structure
+- audit output for levels 10, 20, 50, 100 showing clear differences
