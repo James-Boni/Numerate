@@ -4,7 +4,7 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { useLocation } from 'wouter';
 import { useStore, SessionStats } from '@/lib/store';
 import { Button } from '@/components/ui/button';
-import { X, Clock, Copy, Zap, Lock } from 'lucide-react';
+import { X, Clock, CircleDot, Zap, ChevronLeft, Lock, Copy } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { clsx } from 'clsx';
 import { KeypadModern } from '@/components/game/Keypad';
@@ -13,12 +13,8 @@ import { Card } from '@/components/ui/card';
 
 interface DoublingQuestion {
   id: string;
-  multiplier: number;
-  base: number;
+  number: number;
   answer: number;
-  text: string;
-  hint: string;
-  doublingSteps: string[];
 }
 
 interface GameResult {
@@ -29,42 +25,53 @@ interface GameResult {
   xpEarned: number;
 }
 
-type GameStep = 'intro' | 'locked' | 'countdown' | 'active' | 'results';
+type GameStep = 'locked' | 'intro' | 'countdown' | 'active' | 'results';
 
 function generateDoublingQuestion(level: number): DoublingQuestion {
-  const doublingMultipliers = [2, 4, 8, 16];
-  const multiplierIndex = Math.min(Math.floor((level - 13) / 10), doublingMultipliers.length - 1);
-  const availableMultipliers = doublingMultipliers.slice(0, multiplierIndex + 2);
+  // Scale difficulty based on level
+  // L13-20: Small whole numbers (2-50)
+  // L21-30: Larger numbers (10-200)
+  // L31-50: Include decimals (5.5, 12.75, etc.)
+  // L51+: Complex decimals and larger numbers
   
-  const multiplier = availableMultipliers[Math.floor(Math.random() * availableMultipliers.length)];
+  let number: number;
   
-  const maxBase = Math.min(12 + Math.floor((level - 13) / 2), 25);
-  const base = Math.floor(Math.random() * (maxBase - 2)) + 2;
-  
-  const answer = base * multiplier;
-  const text = `${base} × ${multiplier}`;
-  
-  const doublingSteps: string[] = [];
-  let current = base;
-  let remaining = multiplier;
-  
-  while (remaining > 1) {
-    const doubled = current * 2;
-    doublingSteps.push(`${current} × 2 = ${doubled}`);
-    current = doubled;
-    remaining = remaining / 2;
+  if (level < 21) {
+    // Simple whole numbers
+    number = Math.floor(Math.random() * 48) + 2; // 2 to 50
+  } else if (level < 31) {
+    // Larger whole numbers
+    const base = Math.floor(Math.random() * 190) + 10; // 10 to 200
+    number = base;
+  } else if (level < 51) {
+    // Include some decimals
+    if (Math.random() < 0.4) {
+      // Decimal number
+      const base = Math.floor(Math.random() * 100) + 5;
+      const decimal = Math.random() < 0.5 ? 0.5 : 0.25;
+      number = base + decimal;
+    } else {
+      // Larger whole number
+      number = Math.floor(Math.random() * 300) + 20;
+    }
+  } else {
+    // Complex decimals and larger numbers
+    if (Math.random() < 0.5) {
+      // Decimal with 1-2 places
+      const base = Math.floor(Math.random() * 200) + 10;
+      const decimal = Math.round(Math.random() * 99) / 100;
+      number = base + decimal;
+    } else {
+      number = Math.floor(Math.random() * 500) + 50;
+    }
   }
   
-  const hint = `Double ${doublingSteps.length} time${doublingSteps.length > 1 ? 's' : ''}: ${doublingSteps.join(', then ')}`;
+  const answer = number * 2;
   
   return {
     id: Math.random().toString(36).substr(2, 9),
-    multiplier,
-    base,
-    answer,
-    text,
-    hint,
-    doublingSteps
+    number,
+    answer
   };
 }
 
@@ -73,499 +80,425 @@ function FullScreenFlash({ type }: { type: 'correct' | 'wrong' }) {
     <motion.div
       initial={{ opacity: 0.6 }}
       animate={{ opacity: 0 }}
+      exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
       className={clsx(
-        "fixed inset-0 z-40 pointer-events-none",
-        type === 'correct' ? "bg-green-400" : "bg-red-400"
+        "fixed inset-0 pointer-events-none z-50",
+        type === 'correct' ? "bg-emerald-400" : "bg-red-400"
       )}
     />
   );
 }
 
+const UNLOCK_LEVEL = 13;
+
 export default function DoublingGame() {
-  const [step, setStep] = useState<GameStep>('intro');
-  const [countdownNumber, setCountdownNumber] = useState(3);
+  const [, navigate] = useLocation();
+  const { settings, level, saveSession, xpIntoLevel } = useStore();
+  
+  const isLocked = level < UNLOCK_LEVEL;
+  
+  const [step, setStep] = useState<GameStep>(isLocked ? 'locked' : 'intro');
+  const [countdown, setCountdown] = useState(3);
+  const [timeLeft, setTimeLeft] = useState(180);
   const [question, setQuestion] = useState<DoublingQuestion | null>(null);
   const [input, setInput] = useState('');
-  const [remainingTime, setRemainingTime] = useState(180);
-  const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
-  const [results, setResults] = useState<GameResult | null>(null);
-  const [showFlash, setShowFlash] = useState<'correct' | 'wrong' | null>(null);
-  const [showHint, setShowHint] = useState(false);
+  const [flash, setFlash] = useState<'correct' | 'wrong' | null>(null);
   
-  const [_, setLocation] = useLocation();
-  const { level, settings, saveSession, hasCompletedAssessment } = useStore();
-
-  const correctCountRef = useRef(0);
-  const totalCountRef = useRef(0);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  
   const responseTimesRef = useRef<number[]>([]);
-  const questionStartTimeRef = useRef<number>(performance.now());
-  const startTimeRef = useRef<number>(performance.now());
-  const timerRef = useRef<number | null>(null);
-  const isSubmittingRef = useRef(false);
-  const gameActiveRef = useRef(false);
-
-  const isLocked = level < 13;
-
+  const questionStartRef = useRef<number>(Date.now());
+  const startTimeRef = useRef<number>(Date.now());
+  const sessionEndedRef = useRef(false);
+  
+  const [result, setResult] = useState<GameResult | null>(null);
+  
+  const nextQuestion = useCallback(() => {
+    const q = generateDoublingQuestion(level);
+    setQuestion(q);
+    setInput('');
+    questionStartRef.current = Date.now();
+  }, [level]);
+  
+  // Countdown effect
   useEffect(() => {
-    AudioManager.init();
-    if (!hasCompletedAssessment) {
-      setLocation('/train');
+    if (step !== 'countdown') return;
+    if (countdown <= 0) {
+      setStep('active');
+      startTimeRef.current = Date.now();
+      nextQuestion();
       return;
     }
-    if (isLocked) {
-      setStep('locked');
+    const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [step, countdown, nextQuestion]);
+  
+  // Game timer
+  useEffect(() => {
+    if (step !== 'active') return;
+    
+    const tick = () => {
+      if (sessionEndedRef.current) return;
+      const elapsed = Date.now() - startTimeRef.current;
+      const remaining = Math.max(0, 180000 - elapsed);
+      const remainingSeconds = Math.ceil(remaining / 1000);
+      setTimeLeft(remainingSeconds);
+      
+      if (remaining <= 0 && !sessionEndedRef.current) {
+        sessionEndedRef.current = true;
+        endSession();
+      }
+    };
+    
+    tick();
+    const interval = setInterval(tick, 250);
+    return () => clearInterval(interval);
+  }, [step]);
+  
+  const handleKeyPress = (val: string) => {
+    if (step !== 'active') return;
+    
+    if (val === '.') {
+      if (!input.includes('.')) {
+        setInput(prev => prev + '.');
+      }
+      return;
     }
-  }, [hasCompletedAssessment, setLocation, isLocked]);
-
-  const generateNextQuestion = useCallback(() => {
-    const newQuestion = generateDoublingQuestion(level);
-    setQuestion(newQuestion);
-    setInput('');
-    setFeedback(null);
-    setShowHint(false);
-    questionStartTimeRef.current = performance.now();
-    isSubmittingRef.current = false;
-  }, [level]);
-
-  const stopTimer = useCallback(() => {
-    if (timerRef.current) {
-      cancelAnimationFrame(timerRef.current);
-      timerRef.current = null;
+    
+    setInput(prev => prev + val);
+  };
+  
+  const handleDelete = () => {
+    setInput(prev => prev.slice(0, -1));
+  };
+  
+  const handleSubmit = () => {
+    if (!question || input === '' || step !== 'active') return;
+    
+    const userAnswer = parseFloat(input);
+    const isCorrect = Math.abs(userAnswer - question.answer) < 0.001;
+    const responseTime = Date.now() - questionStartRef.current;
+    responseTimesRef.current.push(responseTime);
+    
+    setTotalCount(prev => prev + 1);
+    
+    if (isCorrect) {
+      setCorrectCount(prev => prev + 1);
+      setStreak(prev => {
+        const newStreak = prev + 1;
+        if (newStreak > bestStreak) setBestStreak(newStreak);
+        return newStreak;
+      });
+      setFlash('correct');
+      if (settings.soundOn) AudioManager.playCorrect();
+    } else {
+      setStreak(0);
+      setFlash('wrong');
+      if (settings.soundOn) AudioManager.playWrong();
     }
-  }, []);
-
-  const endGame = useCallback(() => {
-    gameActiveRef.current = false;
-    stopTimer();
     
-    const durationSeconds = (performance.now() - startTimeRef.current) / 1000;
-    const correctC = correctCountRef.current;
-    const attemptedN = totalCountRef.current;
+    setTimeout(() => setFlash(null), 300);
+    nextQuestion();
+  };
+  
+  const endSession = () => {
+    const times = responseTimesRef.current;
+    const medianMs = times.length > 0 
+      ? times.sort((a, b) => a - b)[Math.floor(times.length / 2)] 
+      : 3000;
     
-    const accuracy = attemptedN > 0 ? correctC / attemptedN : 0;
-    const fluencyMetrics = computeFluency(
-      attemptedN,
-      correctC,
-      durationSeconds,
-      responseTimesRef.current
-    );
+    const accuracy = totalCount > 0 ? correctCount / totalCount : 0;
+    const xpEarned = correctCount * 18 + (bestStreak >= 5 ? 30 : 0);
     
-    const baseXP = correctC * 18;
-    const bonusXP = Math.floor(accuracy * 60);
-    const finalXP = baseXP + bonusXP;
-
+    const fluencyMetrics = computeFluency(totalCount, correctCount, 180, times);
+    
     const sessionStats: SessionStats = {
-      id: Math.random().toString(36).substring(7),
+      id: Math.random().toString(36).substr(2, 9),
       date: new Date().toISOString(),
       sessionType: 'doubling_practice',
       durationMode: 180,
-      durationSecondsActual: Math.round(durationSeconds),
-      totalQuestions: attemptedN,
-      correctQuestions: correctC,
+      durationSecondsActual: 180,
+      totalQuestions: totalCount,
+      correctQuestions: correctCount,
       accuracy,
-      xpEarned: finalXP,
-      bestStreak: correctC,
-      avgResponseTimeMs: fluencyMetrics.medianMs,
-      medianMs: fluencyMetrics.medianMs,
-      variabilityMs: fluencyMetrics.variabilityMs,
+      avgResponseTimeMs: medianMs,
+      medianMs,
+      xpEarned,
       fluencyScore: fluencyMetrics.fluencyScore,
-      baseSessionXP: baseXP,
-      modeMultiplier: 1.0,
-      finalSessionXP: finalXP,
-      responseTimes: [...responseTimesRef.current],
+      levelBefore: level,
+      levelAfter: level,
+      xpIntoLevelBefore: xpIntoLevel,
+      xpIntoLevelAfter: xpIntoLevel + xpEarned,
+      bestStreak
     };
-
+    
     saveSession(sessionStats);
     
-    setResults({
-      totalQuestions: attemptedN,
-      correctQuestions: correctC,
+    setResult({
+      totalQuestions: totalCount,
+      correctQuestions: correctCount,
       accuracy,
-      medianMs: fluencyMetrics.medianMs,
-      xpEarned: finalXP
+      medianMs,
+      xpEarned
     });
     setStep('results');
-  }, [saveSession, stopTimer]);
-
-  const startTimerLoop = useCallback(() => {
-    let lastTick = performance.now();
-    
-    const tick = () => {
-      if (!gameActiveRef.current) return;
-      
-      const now = performance.now();
-      const delta = (now - lastTick) / 1000;
-      lastTick = now;
-      
-      setRemainingTime(prev => {
-        const newTime = Math.max(0, prev - delta);
-        if (newTime <= 0) {
-          endGame();
-          return 0;
-        }
-        return newTime;
-      });
-      
-      timerRef.current = requestAnimationFrame(tick);
-    };
-    
-    timerRef.current = requestAnimationFrame(tick);
-  }, [endGame]);
-
-  const handleSubmit = useCallback(() => {
-    if (!question || isSubmittingRef.current || !gameActiveRef.current) return;
-    if (!input) return;
-    
-    isSubmittingRef.current = true;
-    
-    const now = performance.now();
-    const responseTime = now - questionStartTimeRef.current;
-    
-    const val = parseInt(input, 10);
-    const isCorrect = val === question.answer;
-    
-    totalCountRef.current += 1;
-    responseTimesRef.current.push(responseTime);
-    
-    if (isCorrect) {
-      correctCountRef.current += 1;
-      setFeedback('correct');
-      setShowFlash('correct');
-      if (settings.soundOn) AudioManager.playCorrect();
-      
-      setTimeout(() => {
-        setShowFlash(null);
-        if (gameActiveRef.current) {
-          generateNextQuestion();
-        }
-      }, 300);
-    } else {
-      setFeedback('wrong');
-      setShowFlash('wrong');
-      if (settings.soundOn) AudioManager.playWrong();
-      
-      setTimeout(() => {
-        setShowFlash(null);
-        if (gameActiveRef.current) {
-          generateNextQuestion();
-        }
-      }, 800);
-    }
-  }, [question, input, settings.soundOn, generateNextQuestion]);
-
-  const handleKeypadPress = useCallback((key: string) => {
-    if (feedback) return;
-    setInput(prev => prev + key);
-  }, [feedback]);
-
-  const handleKeypadDelete = useCallback(() => {
-    if (feedback) return;
-    setInput(prev => prev.slice(0, -1));
-  }, [feedback]);
-
-  const startCountdown = useCallback(() => {
-    setStep('countdown');
-    setCountdownNumber(3);
-    
-    if (settings.soundOn) AudioManager.playCountdownHorn();
-    
-    setTimeout(() => {
-      setCountdownNumber(2);
-      if (settings.soundOn) AudioManager.playCountdownHorn();
-    }, 1000);
-    
-    setTimeout(() => {
-      setCountdownNumber(1);
-      if (settings.soundOn) AudioManager.playCountdownHorn();
-    }, 2000);
-    
-    setTimeout(() => {
-      if (settings.soundOn) AudioManager.playGoHorn();
-      
-      gameActiveRef.current = true;
-      startTimeRef.current = performance.now();
-      correctCountRef.current = 0;
-      totalCountRef.current = 0;
-      responseTimesRef.current = [];
-      
-      setRemainingTime(180);
-      setShowFlash(null);
-      generateNextQuestion();
-      startTimerLoop();
-      setStep('active');
-    }, 3000);
-  }, [settings.soundOn, generateNextQuestion, startTimerLoop]);
-
-  useEffect(() => {
-    return () => {
-      stopTimer();
-    };
-  }, [stopTimer]);
-
+  };
+  
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+  
+  // Locked screen
   if (step === 'locked') {
     return (
-      <MobileLayout className="bg-white">
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full relative shadow-2xl">
-            <button
-              onClick={() => setLocation('/train')}
-              className="absolute right-4 top-4 w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100"
-            >
-              <X size={20} className="text-slate-400" />
-            </button>
-            
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
-                <Lock size={32} className="text-slate-400" />
-              </div>
-            </div>
-            
-            <h2 className="text-center text-2xl font-bold text-slate-900">Locked</h2>
-            
-            <div className="text-center space-y-4 pt-4 text-slate-600">
-              <p>Doubling practice unlocks at <span className="font-bold text-purple-600">Level 13</span> when multiplication is introduced.</p>
-              <p className="text-sm text-slate-500">You're currently at Level {level}. Keep practicing to unlock!</p>
-            </div>
-            
-            <Button 
-              onClick={() => setLocation('/train')}
-              className="w-full h-12 rounded-2xl font-bold mt-6"
-            >
-              Back to Training
-            </Button>
-          </div>
-        </div>
-      </MobileLayout>
-    );
-  }
-
-  if (step === 'intro') {
-    return (
-      <MobileLayout className="bg-white">
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full relative shadow-2xl">
-            <button
-              onClick={() => setLocation('/train')}
-              className="absolute right-4 top-4 w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100"
-              data-testid="button-doubling-cancel"
-            >
-              <X size={20} className="text-slate-400" />
-            </button>
-            
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center">
-                <Copy size={32} className="text-purple-500" />
-              </div>
-            </div>
-            
-            <h2 className="text-center text-2xl font-bold text-slate-900">Doubling Practice</h2>
-            
-            <div className="text-center space-y-4 pt-4 text-slate-600">
-              <p className="text-sm">Master the doubling technique for faster multiplication:</p>
-              
-              <div className="bg-purple-50 rounded-2xl p-4 text-left space-y-2">
-                <p className="font-medium text-purple-900">Example: 6 × 8</p>
-                <div className="text-sm text-purple-700 space-y-1">
-                  <p>1. 6 × 2 = 12</p>
-                  <p>2. 12 × 2 = 24</p>
-                  <p>3. 24 × 2 = <span className="font-bold">48</span></p>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-center gap-2 text-slate-500 text-sm">
-                <Clock size={16} className="text-primary" />
-                <span>3 minutes to practice</span>
-              </div>
-            </div>
-            
-            <Button 
-              onClick={startCountdown}
-              className="w-full h-12 rounded-2xl font-bold mt-6 bg-purple-500 hover:bg-purple-600"
-              data-testid="button-doubling-start"
-            >
-              Start Practice
-            </Button>
-          </div>
-        </div>
-      </MobileLayout>
-    );
-  }
-
-  if (step === 'countdown') {
-    return (
-      <MobileLayout className="bg-white">
-        <div className="fixed inset-0 bg-white flex items-center justify-center z-50">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={countdownNumber}
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1.2, opacity: 1 }}
-              exit={{ scale: 1.5, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="text-9xl font-black text-purple-500"
-            >
-              {countdownNumber}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </MobileLayout>
-    );
-  }
-
-  if (step === 'results' && results) {
-    return (
-      <MobileLayout className="bg-white">
-        <div className="flex-1 p-8 space-y-6 flex flex-col justify-center">
-          <div className="text-center space-y-2">
-            <motion.div 
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="inline-flex items-center justify-center w-16 h-16 bg-purple-100 text-purple-500 rounded-full mb-4"
-            >
-              <Copy size={32} />
-            </motion.div>
-            <h1 className="text-3xl font-bold text-slate-900">Practice Complete</h1>
-            <p className="text-slate-500">Great work on your doubling skills!</p>
-          </div>
-
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-purple-50 rounded-3xl p-6 text-center space-y-1"
-          >
-            <span className="text-xs font-bold text-purple-400 uppercase tracking-widest">Questions Correct</span>
-            <div className="text-5xl font-black text-purple-600">
-              {results.correctQuestions}/{results.totalQuestions}
-            </div>
-          </motion.div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-slate-50 border-none shadow-none rounded-2xl">
-              <span className="text-lg font-bold text-slate-900">{Math.round(results.accuracy * 100)}%</span>
-              <span className="text-[10px] text-slate-400 uppercase font-bold">Accuracy</span>
-            </Card>
-            <Card className="p-4 flex flex-col items-center justify-center space-y-1 bg-slate-50 border-none shadow-none rounded-2xl">
-              <span className="text-lg font-bold text-slate-900">{(results.medianMs / 1000).toFixed(1)}s</span>
-              <span className="text-[10px] text-slate-400 uppercase font-bold">Avg Time</span>
-            </Card>
-          </div>
-
+      <MobileLayout className="bg-gradient-to-b from-blue-50 to-white">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-primary/10 rounded-2xl p-4 text-center"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-24 h-24 rounded-3xl bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center shadow-lg"
           >
-            <div className="flex items-center justify-center gap-2">
-              <Zap size={20} className="text-primary fill-primary" />
-              <span className="text-2xl font-bold text-primary">+{results.xpEarned} XP</span>
-            </div>
+            <Lock size={48} className="text-white" />
           </motion.div>
-
-          <Button 
-            size="lg" 
-            className="w-full h-14 text-lg font-semibold rounded-2xl"
-            onClick={() => setLocation('/train')}
-            data-testid="button-doubling-continue"
+          
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold text-slate-900">Doubling Practice</h1>
+            <p className="text-slate-600">Unlocks at Level {UNLOCK_LEVEL}</p>
+          </div>
+          
+          <Card className="w-full max-w-sm p-6 text-center">
+            <p className="text-slate-600">
+              You're currently at Level {level}. Keep practicing to unlock this skill drill!
+            </p>
+            <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-blue-400 rounded-full transition-all"
+                style={{ width: `${(level / UNLOCK_LEVEL) * 100}%` }}
+              />
+            </div>
+            <p className="text-sm text-slate-500 mt-2">{UNLOCK_LEVEL - level} levels to go</p>
+          </Card>
+          
+          <Button
+            variant="ghost"
+            className="text-slate-500"
+            onClick={() => navigate('/train')}
           >
-            Continue
+            <ChevronLeft size={18} />
+            Back to Train
           </Button>
         </div>
       </MobileLayout>
     );
   }
-
-  const minutes = Math.floor(remainingTime / 60);
-  const seconds = Math.floor(remainingTime % 60);
-
+  
+  // Intro screen
+  if (step === 'intro') {
+    return (
+      <MobileLayout className="bg-gradient-to-b from-blue-50 to-white">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-lg"
+          >
+            <Copy size={48} className="text-white" />
+          </motion.div>
+          
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold text-slate-900">Doubling Practice</h1>
+            <p className="text-slate-600">Double each number as fast as you can</p>
+          </div>
+          
+          <Card className="w-full max-w-sm p-6 space-y-4">
+            <div className="space-y-3 text-sm text-slate-600">
+              <div className="flex items-center gap-3">
+                <Clock size={18} className="text-blue-500" />
+                <span>3 minutes of focused practice</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <CircleDot size={18} className="text-blue-500" />
+                <span>See a number, double it</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Zap size={18} className="text-blue-500" />
+                <span>18 XP per correct answer</span>
+              </div>
+            </div>
+          </Card>
+          
+          <Button
+            size="lg"
+            className="w-full max-w-sm h-14 text-lg bg-blue-500 hover:bg-blue-600"
+            onClick={() => setStep('countdown')}
+          >
+            Start Practice
+          </Button>
+          
+          <Button
+            variant="ghost"
+            className="text-slate-500"
+            onClick={() => navigate('/train')}
+          >
+            <ChevronLeft size={18} />
+            Back to Train
+          </Button>
+        </div>
+      </MobileLayout>
+    );
+  }
+  
+  // Countdown screen
+  if (step === 'countdown') {
+    return (
+      <MobileLayout className="bg-gradient-to-b from-blue-50 to-white">
+        <div className="flex-1 flex items-center justify-center">
+          <motion.div
+            key={countdown}
+            initial={{ scale: 2, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.5, opacity: 0 }}
+            className="text-8xl font-black text-blue-500"
+          >
+            {countdown || 'Go!'}
+          </motion.div>
+        </div>
+      </MobileLayout>
+    );
+  }
+  
+  // Results screen
+  if (step === 'results' && result) {
+    return (
+      <MobileLayout className="bg-gradient-to-b from-blue-50 to-white">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-6">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="text-center space-y-2"
+          >
+            <h1 className="text-3xl font-bold text-slate-900">Practice Complete!</h1>
+            <p className="text-slate-600">Great work on your doubling skills</p>
+          </motion.div>
+          
+          <Card className="w-full max-w-sm p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-4 bg-slate-50 rounded-xl">
+                <div className="text-3xl font-bold text-slate-900">{result.correctQuestions}</div>
+                <div className="text-sm text-slate-600">Correct</div>
+              </div>
+              <div className="text-center p-4 bg-slate-50 rounded-xl">
+                <div className="text-3xl font-bold text-slate-900">{Math.round(result.accuracy * 100)}%</div>
+                <div className="text-sm text-slate-600">Accuracy</div>
+              </div>
+              <div className="text-center p-4 bg-slate-50 rounded-xl">
+                <div className="text-3xl font-bold text-slate-900">{(result.medianMs / 1000).toFixed(1)}s</div>
+                <div className="text-sm text-slate-600">Avg Speed</div>
+              </div>
+              <div className="text-center p-4 bg-blue-50 rounded-xl">
+                <div className="text-3xl font-bold text-blue-600">+{result.xpEarned}</div>
+                <div className="text-sm text-blue-600">XP Earned</div>
+              </div>
+            </div>
+          </Card>
+          
+          <div className="flex gap-3 w-full max-w-sm">
+            <Button
+              variant="outline"
+              className="flex-1 h-12"
+              onClick={() => navigate('/train')}
+            >
+              Done
+            </Button>
+            <Button
+              className="flex-1 h-12 bg-blue-500 hover:bg-blue-600"
+              onClick={() => {
+                setStep('intro');
+                setCorrectCount(0);
+                setTotalCount(0);
+                setStreak(0);
+                setBestStreak(0);
+                responseTimesRef.current = [];
+                sessionEndedRef.current = false;
+                setResult(null);
+              }}
+            >
+              Practice Again
+            </Button>
+          </div>
+        </div>
+      </MobileLayout>
+    );
+  }
+  
+  // Active game screen
   return (
     <MobileLayout className="bg-white">
-      {showFlash && <FullScreenFlash type={showFlash} />}
+      <AnimatePresence>
+        {flash && <FullScreenFlash type={flash} />}
+      </AnimatePresence>
       
-      <div className="flex-1 flex flex-col">
-        <div className="px-4 pt-4 pb-2 flex justify-between items-center">
-          <button
-            onClick={() => {
-              stopTimer();
-              gameActiveRef.current = false;
-              setLocation('/train');
-            }}
-            className="w-11 h-11 flex items-center justify-center rounded-full bg-slate-100 text-slate-500"
-            data-testid="button-doubling-exit"
-          >
-            <X size={20} />
-          </button>
-          
-          <div className={clsx(
-            "text-xl font-bold tabular-nums px-4 py-2 rounded-xl",
-            remainingTime <= 30 ? "text-red-500 bg-red-50" : "text-slate-700 bg-slate-100"
-          )}>
-            {minutes}:{seconds.toString().padStart(2, '0')}
-          </div>
-          
-          <div className="w-11 h-11 flex items-center justify-center">
-            <span className="text-sm font-bold text-green-600">{correctCountRef.current}</span>
-          </div>
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b">
+        <button onClick={() => navigate('/train')} className="p-2 -ml-2">
+          <X size={24} className="text-slate-400" />
+        </button>
+        <div className="flex items-center gap-2 text-lg font-semibold">
+          <Clock size={20} className="text-blue-500" />
+          <span className={clsx(timeLeft <= 10 && "text-red-500")}>{formatTime(timeLeft)}</span>
         </div>
-
-        <div className="flex-1 flex flex-col items-center justify-center px-8">
-          {question && (
-            <>
-              <motion.div
-                key={question.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-center space-y-4"
-              >
-                <div className="text-5xl font-bold text-slate-900 tracking-tight">
-                  {question.text}
-                </div>
-                
-                {showHint && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-sm text-purple-600 bg-purple-50 px-4 py-3 rounded-xl space-y-1"
-                  >
-                    {question.doublingSteps.map((step, i) => (
-                      <div key={i}>{step}</div>
-                    ))}
-                  </motion.div>
-                )}
-                
-                <button
-                  onClick={() => setShowHint(!showHint)}
-                  className="text-xs text-slate-400 hover:text-slate-600"
-                >
-                  {showHint ? 'Hide hint' : 'Show hint'}
-                </button>
-              </motion.div>
-
-              <div className="mt-8 w-full max-w-xs">
-                <div className={clsx(
-                  "h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-3xl font-bold transition-colors",
-                  feedback === 'correct' && "bg-green-100 text-green-600",
-                  feedback === 'wrong' && "bg-red-100 text-red-600",
-                  !feedback && "text-slate-900"
-                )}>
-                  {input || <span className="text-slate-300">?</span>}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="pb-8 px-4">
-          <KeypadModern 
-            onPress={handleKeypadPress}
-            onDelete={handleKeypadDelete}
-            onSubmit={handleSubmit}
-            disabled={!!feedback}
-          />
+        <div className="flex items-center gap-1 text-blue-600 font-medium">
+          <Zap size={18} />
+          <span>{correctCount * 18}</span>
         </div>
       </div>
+      
+      {/* Question display */}
+      <div className="flex-1 flex flex-col items-center justify-center p-6">
+        {question && (
+          <motion.div
+            key={question.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center space-y-6"
+          >
+            <div className="text-lg text-slate-500 font-medium">Double this number</div>
+            <div className="text-6xl font-bold text-slate-900">
+              {question.number % 1 === 0 ? question.number : question.number.toFixed(2)}
+            </div>
+            
+            {/* Answer display */}
+            <div className="h-16 flex items-center justify-center">
+              <div className={clsx(
+                "text-4xl font-bold min-w-[120px] border-b-4 pb-2",
+                input ? "text-slate-900 border-blue-400" : "text-slate-300 border-slate-200"
+              )}>
+                {input || '?'}
+              </div>
+            </div>
+          </motion.div>
+        )}
+        
+        {/* Stats row */}
+        <div className="flex gap-6 mt-8 text-sm text-slate-500">
+          <div>Correct: <span className="font-semibold text-slate-900">{correctCount}</span></div>
+          <div>Streak: <span className="font-semibold text-blue-600">{streak}</span></div>
+        </div>
+      </div>
+      
+      {/* Keypad */}
+      <KeypadModern
+        onPress={handleKeyPress}
+        onDelete={handleDelete}
+        onSubmit={handleSubmit}
+        submitDisabled={!input}
+      />
     </MobileLayout>
   );
 }
