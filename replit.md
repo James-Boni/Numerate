@@ -116,6 +116,27 @@ Preferred communication style: Simple, everyday language.
 ### Session Storage
 - **connect-pg-simple**: PostgreSQL session store (available but not currently used for auth)
 
+### Backend User System
+**Database Schema** (users table):
+- `id`: Internal UUID (primary key)
+- `auth_token`: Unique token for Bearer authentication
+- `apple_subject_id`: For future Sign in with Apple linking
+- `email`: Optional, from Apple or user input
+- `entitlement_tier/status/source`: Premium subscription tracking
+- `entitlement_expires_at`, `original_transaction_id`: IAP receipt data
+
+**Auth Endpoints** (`server/routes.ts`):
+- `POST /api/auth/register` - Creates guest user with auth token
+- `POST /api/auth/login` - Login with existing auth token
+- `GET /api/auth/me` - Get current user (requires Bearer token)
+- `POST /api/auth/apple` - Placeholder for future SIWA
+- `POST /api/auth/link-apple` - Placeholder for linking Apple to guest
+
+**Sync Endpoints** (token-authenticated):
+- `POST /api/sync/progress` - Upload progress (partial updates supported)
+- `GET /api/sync/progress` - Fetch user's progress and sessions
+- `POST /api/sync/session` - Save completed session
+
 ### iOS Readiness Framework (Scaffolding)
 **Location**: `client/src/lib/services/`
 
@@ -123,9 +144,10 @@ Scaffolding for future iOS integration (SIWA + IAP):
 
 **Core Services**:
 - `types.ts`: Canonical UserAccount and Entitlement models
-- `auth-service.ts`: AuthService interface with MockAuthService (dev) and AppleAuthService (stub)
+- `auth-service.ts`: Connects to backend /api/auth/register, persists auth token
 - `billing-service.ts`: BillingService interface with MockBillingService (dev entitlement controls)
 - `storage-service.ts`: Secure storage abstraction (localStorage now, SecureStore for Expo later)
+- `sync-service.ts`: Offline-first sync with retry queue for failed requests
 - `api-client.ts`: Backend API contract with LocalApiClient mock
 - `account-store.ts`: Zustand store for account/entitlement state
 - `ios-config.ts`: iOS/Expo configuration placeholders
@@ -143,3 +165,4 @@ Scaffolding for future iOS integration (SIWA + IAP):
 - Anonymous-first, link Apple later
 - Internal UUID as primary key (not Apple subject identifier)
 - Entitlement status derived from entitlement fields only
+- Offline-first with sync queue for failed network requests

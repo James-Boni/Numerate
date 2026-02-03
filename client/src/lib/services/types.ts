@@ -40,6 +40,8 @@ export interface UserAccount {
   id: string;
   authProvider: AuthProvider;
   appleSub?: string;
+  email?: string;
+  appleLinked: boolean;
   createdAt: number;
   lastLoginAt: number;
   
@@ -77,6 +79,7 @@ export function createDefaultUserAccount(id: string): UserAccount {
   return {
     id,
     authProvider: 'anonymous',
+    appleLinked: false,
     createdAt: Date.now(),
     lastLoginAt: Date.now(),
     level: 1,

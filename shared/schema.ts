@@ -5,7 +5,16 @@ import { z } from "zod";
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  authToken: varchar("auth_token").unique(),
+  appleSubjectId: varchar("apple_subject_id").unique(),
+  email: varchar("email"),
+  entitlementTier: text("entitlement_tier").notNull().default('free'),
+  entitlementStatus: text("entitlement_status").notNull().default('none'),
+  entitlementSource: text("entitlement_source").notNull().default('none'),
+  entitlementExpiresAt: timestamp("entitlement_expires_at"),
+  originalTransactionId: varchar("original_transaction_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const userProgress = pgTable("user_progress", {
@@ -78,6 +87,7 @@ export const sessions = pgTable("sessions", {
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 export const insertUserProgressSchema = createInsertSchema(userProgress).omit({

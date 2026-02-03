@@ -14,7 +14,10 @@ import { eq } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
+  getUserByAuthToken(token: string): Promise<User | undefined>;
+  getUserByAppleId(appleSubjectId: string): Promise<User | undefined>;
   createUser(): Promise<User>;
+  updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
   
   getUserProgress(userId: string): Promise<UserProgress | undefined>;
   upsertUserProgress(progress: InsertUserProgress): Promise<UserProgress>;
@@ -29,9 +32,29 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getUserByAuthToken(token: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.authToken, token));
+    return user || undefined;
+  }
+
+  async getUserByAppleId(appleSubjectId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.appleSubjectId, appleSubjectId));
+    return user || undefined;
+  }
+
   async createUser(): Promise<User> {
-    const [user] = await db.insert(users).values({}).returning();
+    const authToken = crypto.randomUUID();
+    const [user] = await db.insert(users).values({ authToken }).returning();
     return user;
+  }
+
+  async updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
   }
 
   async getUserProgress(userId: string): Promise<UserProgress | undefined> {
