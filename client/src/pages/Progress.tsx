@@ -5,6 +5,9 @@ import { useStore, SessionStats } from '@/lib/store';
 import { Card } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, ComposedChart } from 'recharts';
 import { TrendingUp, Award, Clock, Target, Info } from 'lucide-react';
+import { WeeklyInsights } from '@/components/progress/WeeklyInsights';
+import { SkillBreakdown } from '@/components/progress/SkillBreakdown';
+import { JourneyComparison } from '@/components/progress/JourneyComparison';
 
 type TimeRange = '7D' | '30D' | 'all';
 type TrendDirection = 'improving' | 'stable' | 'dipping';
@@ -367,6 +370,22 @@ export default function Progress() {
           {insight}
         </p>
         
+        {timeRange === '7D' && (
+          <WeeklyInsights 
+            sessions={sessions} 
+            currentLevel={level} 
+            startingLevel={startingLevel} 
+          />
+        )}
+        
+        {timeRange === 'all' && (
+          <JourneyComparison 
+            sessions={sessions} 
+            startingLevel={startingLevel} 
+            currentLevel={level} 
+          />
+        )}
+        
         <Card className="p-5 bg-white border-none shadow-sm rounded-2xl" data-testid="card-level-journey">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -547,6 +566,8 @@ export default function Progress() {
                 As difficulty increases, temporary dips in speed or accuracy are normal.
               </p>
             </div>
+            
+            <SkillBreakdown sessions={sessions} currentLevel={level} />
             
             {personalBests && (
               <Card className="p-5 bg-white border-none shadow-sm rounded-2xl" data-testid="card-personal-bests">

@@ -92,10 +92,25 @@ Preferred communication style: Simple, everyday language.
 **UI Sections**:
 1. Time Range Selector (7D default, 30D, All time)
 2. Adaptive Insight Line (one explanatory sentence)
-3. Level Journey Card (start vs current level)
-4. Performance Cards: Accuracy, Speed (with IQR), Throughput
-5. Difficulty Context Copy (static reassurance about dips)
-6. Personal Bests (quiet, no pressure)
+3. Weekly Insights Card (7D view only) - shows week's highlights, avg accuracy/speed, best streak, XP earned, week-over-week comparison
+4. Journey Comparison Card (All time view only) - Day 1 vs Today comparison with improvement badges
+5. Level Journey Card (start vs current level)
+6. Performance Cards: Accuracy, Speed (with IQR), Throughput
+7. Skill Breakdown Dashboard - star ratings per operation type (add/sub/mul/div) based on accuracy, speed, practice volume
+8. Difficulty Context Copy (static reassurance about dips)
+9. Personal Bests (quiet, no pressure)
+
+**Personal Records System**:
+- Tracked metrics: best streak, fastest median response, highest accuracy, highest throughput, highest fluency score
+- Backend persistence via personalBests JSONB column in user_progress table
+- Celebrated in session results with PersonalRecordCelebration component when records are beaten
+- Key files: `PersonalRecordCelebration.tsx`, store's `checkAndUpdatePersonalBests()`
+
+**Daily Focus System (Train Page)**:
+- Personalized insights shown before session start
+- Identifies strengths (high accuracy, fast responses) and focus areas (weak operations)
+- Shows ETA to next level based on average XP earned
+- Key file: `DailyFocus.tsx`
 
 **Exclusions**:
 - No Quick Fire data, no Assessment data

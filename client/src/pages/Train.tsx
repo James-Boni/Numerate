@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { xpRequiredToAdvance } from '@/lib/logic/xp-system';
 import { useAccountStore, isPremiumActive } from '@/lib/services/account-store';
 import { PaywallScreen } from '@/components/game/PaywallScreen';
+import { DailyFocus } from '@/components/train/DailyFocus';
 
 export default function Train() {
   const { level, lifetimeXP, streakCount, hasCompletedAssessment, quickFireHighScore, sessions, xpIntoLevel, hasUsedFreeDaily } = useStore();
@@ -115,6 +116,12 @@ export default function Train() {
                 <span className="bg-white text-slate-600 px-3 py-1 rounded-full text-xs font-medium border border-slate-100">3 Minutes</span>
                 <span className="bg-white text-slate-600 px-3 py-1 rounded-full text-xs font-medium border border-slate-100">Mixed Ops</span>
               </div>
+
+              <DailyFocus 
+                sessions={sessions} 
+                currentLevel={level} 
+                xpIntoLevel={xpIntoLevel} 
+              />
 
               <Button 
                 onClick={() => {

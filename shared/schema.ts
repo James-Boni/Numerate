@@ -48,6 +48,31 @@ export const userProgress = pgTable("user_progress", {
   // Coaching
   seenStrategies: jsonb("seen_strategies").$type<string[]>().notNull().default([]),
   
+  // Personal Records
+  personalBests: jsonb("personal_bests").$type<{
+    bestStreak: number;
+    bestStreakDate: string | null;
+    fastestMedianMs: number | null;
+    fastestMedianDate: string | null;
+    highestAccuracy: number | null;
+    highestAccuracyDate: string | null;
+    highestThroughput: number | null;
+    highestThroughputDate: string | null;
+    highestFluencyScore: number | null;
+    highestFluencyDate: string | null;
+  }>().notNull().default({
+    bestStreak: 0,
+    bestStreakDate: null,
+    fastestMedianMs: null,
+    fastestMedianDate: null,
+    highestAccuracy: null,
+    highestAccuracyDate: null,
+    highestThroughput: null,
+    highestThroughputDate: null,
+    highestFluencyScore: null,
+    highestFluencyDate: null
+  }),
+  
   // Settings
   soundOn: boolean("sound_on").notNull().default(true),
   hapticsOn: boolean("haptics_on").notNull().default(true),

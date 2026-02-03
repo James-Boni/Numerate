@@ -18,6 +18,7 @@ import { ReassuranceScreen } from '@/components/game/ReassuranceScreen';
 import { PaywallScreen } from '@/components/game/PaywallScreen';
 import { DailyChallengeIntro } from '@/components/game/DailyChallengeIntro';
 import { StrategyLesson } from '@/components/game/StrategyLesson';
+import { PersonalRecordCelebration } from '@/components/game/PersonalRecordCelebration';
 import { useAccountStore, isPremiumActive } from '@/lib/services/account-store';
 import { detectWeakness, WeaknessPattern } from '@/lib/logic/weakness-detector';
 
@@ -234,9 +235,10 @@ export default function Game() {
   const [step, setStep] = useState<'daily_intro' | 'active' | 'results' | 'strategy' | 'levelup' | 'reassurance' | 'paywall' | 'blocked'>('daily_intro');
   const [results, setResults] = useState<SessionStats | null>(null);
   const [detectedWeakness, setDetectedWeakness] = useState<WeaknessPattern | null>(null);
+  const [newPersonalRecords, setNewPersonalRecords] = useState<string[]>([]);
   const [entitlementChecked, setEntitlementChecked] = useState(false);
   const [_, setLocation] = useLocation();
-  const { currentTier, saveSession, settings, hasUsedFreeDaily, markFreeTrialUsed, seenStrategies, markStrategySeen } = useStore();
+  const { currentTier, saveSession, settings, hasUsedFreeDaily, markFreeTrialUsed, seenStrategies, markStrategySeen, checkAndUpdatePersonalBests } = useStore();
   const { entitlement, refreshEntitlement } = useAccountStore();
   const revealRun = React.useRef(false);
   const levelUpShownRef = React.useRef(false);
@@ -250,6 +252,13 @@ export default function Game() {
     checkAccess();
     AudioManager.init();
   }, []);
+  
+  // Reset personal records state when going to a new session
+  useEffect(() => {
+    if (step === 'daily_intro' || step === 'active') {
+      setNewPersonalRecords([]);
+    }
+  }, [step]);
 
   // Determine if this is first free session AFTER entitlement is checked
   const isPremium = isPremiumActive(entitlement);
@@ -267,6 +276,13 @@ export default function Game() {
     console.log(`[SESSION_FLOW] Training complete: ${Date.now()}`, stats);
     saveSession(stats);
     setResults(stats);
+    
+    // Check for personal records
+    const newRecords = checkAndUpdatePersonalBests(stats);
+    if (newRecords.length > 0) {
+      console.log('[PERSONAL_RECORDS] New records:', newRecords);
+      setNewPersonalRecords(newRecords);
+    }
     
     // Detect weakness patterns for coaching (filter out already-seen strategies)
     if (stats.questionResults && stats.questionResults.length > 0) {
@@ -464,6 +480,16 @@ export default function Game() {
             />
           </motion.div>
         </motion.div>
+
+        {newPersonalRecords.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <PersonalRecordCelebration newRecords={newPersonalRecords} />
+          </motion.div>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <motion.div

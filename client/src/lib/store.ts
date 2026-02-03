@@ -95,6 +95,20 @@ export interface UserState {
   // Coaching/Strategy tracking
   seenStrategies: string[]; // Strategy IDs user has already seen
   
+  // Personal Records
+  personalBests: {
+    bestStreak: number;
+    bestStreakDate: string | null;
+    fastestMedianMs: number | null;
+    fastestMedianDate: string | null;
+    highestAccuracy: number | null;
+    highestAccuracyDate: string | null;
+    highestThroughput: number | null;
+    highestThroughputDate: string | null;
+    highestFluencyScore: number | null;
+    highestFluencyDate: string | null;
+  };
+  
   // New Progression Engine State
   progression: ProgressionState;
 
@@ -127,6 +141,9 @@ export interface UserState {
   
   // Coaching Actions
   markStrategySeen: (strategyId: string) => void;
+  
+  // Personal Records Actions
+  checkAndUpdatePersonalBests: (session: SessionStats) => string[];
   
   // Sync Actions
   syncWithBackend: () => Promise<void>;
@@ -167,6 +184,19 @@ export const useStore = create<UserState>()(
       
       seenStrategies: [],
       
+      personalBests: {
+        bestStreak: 0,
+        bestStreakDate: null,
+        fastestMedianMs: null,
+        fastestMedianDate: null,
+        highestAccuracy: null,
+        highestAccuracyDate: null,
+        highestThroughput: null,
+        highestThroughputDate: null,
+        highestFluencyScore: null,
+        highestFluencyDate: null
+      },
+      
       progression: { ...INITIAL_PROGRESSION_STATE },
       
       settings: {
@@ -197,6 +227,18 @@ export const useStore = create<UserState>()(
             lastStreakDate: progress.lastStreakDate?.toString() || null,
             hasUsedFreeDaily: progress.hasUsedFreeDaily ?? false,
             seenStrategies: (progress.seenStrategies as string[]) ?? [],
+            personalBests: (progress as any).personalBests ?? {
+              bestStreak: 0,
+              bestStreakDate: null,
+              fastestMedianMs: null,
+              fastestMedianDate: null,
+              highestAccuracy: null,
+              highestAccuracyDate: null,
+              highestThroughput: null,
+              highestThroughputDate: null,
+              highestFluencyScore: null,
+              highestFluencyDate: null
+            },
             progression: {
               level: progress.level,
               band: progress.band,
@@ -424,6 +466,68 @@ export const useStore = create<UserState>()(
         }
       },
       
+      checkAndUpdatePersonalBests: (session: SessionStats): string[] => {
+        const state = get();
+        const newRecords: string[] = [];
+        const today = new Date().toISOString().split('T')[0];
+        const currentBests = { ...state.personalBests };
+        
+        // Only count valid daily sessions
+        if (session.sessionType !== 'daily' || session.valid === false) {
+          return [];
+        }
+        
+        // Check best streak
+        if (session.bestStreak > currentBests.bestStreak) {
+          currentBests.bestStreak = session.bestStreak;
+          currentBests.bestStreakDate = today;
+          newRecords.push('streak');
+        }
+        
+        // Check fastest median response time (lower is better)
+        if (session.medianMs && session.medianMs > 0) {
+          if (currentBests.fastestMedianMs === null || session.medianMs < currentBests.fastestMedianMs) {
+            currentBests.fastestMedianMs = session.medianMs;
+            currentBests.fastestMedianDate = today;
+            newRecords.push('speed');
+          }
+        }
+        
+        // Check highest accuracy (need min 10 questions for validity)
+        if (session.totalQuestions >= 10 && session.accuracy > 0) {
+          if (currentBests.highestAccuracy === null || session.accuracy > currentBests.highestAccuracy) {
+            currentBests.highestAccuracy = session.accuracy;
+            currentBests.highestAccuracyDate = today;
+            newRecords.push('accuracy');
+          }
+        }
+        
+        // Check highest throughput (questions per second - use throughputQps or fall back to qps field from backend)
+        const throughput = session.throughputQps ?? (session as any).qps;
+        if (throughput && throughput > 0) {
+          if (currentBests.highestThroughput === null || throughput > currentBests.highestThroughput) {
+            currentBests.highestThroughput = throughput;
+            currentBests.highestThroughputDate = today;
+            newRecords.push('throughput');
+          }
+        }
+        
+        // Check highest fluency score
+        if (session.fluencyScore && session.fluencyScore > 0) {
+          if (currentBests.highestFluencyScore === null || session.fluencyScore > currentBests.highestFluencyScore) {
+            currentBests.highestFluencyScore = session.fluencyScore;
+            currentBests.highestFluencyDate = today;
+            newRecords.push('fluency');
+          }
+        }
+        
+        if (newRecords.length > 0) {
+          set({ personalBests: currentBests });
+        }
+        
+        return newRecords;
+      },
+      
       syncWithBackend: async () => {
         const state = get();
         if (!state.uid) return;
@@ -446,6 +550,7 @@ export const useStore = create<UserState>()(
             history: state.progression.history as any,
             hasUsedFreeDaily: state.hasUsedFreeDaily,
             seenStrategies: state.seenStrategies,
+            personalBests: state.personalBests,
             soundOn: state.settings.soundOn,
             hapticsOn: state.settings.hapticsOn,
             difficultyPreference: state.settings.difficultyPreference,
@@ -496,6 +601,18 @@ export const useStore = create<UserState>()(
             lastStreakDate: progress.lastStreakDate?.toString() || null,
             hasUsedFreeDaily: progress.hasUsedFreeDaily ?? false,
             seenStrategies: (progress.seenStrategies as string[]) ?? [],
+            personalBests: (progress as any).personalBests ?? {
+              bestStreak: 0,
+              bestStreakDate: null,
+              fastestMedianMs: null,
+              fastestMedianDate: null,
+              highestAccuracy: null,
+              highestAccuracyDate: null,
+              highestThroughput: null,
+              highestThroughputDate: null,
+              highestFluencyScore: null,
+              highestFluencyDate: null
+            },
             progression: {
               level: progress.level,
               band: progress.band,
