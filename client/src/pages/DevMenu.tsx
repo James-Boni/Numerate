@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { useStore } from '@/lib/store';
 import { Card } from '@/components/ui/card';
@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useLocation } from 'wouter';
-import { ArrowLeft, Navigation, Database, Trash2, AlertTriangle, X, CheckCircle, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Navigation, Database, Trash2, AlertTriangle, X, CheckCircle, BarChart3, Crown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getDifficultyProfile } from '@/lib/logic/difficulty-profile';
 import { generateQuestionForLevel } from '@/lib/logic/generator_adapter';
+import { useAccountStore, isPremiumActive, EntitlementStatus } from '@/lib/services';
 
 const SHOW_DEV_MENU = import.meta.env.MODE !== 'production';
 
@@ -35,6 +36,20 @@ export default function DevMenu() {
   const [startingLevelError, setStartingLevelError] = useState('');
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+
+  const { 
+    entitlement, 
+    initAppSession, 
+    devSetPremium, 
+    devSetEntitlementStatus, 
+    devSetExpiry 
+  } = useAccountStore();
+
+  useEffect(() => {
+    initAppSession();
+  }, [initAppSession]);
+
+  const isPremium = isPremiumActive(entitlement);
 
   if (!SHOW_DEV_MENU) {
     return null;
@@ -201,6 +216,107 @@ export default function DevMenu() {
             </div>
             {levelError && <p className="text-rose-400 text-xs">{levelError}</p>}
             <p className="text-slate-500 text-xs">Current: {level}</p>
+          </div>
+        </Card>
+
+        <Card className="bg-slate-800 border-slate-700 p-4 space-y-4">
+          <div className="flex items-center gap-2 text-amber-400 mb-2">
+            <Crown size={16} />
+            <h3 className="text-sm font-bold uppercase tracking-wider">Entitlement Controls</h3>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-300 text-sm">Premium Mode</span>
+              <Switch
+                checked={isPremium}
+                onCheckedChange={async (checked) => {
+                  await devSetPremium(checked);
+                  showToast(checked ? 'Premium enabled' : 'Premium disabled');
+                }}
+                data-testid="switch-premium-mode"
+              />
+            </div>
+            <p className="text-slate-500 text-xs">
+              Current: {entitlement.tier} ({entitlement.status})
+            </p>
+          </div>
+
+          <div className="border-t border-slate-700 pt-4 space-y-2">
+            <label className="text-slate-300 text-sm block">Entitlement Status</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['inactive', 'active', 'grace', 'expired'] as const).map((status) => (
+                <Button
+                  key={status}
+                  variant="outline"
+                  size="sm"
+                  className={`bg-slate-700 border-slate-600 text-white hover:bg-slate-600 ${
+                    entitlement.status === status ? 'ring-2 ring-amber-400' : ''
+                  }`}
+                  onClick={async () => {
+                    await devSetEntitlementStatus(status);
+                    showToast(`Status set to ${status}`);
+                  }}
+                >
+                  {status}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-700 pt-4 space-y-2">
+            <label className="text-slate-300 text-sm block">Expiry Simulation</label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                onClick={async () => {
+                  await devSetExpiry(-1);
+                  showToast('Set as expired (1 hour ago)');
+                }}
+              >
+                Expired
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                onClick={async () => {
+                  await devSetExpiry(24);
+                  showToast('Expires in 24 hours');
+                }}
+              >
+                24h remaining
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                onClick={async () => {
+                  await devSetExpiry(720);
+                  showToast('Expires in 30 days');
+                }}
+              >
+                30d remaining
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                onClick={async () => {
+                  await devSetExpiry(null);
+                  showToast('No expiry set');
+                }}
+              >
+                No expiry
+              </Button>
+            </div>
+            {entitlement.expiresAt && (
+              <p className="text-slate-500 text-xs">
+                Expires: {new Date(entitlement.expiresAt).toLocaleString()}
+              </p>
+            )}
           </div>
         </Card>
 

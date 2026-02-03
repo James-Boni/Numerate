@@ -1,0 +1,214 @@
+Master prompt: iOS readiness framework (SIWA + IAP + user accounts scaffolding)
+We are preparing Numerate for iOS integration later (Expo iOS build), specifically:
+- Sign in with Apple (SIWA)
+- Apple In-App Purchases (IAP) subscriptions
+- A clean framework for individual user accounts + entitlements
+WITHOUT fully implementing Apple integration yet.
+
+This is a scaffolding task:
+- Create the architecture, interfaces, and safe local persistence now.
+- Use dev/mock implementations to keep the app runnable without App Store Connect.
+- Do NOT change game logic, XP logic, difficulty logic, or Progress charts.
+- Do NOT add new UI except minimal Settings rows needed to show account state + restore purchases later.
+
+This must follow these principles from the roadmap:
+- Apple ID -> internal UUID
+- No passwords stored
+- Persistent secure session storage on device
+- Per-user data stored: UUID, level, XP, progress history, entitlement status
+- Apple IAP only on iOS; backend stores entitlement + expiry/renewal state
+- Do not store payment card data or raw Apple credentials :contentReference[oaicite:1]{index=1}
+
+====================================================================
+A) DATA MODEL (SINGLE SOURCE OF TRUTH)
+====================================================================
+Create a single canonical user model used throughout the app:
+
+UserAccount {
+  id: string;                 // internal UUID (NOT Apple identifier)
+  authProvider: "anonymous" | "apple";
+  appleSub?: string;          // optional stable Apple subject identifier IF available; never used as primary key
+  createdAt: number;
+  lastLoginAt: number;
+
+  level: number;
+  xpTotal: number;
+
+  // Progress & history references (or stored data)
+  progressHistory: DailyAggregates[] | SessionRecord[];
+
+  entitlement: {
+    tier: "free" | "premium";
+    source: "none" | "apple_iap";
+    status: "inactive" | "active" | "grace" | "expired";
+    productId?: string;
+    originalTransactionId?: string;
+    expiresAt?: number;       // unix ms
+    updatedAt: number;
+  };
+
+  // feature flags / housekeeping
+  hasCompletedAssessment: boolean;
+  initialAssessmentLevel?: number;
+}
+
+Rules:
+1) user.level remains the single source of truth for difficulty.
+2) entitlement status is derived from entitlement fields only.
+3) assessment placement is separate; never overwritten by reset.
+4) NEVER store passwords.
+5) NEVER store payment card data.
+6) NEVER store Apple identity token long-term.
+
+====================================================================
+B) AUTH FRAMEWORK (SIWA-READY WITHOUT IMPLEMENTING SIWA NOW)
+====================================================================
+Create an AuthService interface with two implementations:
+- MockAuthService (dev / current behavior)
+- AppleAuthService (stubbed now; real SIWA later)
+
+AuthService methods:
+- getCurrentUser(): Promise<UserAccount | null>
+- signIn(): Promise<UserAccount>           // dev: creates/loads local user; later: SIWA
+- signOut(): Promise<void>
+- linkAppleAccount(): Promise<UserAccount> // later: upgrade anonymous -> apple
+- getAuthState(): { status: "signed_out" | "signed_in"; provider: ... }
+
+Important:
+- Current app can continue using anonymous mode, but it must pass through AuthService.
+- Prepare for “anonymous first, link Apple later” (common pattern).
+
+Device storage:
+- Store only internal UUID + provider + minimal session marker in secure storage if available.
+- Persist user data in your existing persistence layer.
+- Do NOT persist Apple tokens.
+
+====================================================================
+C) ENTITLEMENTS / IAP FRAMEWORK (STUB NOW, REAL LATER)
+====================================================================
+Create a BillingService interface with:
+- MockBillingService (dev: toggle premium, simulate expiry)
+- AppleIAPService (stub now; real StoreKit later)
+
+BillingService methods:
+- getEntitlement(): Promise<Entitlement>
+- purchasePremium(productId: string): Promise<Entitlement>
+- restorePurchases(): Promise<Entitlement>
+- syncEntitlement(): Promise<Entitlement> // later: validate receipt/server, update expiry
+
+Rules:
+- UI should only ever display entitlement based on BillingService.getEntitlement().
+- Do not hardcode “premium” anywhere else.
+
+Add product constants:
+- PREMIUM_MONTHLY_PRODUCT_ID
+- PREMIUM_YEARLY_PRODUCT_ID
+(Use placeholder IDs now; make it easy to swap later)
+
+====================================================================
+D) SERVER / BACKEND CONTRACT (PLACEHOLDER, NO REAL BACKEND REQUIRED TODAY)
+====================================================================
+Define a thin ApiClient contract (even if currently unused) with endpoints planned:
+
+POST /auth/apple
+- input: appleIdentityToken (short-lived), nonce (optional)
+- output: { user: UserAccount, session: ... }  (session could be JWT later)
+
+GET /me
+- output: { user: UserAccount, entitlement: Entitlement }
+
+POST /billing/apple/confirm
+- input: receipt / transaction payload (StoreKit 2 later)
+- output: updated Entitlement
+
+POST /billing/apple/notifications
+- for App Store server notifications later
+
+Implementation today:
+- Provide a LocalApiClient (mock) that returns local user state.
+- The rest of the app must depend on the contract, not concrete network calls.
+
+====================================================================
+E) STATE MANAGEMENT INTEGRATION (IMPORTANT)
+====================================================================
+Integrate the above services cleanly into the existing store:
+
+- Create a single “account slice” or “account store”:
+  - account.user
+  - account.entitlement
+  - account.isLoading
+  - actions: initAppSession(), signIn(), signOut(), restorePurchases(), refreshEntitlement()
+
+App startup sequence:
+1) initAppSession():
+   - load persisted user UUID + provider
+   - hydrate UserAccount
+   - load entitlement from BillingService
+   - set store state
+
+Acceptance:
+- App should behave exactly as today for gameplay.
+- But it now has a real account/entitlement framework ready for SIWA/IAP.
+
+====================================================================
+F) MINIMAL UI (ONLY WHAT IS NECESSARY NOW)
+====================================================================
+Do NOT clutter UI.
+Add only minimal UI surfaces:
+
+Settings:
+- Account section:
+  - “Account: Guest” or “Account: Apple”
+  - Button: “Sign in with Apple” (only show if AppleAuthService available; otherwise show “Coming soon” or hide in production)
+- Premium section:
+  - “Restore Purchases” button (calls BillingService.restorePurchases)
+  - Premium status label (Free/Premium)
+
+Dev menu (dev-only):
+- Toggle premium entitlement via MockBillingService
+- Set entitlement expiry (simulate expired/grace/active)
+- Force sign-in state for testing (without real Apple)
+
+====================================================================
+G) IOS/EXPO COMPATIBILITY PREP (NO APP STORE CONNECT REQUIRED)
+====================================================================
+Prepare the project for later iOS integration:
+
+1) Centralize configuration:
+- app.config / config file for bundle id, schemes, etc.
+- add placeholders for:
+  - iOS bundle identifier
+  - associated domains (later)
+  - entitlement capabilities notes (later)
+
+2) Add dependency placeholders (do NOT fully wire if not needed now):
+- expo-apple-authentication (only if safe to add now)
+- storekit / IAP library choice: decide later; stub now
+
+3) Ensure secure storage mechanism is abstracted:
+- if Expo: SecureStore wrapper
+- if web: localStorage wrapper
+
+The app must still run on web and current environment after these changes.
+
+====================================================================
+H) SECURITY RULES (FROM ROADMAP)
+====================================================================
+- HTTPS everywhere (when backend exists)
+- secure token storage on device
+- server-side validation of XP and entitlements later
+- mitigate: XP tampering, entitlement spoofing, accidental data leakage :contentReference[oaicite:2]{index=2}
+
+Today’s scope:
+- ensure entitlement cannot be permanently set to premium via UI in production builds
+- only dev tools can toggle premium; production must rely on BillingService
+
+====================================================================
+I) DELIVERABLES
+====================================================================
+After completing:
+1) List files added/changed
+2) Show where AuthService and BillingService are used
+3) Confirm the app still compiles and runs
+4) Confirm gameplay unaffected
+5) Confirm user model includes: UUID, level, XP, progress history, entitlement :contentReference[oaicite:3]{index

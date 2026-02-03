@@ -1,22 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { useStore } from '@/lib/store';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { Volume2, Zap, LogOut, Trash2, ChevronRight, User, AlertTriangle, X, Code } from 'lucide-react';
+import { Volume2, Zap, LogOut, Trash2, ChevronRight, User, AlertTriangle, X, Code, Crown, RotateCcw, Apple } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'wouter';
+import { useAccountStore, isPremiumActive, authService } from '@/lib/services';
 
 const SHOW_DEV_MENU = import.meta.env.MODE !== 'production';
 
 export default function Settings() {
   const [, navigate] = useLocation();
   const { settings, updateSettings, logout, resetProgress, email, hasCompletedAssessment, startingLevel } = useStore();
+  const { entitlement, authState, restorePurchases, linkApple, initAppSession } = useAccountStore();
   const [showResetModal, setShowResetModal] = useState(false);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  useEffect(() => {
+    initAppSession();
+  }, [initAppSession]);
+
+  const handleRestorePurchases = async () => {
+    setIsRestoring(true);
+    try {
+      await restorePurchases();
+      setToast({ message: 'Purchases restored successfully.', visible: true });
+    } catch (error) {
+      setToast({ message: 'Failed to restore purchases.', visible: true });
+    }
+    setIsRestoring(false);
+    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+  };
+
+  const handleLinkApple = async () => {
+    const success = await linkApple();
+    if (success) {
+      setToast({ message: 'Apple account linked!', visible: true });
+    } else {
+      setToast({ message: 'Apple Sign-In coming soon.', visible: true });
+    }
+    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+  };
+
+  const isPremium = isPremiumActive(entitlement);
+  const isAppleLinked = authState.provider === 'apple';
+  const isAppleAvailable = authService.isAppleAuthAvailable();
 
   const handleResetClick = () => {
     if (!hasCompletedAssessment) {
@@ -50,17 +83,63 @@ export default function Settings() {
 
         <div className="space-y-3">
           <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Account</h3>
-          <Card className="p-4 border-none shadow-sm flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                <User size={20} />
+          <Card className="divide-y divide-slate-50 border-none shadow-sm overflow-hidden">
+            <div className="p-4 flex items-center justify-between bg-white">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isAppleLinked ? 'bg-slate-900' : 'bg-indigo-100'}`}>
+                  {isAppleLinked ? <Apple size={20} className="text-white" /> : <User size={20} className="text-indigo-600" />}
+                </div>
+                <div>
+                  <p className="font-bold text-sm">{isAppleLinked ? 'Apple Account' : 'Guest User'}</p>
+                  <p className="text-xs text-slate-400">{isPremium ? 'Premium' : 'Free Tier'}</p>
+                </div>
               </div>
-              <div>
-                <p className="font-bold text-sm">{email || 'Guest User'}</p>
-                <p className="text-xs text-slate-400">Free Tier</p>
-              </div>
+              {!isAppleLinked && (
+                <button 
+                  onClick={handleLinkApple}
+                  className="text-primary text-xs font-bold uppercase tracking-wider"
+                  data-testid="button-link-apple"
+                >
+                  {isAppleAvailable ? 'Link Apple' : 'Coming Soon'}
+                </button>
+              )}
             </div>
-            <button className="text-primary text-xs font-bold uppercase tracking-wider">Upgrade</button>
+          </Card>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Premium</h3>
+          <Card className="divide-y divide-slate-50 border-none shadow-sm overflow-hidden">
+            <div className="p-4 flex items-center justify-between bg-white">
+              <div className="flex items-center gap-3">
+                <Crown size={20} className={isPremium ? 'text-amber-500' : 'text-slate-300'} />
+                <div>
+                  <span className="font-medium text-sm">{isPremium ? 'Premium Active' : 'Free Plan'}</span>
+                  {isPremium && entitlement.expiresAt && (
+                    <p className="text-xs text-slate-400">
+                      {entitlement.status === 'grace' ? 'Grace period' : 
+                       entitlement.status === 'expired' ? 'Expired' :
+                       `Renews ${new Date(entitlement.expiresAt).toLocaleDateString()}`}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {!isPremium && (
+                <span className="text-xs text-slate-400">Coming soon</span>
+              )}
+            </div>
+            <button 
+              onClick={handleRestorePurchases}
+              disabled={isRestoring}
+              className="w-full p-4 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors disabled:opacity-50"
+              data-testid="button-restore-purchases"
+            >
+              <div className="flex items-center gap-3 text-slate-600">
+                <RotateCcw size={20} className={isRestoring ? 'animate-spin' : ''} />
+                <span className="font-medium text-sm">Restore Purchases</span>
+              </div>
+              <ChevronRight size={16} className="text-slate-300" />
+            </button>
           </Card>
         </div>
 

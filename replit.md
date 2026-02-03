@@ -116,7 +116,30 @@ Preferred communication style: Simple, everyday language.
 ### Session Storage
 - **connect-pg-simple**: PostgreSQL session store (available but not currently used for auth)
 
-### No External Auth Service
-- Current implementation uses simple auto-login for MVP
-- Firebase Auth was specified in requirements but not yet implemented
-- Backend generates UUIDs for user identification
+### iOS Readiness Framework (Scaffolding)
+**Location**: `client/src/lib/services/`
+
+Scaffolding for future iOS integration (SIWA + IAP):
+
+**Core Services**:
+- `types.ts`: Canonical UserAccount and Entitlement models
+- `auth-service.ts`: AuthService interface with MockAuthService (dev) and AppleAuthService (stub)
+- `billing-service.ts`: BillingService interface with MockBillingService (dev entitlement controls)
+- `storage-service.ts`: Secure storage abstraction (localStorage now, SecureStore for Expo later)
+- `api-client.ts`: Backend API contract with LocalApiClient mock
+- `account-store.ts`: Zustand store for account/entitlement state
+- `ios-config.ts`: iOS/Expo configuration placeholders
+
+**Security Rules**:
+- Never store passwords, payment card data, or Apple identity tokens
+- Production builds cannot toggle premium via dev methods
+- Entitlement displayed only from BillingService.getEntitlement()
+
+**UI Surfaces**:
+- Settings: Account section (Guest/Apple status), Premium section (Restore Purchases)
+- DevMenu: Entitlement controls (toggle premium, set status, simulate expiry)
+
+**Key Patterns**:
+- Anonymous-first, link Apple later
+- Internal UUID as primary key (not Apple subject identifier)
+- Entitlement status derived from entitlement fields only
