@@ -42,6 +42,9 @@ export const userProgress = pgTable("user_progress", {
     ps?: number;
   }>>().notNull().default([]),
   
+  // Paywall
+  hasUsedFreeDaily: boolean("has_used_free_daily").notNull().default(false),
+  
   // Settings
   soundOn: boolean("sound_on").notNull().default(true),
   hapticsOn: boolean("haptics_on").notNull().default(true),

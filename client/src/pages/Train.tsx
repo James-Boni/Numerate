@@ -1,23 +1,56 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { useStore } from '@/lib/store';
 import { useLocation } from 'wouter';
-import { Zap, Play, Flame, Timer, Trophy, ChevronRight } from 'lucide-react';
+import { Zap, Play, Flame, Timer, Trophy, ChevronRight, Lock } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { xpRequiredToAdvance } from '@/lib/logic/xp-system';
+import { useAccountStore, isPremiumActive } from '@/lib/services/account-store';
+import { PaywallScreen } from '@/components/game/PaywallScreen';
 
 export default function Train() {
-  const { level, lifetimeXP, streakCount, hasCompletedAssessment, quickFireHighScore, sessions, xpIntoLevel } = useStore();
+  const { level, lifetimeXP, streakCount, hasCompletedAssessment, quickFireHighScore, sessions, xpIntoLevel, hasUsedFreeDaily } = useStore();
+  const { entitlement, refreshEntitlement } = useAccountStore();
+  const [showPaywall, setShowPaywall] = useState(false);
   const [_, setLocation] = useLocation();
+  
+  const [entitlementChecked, setEntitlementChecked] = useState(false);
+  
+  useEffect(() => {
+    const checkEntitlement = async () => {
+      await refreshEntitlement();
+      setEntitlementChecked(true);
+    };
+    checkEntitlement();
+  }, []);
+  
+  const isPremium = isPremiumActive(entitlement);
+  // Default to locked until entitlement is verified, then check actual status
+  const needsSubscription = entitlementChecked ? (hasUsedFreeDaily && !isPremium) : false;
+  const showLoadingButton = !entitlementChecked && hasUsedFreeDaily;
   
   const xpNeeded = xpRequiredToAdvance(level);
   const progressPercent = Math.min(100, (xpIntoLevel / xpNeeded) * 100);
   const xpRemaining = Math.max(0, xpNeeded - xpIntoLevel);
 
   const quickFireAttempts = sessions.filter(s => s.sessionType === 'quick_fire').length;
+
+  if (showPaywall) {
+    return (
+      <PaywallScreen 
+        onSubscribed={() => {
+          setShowPaywall(false);
+          setLocation('/game');
+        }}
+        onRestore={() => {
+          setShowPaywall(false);
+        }}
+      />
+    );
+  }
 
   return (
     <MobileLayout className="bg-white">
@@ -84,11 +117,33 @@ export default function Train() {
               </div>
 
               <Button 
-                onClick={() => setLocation('/game')}
-                className="w-full h-12 bg-primary text-white hover:opacity-90 font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-primary/10"
+                onClick={() => {
+                  if (needsSubscription) {
+                    setShowPaywall(true);
+                  } else {
+                    setLocation('/game');
+                  }
+                }}
+                disabled={showLoadingButton}
+                className="w-full h-12 bg-primary text-white hover:opacity-90 font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50"
+                data-testid="button-start-training"
               >
-                <Play size={18} fill="currentColor" />
-                Start Training
+                {showLoadingButton ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Loading...
+                  </>
+                ) : needsSubscription ? (
+                  <>
+                    <Lock size={18} />
+                    Unlock Training
+                  </>
+                ) : (
+                  <>
+                    <Play size={18} fill="currentColor" />
+                    Start Training
+                  </>
+                )}
               </Button>
             </div>
           </Card>

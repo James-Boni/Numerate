@@ -14,6 +14,9 @@ import { xpRequiredToAdvance } from '@/lib/logic/xp-system';
 import { ContextualMessage } from '@/components/game/ContextualMessage';
 import { SparkleEffect } from '@/components/game/SparkleEffect';
 import { Confetti } from '@/components/game/Confetti';
+import { ReassuranceScreen } from '@/components/game/ReassuranceScreen';
+import { PaywallScreen } from '@/components/game/PaywallScreen';
+import { useAccountStore, isPremiumActive } from '@/lib/services/account-store';
 
 function LevelUpCelebration({ 
   levelBefore, 
@@ -225,17 +228,36 @@ function CountUp({ value, duration = 1, delay = 0, onTick, suffix = '' }: {
 }
 
 export default function Game() {
-  const [step, setStep] = useState<'active' | 'results' | 'levelup'>('active');
+  const [step, setStep] = useState<'active' | 'results' | 'levelup' | 'reassurance' | 'paywall' | 'blocked'>('active');
   const [results, setResults] = useState<SessionStats | null>(null);
+  const [entitlementChecked, setEntitlementChecked] = useState(false);
   const [_, setLocation] = useLocation();
-  const { currentTier, saveSession, settings } = useStore();
+  const { currentTier, saveSession, settings, hasUsedFreeDaily, markFreeTrialUsed } = useStore();
+  const { entitlement, refreshEntitlement } = useAccountStore();
   const revealRun = React.useRef(false);
   const levelUpShownRef = React.useRef(false);
 
-  // Pre-initialize audio context on mount
+  // Check entitlement on mount and determine if user should be blocked
   useEffect(() => {
+    const checkAccess = async () => {
+      await refreshEntitlement();
+      setEntitlementChecked(true);
+    };
+    checkAccess();
     AudioManager.init();
   }, []);
+
+  // Determine if this is first free session AFTER entitlement is checked
+  const isPremium = isPremiumActive(entitlement);
+  const isFirstFreeSession = !hasUsedFreeDaily && !isPremium;
+  const shouldBlockAccess = hasUsedFreeDaily && !isPremium;
+
+  // Block access if user has used free trial and is not premium
+  useEffect(() => {
+    if (entitlementChecked && shouldBlockAccess && step === 'active') {
+      setStep('blocked');
+    }
+  }, [entitlementChecked, shouldBlockAccess, step]);
 
   const handleComplete = (stats: SessionStats) => {
     console.log(`[SESSION_FLOW] Training complete: ${Date.now()}`, stats);
@@ -275,6 +297,20 @@ export default function Game() {
   }, [step, results, settings.soundOn]);
 
   if (step === 'active') {
+    // Wait for entitlement check before allowing session
+    if (!entitlementChecked) {
+      return (
+        <MobileLayout className="bg-white">
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-slate-500">Loading...</p>
+            </div>
+          </div>
+        </MobileLayout>
+      );
+    }
+    
     return (
       <SessionScreen 
         mode="training"
@@ -294,8 +330,45 @@ export default function Game() {
         xpIntoLevelBefore={results.xpIntoLevelBefore ?? 0}
         xpIntoLevelAfter={results.xpIntoLevelAfter ?? 0}
         levelUpCount={results.levelUpCount ?? 1}
-        onComplete={() => setLocation('/train')}
+        onComplete={() => {
+          if (isFirstFreeSession) {
+            markFreeTrialUsed();
+            setStep('reassurance');
+          } else {
+            setLocation('/train');
+          }
+        }}
         soundOn={settings.soundOn}
+      />
+    );
+  }
+
+  if (step === 'reassurance') {
+    return (
+      <ReassuranceScreen 
+        onContinue={() => setStep('paywall')}
+      />
+    );
+  }
+
+  if (step === 'paywall' || step === 'blocked') {
+    return (
+      <PaywallScreen 
+        onSubscribed={() => {
+          if (step === 'blocked') {
+            setStep('active');
+          } else {
+            setLocation('/train');
+          }
+        }}
+        onRestore={() => {
+          if (step === 'blocked') {
+            setStep('active');
+          } else {
+            setLocation('/train');
+          }
+        }}
+        onDismiss={step === 'blocked' ? undefined : () => setLocation('/train')}
       />
     );
   }
@@ -405,6 +478,9 @@ export default function Game() {
               if (hasLevelUp && !levelUpShownRef.current) {
                 levelUpShownRef.current = true;
                 setStep('levelup');
+              } else if (isFirstFreeSession) {
+                markFreeTrialUsed();
+                setStep('reassurance');
               } else {
                 setLocation('/train');
               }

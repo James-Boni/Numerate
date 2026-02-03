@@ -80,6 +80,9 @@ export interface UserState {
   quickFireIntroSeen: boolean;
   quickFireHighScore: number;
   
+  // Paywall
+  hasUsedFreeDaily: boolean;
+  
   // New Progression Engine State
   progression: ProgressionState;
 
@@ -106,6 +109,9 @@ export interface UserState {
   // Quick Fire Actions
   setQuickFireIntroSeen: () => void;
   updateQuickFireHighScore: (score: number) => boolean;
+  
+  // Paywall Actions
+  markFreeTrialUsed: () => void;
   
   // Sync Actions
   syncWithBackend: () => Promise<void>;
@@ -142,6 +148,8 @@ export const useStore = create<UserState>()(
       quickFireIntroSeen: false,
       quickFireHighScore: 0,
       
+      hasUsedFreeDaily: false,
+      
       progression: { ...INITIAL_PROGRESSION_STATE },
       
       settings: {
@@ -170,6 +178,7 @@ export const useStore = create<UserState>()(
             lifetimeXP: progress.lifetimeXP,
             streakCount: progress.streakCount,
             lastStreakDate: progress.lastStreakDate?.toString() || null,
+            hasUsedFreeDaily: progress.hasUsedFreeDaily ?? false,
             progression: {
               level: progress.level,
               band: progress.band,
@@ -381,6 +390,15 @@ export const useStore = create<UserState>()(
         return false;
       },
       
+      markFreeTrialUsed: () => {
+        set({ hasUsedFreeDaily: true });
+        // Sync with backend
+        const state = get();
+        if (state.uid) {
+          get().syncWithBackend();
+        }
+      },
+      
       syncWithBackend: async () => {
         const state = get();
         if (!state.uid) return;
@@ -401,6 +419,7 @@ export const useStore = create<UserState>()(
             goodStreak: state.progression.goodStreak,
             poorStreak: state.progression.poorStreak,
             history: state.progression.history as any,
+            hasUsedFreeDaily: state.hasUsedFreeDaily,
             soundOn: state.settings.soundOn,
             hapticsOn: state.settings.hapticsOn,
             difficultyPreference: state.settings.difficultyPreference,
@@ -449,6 +468,7 @@ export const useStore = create<UserState>()(
             lifetimeXP: progress.lifetimeXP,
             streakCount: progress.streakCount,
             lastStreakDate: progress.lastStreakDate?.toString() || null,
+            hasUsedFreeDaily: progress.hasUsedFreeDaily ?? false,
             progression: {
               level: progress.level,
               band: progress.band,
