@@ -21,6 +21,7 @@ import { StrategyLesson } from '@/components/game/StrategyLesson';
 import { PersonalRecordCelebration } from '@/components/game/PersonalRecordCelebration';
 import { useAccountStore, isPremiumActive } from '@/lib/services/account-store';
 import { detectWeakness, WeaknessPattern } from '@/lib/logic/weakness-detector';
+import { DailyStreakCelebration, isMilestone } from '@/components/game/DailyStreakCelebration';
 
 function LevelUpCelebration({ 
   levelBefore, 
@@ -42,6 +43,8 @@ function LevelUpCelebration({
   const [displayLevel, setDisplayLevel] = useState(levelBefore);
   const [barProgress, setBarProgress] = useState(0);
   const [animationPhase, setAnimationPhase] = useState<'filling' | 'leveling' | 'complete'>('filling');
+  const [showGlow, setShowGlow] = useState(false);
+  const [showParticles, setShowParticles] = useState(false);
   const animatedRef = useRef(false);
 
   useEffect(() => {
@@ -69,13 +72,19 @@ function LevelUpCelebration({
           
           if (!isLast) {
             setTimeout(() => {
-              if (soundOn) AudioManager.playLevelUp();
+              if (soundOn) AudioManager.playLevelUpEnhanced(1);
               setAnimationPhase('leveling');
+              setShowGlow(true);
+              setShowParticles(true);
+              setTimeout(() => {
+                setShowGlow(false);
+                setShowParticles(false);
+              }, 400);
               setBarProgress(0);
             }, baseStepDuration * 0.6);
           } else {
             setTimeout(() => {
-              if (soundOn) AudioManager.playLevelUp();
+              if (soundOn) AudioManager.playLevelUpEnhanced(levelUpCount);
               setAnimationPhase('complete');
             }, baseStepDuration * 0.4);
           }
@@ -104,42 +113,119 @@ function LevelUpCelebration({
   useEffect(() => {
     if (animationPhase === 'complete') {
       setShowConfetti(true);
+      setShowGlow(true);
     }
   }, [animationPhase]);
 
   return (
-    <MobileLayout className="bg-gradient-to-b from-primary/5 to-white">
-      <Confetti active={showConfetti} originX={50} originY={40} count={50} />
+    <MobileLayout className="bg-gradient-to-b from-primary/5 to-white overflow-hidden">
+      <Confetti active={showConfetti} originX={50} originY={40} count={levelUpCount > 1 ? 80 : 50} />
       
-      <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8">
+      {/* Screen flash on level up */}
+      <AnimatePresence>
+        {showGlow && (
+          <motion.div
+            className="absolute inset-0 bg-primary/10 pointer-events-none z-10"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          />
+        )}
+      </AnimatePresence>
+      
+      {/* Radial particles */}
+      <AnimatePresence>
+        {showParticles && (
+          <>
+            {Array.from({ length: 16 }).map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-3 h-3 rounded-full bg-primary"
+                style={{ left: '50%', top: '40%' }}
+                initial={{ opacity: 1, scale: 0, x: 0, y: 0 }}
+                animate={{ 
+                  opacity: 0, 
+                  scale: 1.5,
+                  x: Math.cos((i / 16) * Math.PI * 2) * 150,
+                  y: Math.sin((i / 16) * Math.PI * 2) * 150
+                }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+              />
+            ))}
+          </>
+        )}
+      </AnimatePresence>
+      
+      <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8 relative z-20">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center space-y-2"
         >
           <motion.div
-            animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
-            transition={{ duration: 0.6, repeat: animationPhase === 'leveling' ? Infinity : 0 }}
+            animate={animationPhase === 'leveling' ? { 
+              scale: [1, 1.3, 1], 
+              rotate: [0, 10, -10, 0],
+              y: [0, -10, 0]
+            } : { scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+            transition={{ duration: 0.5, repeat: animationPhase === 'leveling' ? Infinity : 0 }}
           >
             <ChevronUp size={48} className="text-primary mx-auto" />
           </motion.div>
-          <h1 className="text-3xl font-bold text-slate-900">Level Up!</h1>
+          <motion.h1 
+            className="text-3xl font-bold text-slate-900"
+            animate={animationPhase === 'complete' ? { scale: [1, 1.1, 1] } : {}}
+            transition={{ duration: 0.3 }}
+          >
+            Level Up!
+          </motion.h1>
         </motion.div>
 
         <motion.div 
-          className="w-full max-w-xs bg-white rounded-3xl p-8 shadow-lg shadow-primary/10 text-center"
+          className="w-full max-w-xs bg-white rounded-3xl p-8 shadow-lg shadow-primary/10 text-center relative overflow-hidden"
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.2 }}
         >
+          {/* Shimmer effect on complete */}
+          {animationPhase === 'complete' && (
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+              initial={{ x: '-100%' }}
+              animate={{ x: '200%' }}
+              transition={{ duration: 1, repeat: 2, repeatDelay: 0.5 }}
+            />
+          )}
+          
           <motion.div 
-            className="text-8xl font-black text-primary mb-4"
+            className="text-8xl font-black text-primary mb-4 relative"
             key={displayLevel}
-            initial={{ scale: 0.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            initial={{ scale: 0.5, opacity: 0, rotate: -10 }}
+            animate={{ 
+              scale: animationPhase === 'complete' ? [1, 1.15, 1] : 1, 
+              opacity: 1, 
+              rotate: 0 
+            }}
+            transition={{ 
+              type: 'spring', 
+              stiffness: 300, 
+              damping: 15,
+              scale: { delay: 0.1, duration: 0.4 }
+            }}
           >
             {displayLevel}
+            
+            {/* Glow behind number */}
+            <motion.div
+              className="absolute inset-0 blur-xl bg-primary/30 -z-10"
+              animate={{ 
+                opacity: animationPhase === 'complete' ? [0.3, 0.6, 0.3] : 0,
+                scale: animationPhase === 'complete' ? [1, 1.2, 1] : 1
+              }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            />
           </motion.div>
 
           <div className="space-y-2">
@@ -152,38 +238,46 @@ function LevelUpCelebration({
               />
               {animationPhase === 'leveling' && (
                 <motion.div
-                  className="absolute inset-0 bg-primary/30"
+                  className="absolute inset-0 bg-primary/50"
                   animate={{ opacity: [0, 1, 0] }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ duration: 0.2 }}
                 />
               )}
             </div>
-            <p className="text-sm text-slate-500">
+            <motion.p 
+              className="text-sm text-slate-500"
+              animate={animationPhase === 'complete' ? { color: '#0d9488' } : {}}
+            >
               {animationPhase === 'complete' ? `Level ${levelAfter} unlocked!` : 'Leveling up...'}
-            </p>
+            </motion.p>
           </div>
         </motion.div>
 
         {levelUpCount > 1 && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="bg-amber-50 text-amber-700 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2"
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ delay: 0.5, type: 'spring' }}
+            className="bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 px-6 py-3 rounded-full text-base font-bold flex items-center gap-2 shadow-lg shadow-amber-200/50"
           >
-            <Star size={16} className="fill-amber-500 text-amber-500" />
+            <motion.div
+              animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] }}
+              transition={{ duration: 0.5, repeat: 3 }}
+            >
+              <Star size={20} className="fill-amber-500 text-amber-500" />
+            </motion.div>
             {levelUpCount} levels gained!
           </motion.div>
         )}
 
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: animationPhase === 'complete' ? 1 : 0 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: animationPhase === 'complete' ? 1 : 0, y: animationPhase === 'complete' ? 0 : 20 }}
           transition={{ delay: 0.3 }}
         >
           <Button 
             size="lg" 
-            className="w-full h-14 px-12 text-lg font-semibold rounded-2xl shadow-lg shadow-primary/10"
+            className="w-full h-14 px-12 text-lg font-semibold rounded-2xl shadow-lg shadow-primary/20"
             onClick={onComplete}
           >
             Continue
@@ -232,16 +326,18 @@ function CountUp({ value, duration = 1, delay = 0, onTick, suffix = '' }: {
 }
 
 export default function Game() {
-  const [step, setStep] = useState<'daily_intro' | 'active' | 'results' | 'strategy' | 'levelup' | 'reassurance' | 'paywall' | 'blocked'>('daily_intro');
+  const [step, setStep] = useState<'daily_intro' | 'active' | 'results' | 'streak_milestone' | 'strategy' | 'levelup' | 'reassurance' | 'paywall' | 'blocked'>('daily_intro');
   const [results, setResults] = useState<SessionStats | null>(null);
   const [detectedWeakness, setDetectedWeakness] = useState<WeaknessPattern | null>(null);
   const [newPersonalRecords, setNewPersonalRecords] = useState<string[]>([]);
   const [entitlementChecked, setEntitlementChecked] = useState(false);
+  const [streakMilestoneReached, setStreakMilestoneReached] = useState<number | null>(null);
   const [_, setLocation] = useLocation();
-  const { currentTier, saveSession, settings, hasUsedFreeDaily, markFreeTrialUsed, seenStrategies, markStrategySeen, checkAndUpdatePersonalBests } = useStore();
+  const { currentTier, saveSession, settings, hasUsedFreeDaily, markFreeTrialUsed, seenStrategies, markStrategySeen, checkAndUpdatePersonalBests, streakCount } = useStore();
   const { entitlement, refreshEntitlement } = useAccountStore();
   const revealRun = React.useRef(false);
   const levelUpShownRef = React.useRef(false);
+  const streakMilestoneShownRef = React.useRef(false);
 
   // Check entitlement on mount and determine if user should be blocked
   useEffect(() => {
@@ -293,6 +389,13 @@ export default function Game() {
       }
     }
     
+    // Check for daily streak milestone (store would have updated after saveSession)
+    const newStreakCount = useStore.getState().streakCount;
+    if (isMilestone(newStreakCount)) {
+      console.log('[STREAK] Milestone reached:', newStreakCount);
+      setStreakMilestoneReached(newStreakCount);
+    }
+    
     setStep('results');
   };
 
@@ -307,14 +410,14 @@ export default function Game() {
       });
       
       if (settings.soundOn) {
-        AudioManager.playCompletion();
-        setTimeout(() => AudioManager.playEnergyRise(0.8), 200);
+        // Use performance-based session complete sound
+        AudioManager.playSessionComplete(results.accuracy);
         
         // Accuracy reveal overlap
         setTimeout(() => {
           AudioManager.playThud();
           if (results.accuracy >= 0.95) {
-            setTimeout(() => AudioManager.playSuccessBell(), 600);
+            setTimeout(() => AudioManager.playSuccessBell(), 400);
           }
         }, 900);
 
@@ -387,6 +490,35 @@ export default function Game() {
     );
   }
 
+  // Streak milestone celebration (shown after results, before strategy/levelup)
+  if (step === 'streak_milestone' && streakMilestoneReached) {
+    return (
+      <DailyStreakCelebration
+        streakCount={streakMilestoneReached}
+        onContinue={() => {
+          streakMilestoneShownRef.current = true;
+          setStreakMilestoneReached(null);
+          // Continue to next step in flow
+          if (detectedWeakness) {
+            setStep('strategy');
+          } else {
+            const hasLevelUp = results && (results.levelUpCount ?? 0) > 0;
+            if (hasLevelUp && !levelUpShownRef.current) {
+              levelUpShownRef.current = true;
+              setStep('levelup');
+            } else if (isFirstFreeSession) {
+              markFreeTrialUsed();
+              setStep('reassurance');
+            } else {
+              setLocation('/train');
+            }
+          }
+        }}
+        soundOn={settings.soundOn}
+      />
+    );
+  }
+
   if (step === 'levelup' && results && (results.levelUpCount ?? 0) > 0) {
     return (
       <LevelUpCelebration
@@ -439,19 +571,58 @@ export default function Game() {
   }
 
   const hasLevelUp = results && (results.levelUpCount ?? 0) > 0;
+  const accuracy = results?.accuracy || 0;
+  const isExcellent = accuracy >= 0.9;
+  const isGood = accuracy >= 0.7;
 
   return (
-    <MobileLayout className="bg-white">
-      <div className="flex-1 p-8 space-y-8 flex flex-col justify-center">
+    <MobileLayout className="bg-white overflow-hidden">
+      {/* Confetti for excellent performance */}
+      <Confetti 
+        active={isExcellent} 
+        originX={50} 
+        originY={30} 
+        count={40} 
+      />
+      
+      {/* Celebration glow for good performance */}
+      {isGood && (
+        <motion.div
+          className="absolute inset-0 pointer-events-none"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent" />
+        </motion.div>
+      )}
+      
+      <div className="flex-1 p-8 space-y-8 flex flex-col justify-center relative z-10">
         <div className="text-center space-y-2">
           <motion.div 
-            initial={{ scale: 0.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 text-primary rounded-full mb-4"
+            initial={{ scale: 0.5, opacity: 0, rotate: -180 }}
+            animate={{ scale: 1, opacity: 1, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+            className={clsx(
+              "inline-flex items-center justify-center w-16 h-16 rounded-full mb-4",
+              isExcellent ? "bg-primary/20 text-primary" : "bg-primary/10 text-primary"
+            )}
           >
-            <ClipboardCheck size={32} />
+            <motion.div
+              animate={isExcellent ? { scale: [1, 1.2, 1] } : {}}
+              transition={{ duration: 0.5, repeat: isExcellent ? 2 : 0 }}
+            >
+              <ClipboardCheck size={32} />
+            </motion.div>
           </motion.div>
-          <h1 className="text-3xl font-bold text-slate-900">Session Complete</h1>
+          <motion.h1 
+            className="text-3xl font-bold text-slate-900"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            {isExcellent ? 'Excellent Work!' : isGood ? 'Great Session!' : 'Session Complete'}
+          </motion.h1>
           <ContextualMessage 
             accuracy={results?.accuracy || 0}
             avgSpeed={results?.avgResponseTimeMs || 0}
@@ -461,23 +632,48 @@ export default function Game() {
         </div>
 
         <motion.div 
-          initial={{ scale: 1, opacity: 0, y: 20 }}
+          initial={{ scale: 0.95, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white border border-slate-100 rounded-[2.5rem] p-8 text-center space-y-4 shadow-sm"
+          transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+          className={clsx(
+            "relative rounded-[2.5rem] p-8 text-center space-y-4 overflow-hidden",
+            isExcellent ? "bg-gradient-to-br from-primary/5 to-primary/10 shadow-lg shadow-primary/10" : "bg-white border border-slate-100 shadow-sm"
+          )}
         >
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">XP Earned</span>
+          {/* Shimmer effect for excellent */}
+          {isExcellent && (
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -z-0"
+              initial={{ x: '-100%' }}
+              animate={{ x: '200%' }}
+              transition={{ duration: 1.5, repeat: 2, repeatDelay: 1 }}
+            />
+          )}
+          
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest relative z-10">XP Earned</span>
           <motion.div 
-            animate={{ scale: [1, 1.06, 1] }}
-            transition={{ delay: 0.2, duration: 0.8 }}
-            className="text-7xl font-black text-primary"
+            animate={{ scale: [1, 1.1, 1] }}
+            transition={{ delay: 0.5, duration: 0.5 }}
+            className={clsx(
+              "text-7xl font-black relative z-10",
+              isExcellent ? "text-primary" : "text-primary"
+            )}
           >
             <CountUp 
               value={results?.xpEarned || 0} 
-              duration={0.8} 
-              delay={0.2} 
-              onTick={() => settings.soundOn && AudioManager.playTallyTick()} 
+              duration={1} 
+              delay={0.3} 
+              onTick={() => settings.soundOn && AudioManager.playXPTick()} 
             />
+            
+            {/* Glow behind XP for excellent */}
+            {isExcellent && (
+              <motion.div
+                className="absolute inset-0 blur-xl bg-primary/20 -z-10"
+                animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.1, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              />
+            )}
           </motion.div>
         </motion.div>
 
@@ -550,8 +746,10 @@ export default function Game() {
             size="lg" 
             className="w-full h-14 text-lg font-semibold rounded-2xl shadow-lg shadow-primary/10 mt-4"
             onClick={() => {
-              // Flow: results → strategy (if weakness) → levelup (if applicable) → reassurance/train
-              if (detectedWeakness) {
+              // Flow: results → streak_milestone (if milestone) → strategy (if weakness) → levelup (if applicable) → reassurance/train
+              if (streakMilestoneReached && !streakMilestoneShownRef.current) {
+                setStep('streak_milestone');
+              } else if (detectedWeakness) {
                 setStep('strategy');
               } else if (hasLevelUp && !levelUpShownRef.current) {
                 levelUpShownRef.current = true;
@@ -564,7 +762,10 @@ export default function Game() {
               }
             }}
           >
-            {detectedWeakness ? 'See Tip' : hasLevelUp && !levelUpShownRef.current ? 'View Level Up!' : 'Continue'}
+            {streakMilestoneReached && !streakMilestoneShownRef.current ? 'View Streak!' : 
+             detectedWeakness ? 'See Tip' : 
+             hasLevelUp && !levelUpShownRef.current ? 'View Level Up!' : 
+             'Continue'}
           </Button>
         </motion.div>
 

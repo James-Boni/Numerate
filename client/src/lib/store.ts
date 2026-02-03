@@ -22,6 +22,8 @@ export interface UserSettings {
   hapticsOn: boolean;
   difficultyPreference: 'easier' | 'balanced' | 'harder';
   showDebugOverlay: boolean;
+  notificationsEnabled: boolean;
+  notificationTime: string; // HH:MM format, e.g., "09:00"
 }
 
 export interface QuestionResult {
@@ -204,6 +206,8 @@ export const useStore = create<UserState>()(
         hapticsOn: true,
         difficultyPreference: 'balanced',
         showDebugOverlay: false,
+        notificationsEnabled: false,
+        notificationTime: '09:00',
       },
       
       sessions: [],
@@ -252,7 +256,9 @@ export const useStore = create<UserState>()(
               soundOn: progress.soundOn,
               hapticsOn: progress.hapticsOn,
               difficultyPreference: progress.difficultyPreference as 'easier' | 'balanced' | 'harder',
-              showDebugOverlay: progress.showDebugOverlay
+              showDebugOverlay: progress.showDebugOverlay,
+              notificationsEnabled: false,
+              notificationTime: '09:00'
             }
           });
         } catch (error) {
@@ -626,7 +632,9 @@ export const useStore = create<UserState>()(
               soundOn: progress.soundOn,
               hapticsOn: progress.hapticsOn,
               difficultyPreference: progress.difficultyPreference as 'easier' | 'balanced' | 'harder',
-              showDebugOverlay: progress.showDebugOverlay
+              showDebugOverlay: progress.showDebugOverlay,
+              notificationsEnabled: false,
+              notificationTime: '09:00'
             },
             sessions: sessions.map(s => ({
               id: s.id,

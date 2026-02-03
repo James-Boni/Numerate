@@ -161,4 +161,154 @@ export class AudioManager {
       setTimeout(() => this.playSynth(freq, 'sine', 0.12, 0.3), i * 60);
     });
   }
+
+  // XP feedback sounds - varied based on gain size
+  static playXPTick() {
+    // Small, subtle tick for incremental XP
+    this.playSynth(1200, 'sine', 0.03, 0.08);
+  }
+
+  static playXPPop(intensity: number = 1) {
+    // Pop sound with intensity scaling
+    const baseFreq = 600 + intensity * 100;
+    this.playSynth(baseFreq, 'sine', 0.08 + intensity * 0.02, 0.15 + intensity * 0.05, true, baseFreq * 1.3);
+  }
+
+  static playXPBurst() {
+    // Satisfying burst for big XP gains
+    if (!this.context) return;
+    if (this.context.state === 'suspended') this.context.resume();
+    
+    // Layered burst - shimmer + thump
+    this.playSynth(200, 'triangle', 0.15, 0.3); // Low thump
+    this.playSynth(1000, 'sine', 0.1, 0.2, true, 1500); // High shimmer
+    setTimeout(() => this.playSynth(1200, 'sine', 0.08, 0.15), 50);
+  }
+
+  // Enhanced level-up with intensity scaling
+  static playLevelUpEnhanced(levelsGained: number = 1) {
+    if (!this.context) return;
+    if (this.context.state === 'suspended') this.context.resume();
+    
+    // Base arpeggio - longer and more dramatic for more levels
+    const baseNotes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
+    const extendedNotes = [...baseNotes, 659.25, 783.99, 1046.50]; // Add E5, G5, C6
+    
+    const notes = levelsGained >= 2 ? extendedNotes : baseNotes;
+    const noteDelay = levelsGained >= 2 ? 70 : 80;
+    const volume = Math.min(0.25 + levelsGained * 0.05, 0.4);
+    
+    notes.forEach((freq, i) => {
+      setTimeout(() => this.playSynth(freq, 'sine', 0.15, volume), i * noteDelay);
+    });
+    
+    // Add final chord for multi-level ups
+    if (levelsGained >= 2) {
+      const chordDelay = notes.length * noteDelay;
+      setTimeout(() => {
+        this.playSynth(523.25, 'sine', 0.3, 0.2);
+        this.playSynth(659.25, 'sine', 0.3, 0.18);
+        this.playSynth(783.99, 'sine', 0.3, 0.16);
+      }, chordDelay);
+    }
+  }
+
+  // Session completion fanfare - scales with performance
+  static playSessionComplete(accuracy: number = 0.7) {
+    if (!this.context) return;
+    if (this.context.state === 'suspended') this.context.resume();
+    
+    // Performance-based sound selection
+    if (accuracy >= 0.9) {
+      // Triumphant fanfare for excellent performance
+      const notes = [392.00, 523.25, 659.25, 783.99, 1046.50, 1318.51];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.12, 0.3), i * 50);
+      });
+      // Final flourish
+      setTimeout(() => {
+        this.playSynth(1046.50, 'sine', 0.4, 0.25);
+        this.playSynth(1318.51, 'sine', 0.35, 0.2);
+      }, 350);
+    } else if (accuracy >= 0.7) {
+      // Good job sound
+      const notes = [523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.12, 0.25), i * 70);
+      });
+    } else {
+      // Encouraging completion sound
+      const notes = [440, 523.25, 659.25];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.15, 0.2), i * 100);
+      });
+    }
+  }
+
+  // Streak milestone celebration - escalates with streak level
+  static playStreakCelebration(streak: number) {
+    if (!this.context) return;
+    if (this.context.state === 'suspended') this.context.resume();
+    
+    if (streak >= 20) {
+      // Epic streak sound
+      const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50, 1318.51];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.08, 0.25), i * 40);
+      });
+      // Shimmer overlay
+      setTimeout(() => {
+        this.playSynth(2000, 'sine', 0.3, 0.1, true, 3000);
+      }, 300);
+    } else if (streak >= 15) {
+      const notes = [392.00, 523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.1, 0.22), i * 45);
+      });
+    } else if (streak >= 10) {
+      const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.1, 0.2), i * 50);
+      });
+    } else if (streak >= 5) {
+      const notes = [659.25, 783.99, 987.77];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.1, 0.18), i * 60);
+      });
+    } else if (streak >= 3) {
+      this.playSynth(783.99, 'sine', 0.15, 0.15, true, 987.77);
+    }
+  }
+
+  // Daily streak milestone sounds
+  static playDailyStreakMilestone(days: number) {
+    if (!this.context) return;
+    if (this.context.state === 'suspended') this.context.resume();
+    
+    if (days >= 30) {
+      // Month streak - grand celebration
+      const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.15, 0.3), i * 60);
+      });
+      // Add harmonics
+      setTimeout(() => {
+        this.playSynth(523.25, 'sine', 0.5, 0.2);
+        this.playSynth(783.99, 'sine', 0.45, 0.18);
+        this.playSynth(1046.50, 'sine', 0.4, 0.15);
+      }, 450);
+    } else if (days >= 7) {
+      // Week streak
+      const notes = [392.00, 523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.12, 0.25), i * 70);
+      });
+    } else if (days >= 3) {
+      // Getting started streak
+      const notes = [523.25, 659.25, 783.99];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.12, 0.2), i * 80);
+      });
+    }
+  }
 }

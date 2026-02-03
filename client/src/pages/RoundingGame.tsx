@@ -12,6 +12,7 @@ import { computeFluency } from '@/lib/logic/xp-system';
 import { Card } from '@/components/ui/card';
 import { AnswerFeedback } from '@/components/game/AnswerFeedback';
 import { StreakIndicator } from '@/components/game/StreakIndicator';
+import { AnimatedXP } from '@/components/game/AnimatedXP';
 
 interface RoundingQuestion {
   id: string;
@@ -219,16 +220,19 @@ export default function RoundingGame() {
     
     if (isCorrect) {
       setCorrectCount(prev => prev + 1);
-      setStreak(prev => {
-        const newStreak = prev + 1;
-        if (newStreak > bestStreak) setBestStreak(newStreak);
-        return newStreak;
-      });
+      const newStreak = streak + 1;
+      setStreak(newStreak);
+      if (newStreak > bestStreak) setBestStreak(newStreak);
       setFlash('correct');
       setFeedback('correct');
-      if (settings.soundOn) AudioManager.playCorrect();
+      if (settings.soundOn) {
+        AudioManager.playCorrect(newStreak);
+        if ([3, 5, 10, 15, 20].includes(newStreak)) {
+          AudioManager.playStreakCelebration(newStreak);
+        }
+      }
       
-      const delay = [3, 5, 10, 15, 20].includes(streak + 1) ? 300 : 100;
+      const delay = [3, 5, 10, 15, 20].includes(newStreak) ? 300 : 100;
       setTimeout(() => {
         setFlash(null);
         setFeedback(null);
@@ -476,7 +480,7 @@ export default function RoundingGame() {
           </motion.div>
           <div className="flex items-center gap-3">
             <StreakIndicator streak={streak} />
-            <div className="text-sm font-bold text-primary">XP {correctCount * 15}</div>
+            <AnimatedXP value={correctCount * 15} soundEnabled={settings.soundOn} />
           </div>
         </div>
         

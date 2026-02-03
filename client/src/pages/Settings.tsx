@@ -5,7 +5,7 @@ import { useStore } from '@/lib/store';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { Volume2, Zap, LogOut, Trash2, ChevronRight, User, AlertTriangle, X, Code, Crown, RotateCcw, Apple } from 'lucide-react';
+import { Volume2, Zap, LogOut, Trash2, ChevronRight, User, AlertTriangle, X, Code, Crown, RotateCcw, Apple, Bell, Clock } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'wouter';
@@ -166,6 +166,56 @@ export default function Settings() {
                 onCheckedChange={(checked) => updateSettings({ hapticsOn: checked })} 
               />
             </div>
+          </Card>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Daily Reminders</h3>
+          <Card className="divide-y divide-slate-50 border-none shadow-sm overflow-hidden">
+            <div className="p-4 flex items-center justify-between bg-white">
+              <div className="flex items-center gap-3">
+                <Bell className={settings.notificationsEnabled ? "text-primary" : "text-slate-400"} size={20} />
+                <div>
+                  <span className="font-medium text-sm">Daily Reminder</span>
+                  <p className="text-xs text-slate-400">Get a nudge on this device</p>
+                </div>
+              </div>
+              <Switch 
+                checked={settings.notificationsEnabled} 
+                onCheckedChange={(checked) => {
+                  if (checked && 'Notification' in window) {
+                    Notification.requestPermission().then(permission => {
+                      if (permission === 'granted') {
+                        updateSettings({ notificationsEnabled: true });
+                        setToast({ message: 'Daily reminders enabled!', visible: true });
+                        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+                      } else {
+                        setToast({ message: 'Please allow notifications in your browser settings.', visible: true });
+                        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+                      }
+                    });
+                  } else {
+                    updateSettings({ notificationsEnabled: checked });
+                  }
+                }}
+                data-testid="switch-notifications-enabled"
+              />
+            </div>
+            {settings.notificationsEnabled && (
+              <div className="p-4 flex items-center justify-between bg-white">
+                <div className="flex items-center gap-3">
+                  <Clock className="text-slate-400" size={20} />
+                  <span className="font-medium text-sm">Reminder Time</span>
+                </div>
+                <input
+                  type="time"
+                  value={settings.notificationTime}
+                  onChange={(e) => updateSettings({ notificationTime: e.target.value })}
+                  className="text-sm font-medium text-primary bg-primary/10 px-3 py-1.5 rounded-lg border-none focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  data-testid="input-notification-time"
+                />
+              </div>
+            )}
           </Card>
         </div>
 

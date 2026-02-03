@@ -17,6 +17,7 @@ import { DebugOverlay } from './DebugOverlay';
 import { SessionDiagnosticsOverlay } from './SessionDiagnosticsOverlay';
 import { AnswerFeedback } from './AnswerFeedback';
 import { StreakIndicator } from './StreakIndicator';
+import { AnimatedXP } from './AnimatedXP';
 
 interface OpCounts {
   add: number;
@@ -487,7 +488,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
           
           <div className="flex items-center gap-3">
             <StreakIndicator streak={streak} />
-            <div className="text-sm font-bold text-primary">XP {score}</div>
+            <AnimatedXP value={score} soundEnabled={settings.soundOn} />
           </div>
         </div>
 

@@ -58,8 +58,16 @@ Preferred communication style: Simple, everyday language.
 
 **Audio Feedback**:
 - Web Audio API synthesized sounds for zero-latency playback
-- Short, unobtrusive sounds for correct/incorrect feedback
+- Performance-scaled sounds (XP ticks, pops, bursts for different gain sizes)
+- Level-up fanfares scale with levels gained
+- Session completion sounds vary by accuracy (90%+ triumphant, 70%+ good, <70% encouraging)
 - Respects user sound toggle preferences
+
+**Notification Settings (Device-Local)**:
+- Daily reminder toggle with browser permission request
+- Time picker for preferred reminder time (default 09:00)
+- Settings stored in local Zustand persist (not synced to backend)
+- Device-local by design: browser notification permissions are browser-specific
 
 **Coaching System (Strategy Lessons)**:
 - Weakness detection analyzes session question results for patterns
