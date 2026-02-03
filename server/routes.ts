@@ -218,8 +218,15 @@ export async function registerRoutes(
   app.post("/api/progress/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
+      const body = { ...req.body };
+      
+      // Convert date strings to Date objects for timestamp fields
+      if (body.lastStreakDate && typeof body.lastStreakDate === 'string') {
+        body.lastStreakDate = new Date(body.lastStreakDate);
+      }
+      
       const validatedData = insertUserProgressSchema.parse({
-        ...req.body,
+        ...body,
         userId,
       });
       
