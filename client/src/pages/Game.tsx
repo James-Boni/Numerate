@@ -11,6 +11,9 @@ import { AudioManager } from '@/lib/audio';
 import { motion, animate, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { xpRequiredToAdvance } from '@/lib/logic/xp-system';
+import { ContextualMessage } from '@/components/game/ContextualMessage';
+import { SparkleEffect } from '@/components/game/SparkleEffect';
+import { Confetti } from '@/components/game/Confetti';
 
 function LevelUpCelebration({ 
   levelBefore, 
@@ -89,8 +92,18 @@ function LevelUpCelebration({
 
   }, [levelBefore, levelAfter, xpIntoLevelBefore, xpIntoLevelAfter, levelUpCount, soundOn]);
 
+  const [showConfetti, setShowConfetti] = useState(false);
+  
+  useEffect(() => {
+    if (animationPhase === 'complete') {
+      setShowConfetti(true);
+    }
+  }, [animationPhase]);
+
   return (
     <MobileLayout className="bg-gradient-to-b from-primary/5 to-white">
+      <Confetti active={showConfetti} originX={50} originY={40} count={50} />
+      
       <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -301,7 +314,12 @@ export default function Game() {
             <ClipboardCheck size={32} />
           </motion.div>
           <h1 className="text-3xl font-bold text-slate-900">Session Complete</h1>
-          <p className="text-slate-500">Great progress today.</p>
+          <ContextualMessage 
+            accuracy={results?.accuracy || 0}
+            avgSpeed={results?.avgResponseTimeMs || 0}
+            bestStreak={results?.bestStreak || 0}
+            totalQuestions={results?.totalQuestions || 0}
+          />
         </div>
 
         <motion.div 
@@ -331,7 +349,8 @@ export default function Game() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.8 }}
           >
-            <Card className="p-5 flex flex-col items-center justify-center space-y-2 bg-slate-50 border-none shadow-none rounded-[2rem]">
+            <Card className="p-5 flex flex-col items-center justify-center space-y-2 bg-slate-50 border-none shadow-none rounded-[2rem] relative overflow-visible">
+              <SparkleEffect active={(results?.accuracy || 0) >= 0.95} color="#14B8A6" />
               <motion.div animate={{ scale: [1, 1.08, 1] }} transition={{ delay: 0.9, duration: 0.3 }}>
                 <Target size={20} className="text-primary" />
               </motion.div>

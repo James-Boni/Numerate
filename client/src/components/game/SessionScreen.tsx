@@ -15,6 +15,8 @@ import { calculateCombinedSessionXP, applyXPAndLevelUp, CombinedXPResult } from 
 import { getDifficultyParams, DifficultyParams } from '@/lib/logic/difficulty';
 import { DebugOverlay } from './DebugOverlay';
 import { SessionDiagnosticsOverlay } from './SessionDiagnosticsOverlay';
+import { AnswerFeedback } from './AnswerFeedback';
+import { StreakIndicator } from './StreakIndicator';
 
 interface OpCounts {
   add: number;
@@ -346,7 +348,13 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
 
     if (isCorrect) {
       console.log(`[AUDIO_LOG] CORRECT_SUBMITTED: ${Date.now()}`);
-      if (settings.soundOn) AudioManager.playCorrect();
+      const newStreak = streak + 1;
+      if (settings.soundOn) {
+        AudioManager.playCorrect(newStreak);
+        if ([3, 5, 10, 15, 20].includes(newStreak)) {
+          setTimeout(() => AudioManager.playStreakMilestone(newStreak), 100);
+        }
+      }
       
       const xp = calculateXP(true, timeTaken, streak);
       scoreRef.current += xp;
@@ -364,7 +372,6 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       
       correctCountRef.current += 1;
       setCorrectCount(correctCountRef.current);
-      const newStreak = streak + 1;
       setStreak(newStreak);
       if (newStreak > bestStreak) {
         bestStreakRef.current = newStreak;
@@ -372,10 +379,13 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       }
       setFeedback('correct');
       setFlash('correct');
-      if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(5);
       
-      // Advance to next question quickly (80ms)
-      setTimeout(nextQuestion, 80);
+      const vibrateIntensity = Math.min(5 + newStreak, 15);
+      if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(vibrateIntensity);
+      
+      // Advance to next question - slightly longer for streak celebration
+      const delay = [3, 5, 10, 15, 20].includes(newStreak) ? 300 : 100;
+      setTimeout(nextQuestion, delay);
     } else {
       console.log(`[AUDIO_LOG] WRONG_SUBMITTED: ${Date.now()}`);
       if (settings.soundOn) AudioManager.playWrong();
@@ -425,11 +435,14 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       <div 
         className={clsx(
           "absolute inset-x-0 top-0 bottom-[320px] z-0 transition-colors duration-150",
-          flash === 'correct' ? "bg-primary/5" : 
-          flash === 'wrong' ? "bg-destructive/5" : 
+          flash === 'correct' ? "bg-teal-500/8" : 
+          flash === 'wrong' ? "bg-amber-500/8" : 
           "bg-transparent"
         )}
       />
+      
+      {/* Enhanced Answer Feedback Overlay */}
+      <AnswerFeedback type={feedback} streak={streak} />
 
       {/* Touchable Submission Layer - Entire top area */}
       <div 
@@ -457,7 +470,10 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
               </motion.div>
           )}
           
-          <div className="text-sm font-bold text-primary">XP {score}</div>
+          <div className="flex items-center gap-3">
+            <StreakIndicator streak={streak} />
+            <div className="text-sm font-bold text-primary">XP {score}</div>
+          </div>
         </div>
 
         {/* Game Area */}
@@ -477,12 +493,12 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
                       
                       <div className={clsx(
                         "h-24 flex items-center justify-center text-7xl font-mono font-medium transition-all",
-                        feedback === 'correct' ? "text-primary" :
-                        feedback === 'wrong' ? "text-destructive" :
+                        feedback === 'correct' ? "text-teal-600" :
+                        feedback === 'wrong' ? "text-amber-600" :
                         "text-slate-900"
                       )}>
                           {feedback === 'wrong' ? (
-                              <span className="text-destructive/60 text-3xl font-sans font-bold">Ans: {question.answer}</span>
+                              <span className="text-amber-600/80 text-3xl font-sans font-bold">Ans: {question.answer}</span>
                           ) : (
                               input || <span className="text-slate-200 font-sans text-5xl">?</span>
                           )}

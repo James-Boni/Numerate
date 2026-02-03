@@ -45,12 +45,37 @@ export class AudioManager {
     osc.stop(this.context.currentTime + duration + 0.05);
   }
 
-  static playCorrect() {
-    this.playSynth(880, 'sine', 0.12, 0.2, true, 1320);
+  static playCorrect(streak: number = 0) {
+    const baseFreq = 880 + Math.min(streak, 10) * 30;
+    const volume = 0.2 + Math.min(streak, 10) * 0.01;
+    this.playSynth(baseFreq, 'sine', 0.12, volume, true, baseFreq * 1.5);
+    
+    if (streak >= 10) {
+      setTimeout(() => this.playSynth(baseFreq * 1.5, 'sine', 0.08, 0.15), 50);
+    }
   }
 
   static playWrong() {
-    this.playSynth(110, 'triangle', 0.14, 0.4);
+    this.playSynth(180, 'triangle', 0.12, 0.25);
+  }
+
+  static playStreakMilestone(streak: number) {
+    if (!this.context) return;
+    if (this.context.state === 'suspended') this.context.resume();
+    
+    if (streak >= 10) {
+      const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.1, 0.2), i * 50);
+      });
+    } else if (streak >= 5) {
+      const notes = [659.25, 783.99, 987.77];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.1, 0.18), i * 60);
+      });
+    } else if (streak >= 3) {
+      this.playSynth(783.99, 'sine', 0.15, 0.15, true, 987.77);
+    }
   }
 
   static playTick() {
