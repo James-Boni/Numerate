@@ -71,7 +71,34 @@ Preferred communication style: Simple, everyday language.
 ### Application Flow
 1. Welcome → Assessment (3-minute placement test) → Starting level assignment
 2. Daily Training → Daily Challenge Intro → Timed session (3 minutes) → Session summary → Strategy Lesson (if weakness detected) → Level Up celebration → Reassurance/Paywall (first session)
-3. Progress tracking → Time-bound metrics, level journey, performance insights
+3. Skill Drills → Rounding, Doubling (L13+), Halving (L21+) practice modes
+4. Progress tracking → Time-bound metrics, level journey, performance insights
+
+### Skill Drill Game Modes
+**Rounding Practice** (`/rounding`):
+- Available to all users after assessment
+- 3-minute timed sessions practicing rounding technique for addition/subtraction
+- Shows hint system with step-by-step breakdown (e.g., "Round to 80 + 45 = 125, adjust by -2")
+- Level-appropriate operand ranges
+- Key file: `RoundingGame.tsx`
+
+**Doubling Practice** (`/doubling`):
+- Unlocks at Level 13 (when multiplication introduced)
+- 3-minute timed sessions practicing doubling technique for multiplication
+- Shows hint system with doubling steps (e.g., "6 × 2 = 12, 12 × 2 = 24, 24 × 2 = 48")
+- Uses powers of 2 as multipliers (2, 4, 8, 16)
+- Key file: `DoublingGame.tsx`
+
+**Halving Practice** (`/halving`):
+- Unlocks at Level 21 (when division introduced)
+- 3-minute timed sessions practicing halving technique for division
+- Shows hint system with halving steps (e.g., "48 ÷ 2 = 24, 24 ÷ 2 = 12")
+- Uses powers of 2 as divisors (2, 4, 8)
+- Key file: `HalvingGame.tsx`
+
+**Skill Drill Session Types**: rounding_practice, doubling_practice, halving_practice
+- These do NOT count toward Progress page metrics (daily sessions only)
+- Award XP for practice motivation
 
 ### Progress Page System (Core System - Locked)
 **Foundational Principles**:

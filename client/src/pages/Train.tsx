@@ -4,7 +4,7 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { BottomNav } from '@/components/ui/bottom-nav';
 import { useStore } from '@/lib/store';
 import { useLocation } from 'wouter';
-import { Zap, Play, Flame, Timer, Trophy, ChevronRight, Lock } from 'lucide-react';
+import { Zap, Play, Flame, Timer, Trophy, ChevronRight, Lock, CircleDot, Copy, Scissors } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { xpRequiredToAdvance } from '@/lib/logic/xp-system';
@@ -155,6 +155,92 @@ export default function Train() {
             </div>
           </Card>
         </div>
+
+        {/* Skill Practice Section - Only shown after assessment */}
+        {hasCompletedAssessment && (
+          <div className="px-6 pb-4">
+            <h3 className="text-slate-700 font-semibold text-sm uppercase tracking-wider mb-3">Skill Drills</h3>
+            <div className="space-y-3">
+              {/* Rounding Practice */}
+              <Card 
+                className="p-4 bg-gradient-to-br from-blue-50 to-sky-50 border-none shadow-none rounded-2xl cursor-pointer active:scale-[0.98] transition-transform"
+                onClick={() => setLocation('/rounding')}
+                data-testid="card-rounding-practice"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <CircleDot size={24} className="text-blue-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-slate-900 font-bold">Rounding</h4>
+                    <p className="text-slate-500 text-xs">Round numbers for easier mental math</p>
+                  </div>
+                  <ChevronRight size={20} className="text-slate-400" />
+                </div>
+              </Card>
+
+              {/* Doubling Practice */}
+              <Card 
+                className={`p-4 border-none shadow-none rounded-2xl transition-transform ${
+                  level >= 13 
+                    ? 'bg-gradient-to-br from-purple-50 to-violet-50 cursor-pointer active:scale-[0.98]' 
+                    : 'bg-slate-50 opacity-60'
+                }`}
+                onClick={() => level >= 13 && setLocation('/doubling')}
+                data-testid="card-doubling-practice"
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    level >= 13 ? 'bg-purple-100' : 'bg-slate-200'
+                  }`}>
+                    {level >= 13 ? (
+                      <Copy size={24} className="text-purple-500" />
+                    ) : (
+                      <Lock size={20} className="text-slate-400" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-slate-900 font-bold">Doubling</h4>
+                    <p className="text-slate-500 text-xs">
+                      {level >= 13 ? 'Double your way to faster multiplication' : 'Unlocks at Level 13'}
+                    </p>
+                  </div>
+                  <ChevronRight size={20} className="text-slate-400" />
+                </div>
+              </Card>
+
+              {/* Halving Practice */}
+              <Card 
+                className={`p-4 border-none shadow-none rounded-2xl transition-transform ${
+                  level >= 21 
+                    ? 'bg-gradient-to-br from-green-50 to-emerald-50 cursor-pointer active:scale-[0.98]' 
+                    : 'bg-slate-50 opacity-60'
+                }`}
+                onClick={() => level >= 21 && setLocation('/halving')}
+                data-testid="card-halving-practice"
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    level >= 21 ? 'bg-green-100' : 'bg-slate-200'
+                  }`}>
+                    {level >= 21 ? (
+                      <Scissors size={24} className="text-green-500" />
+                    ) : (
+                      <Lock size={20} className="text-slate-400" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-slate-900 font-bold">Halving</h4>
+                    <p className="text-slate-500 text-xs">
+                      {level >= 21 ? 'Halve your way to faster division' : 'Unlocks at Level 21'}
+                    </p>
+                  </div>
+                  <ChevronRight size={20} className="text-slate-400" />
+                </div>
+              </Card>
+            </div>
+          </div>
+        )}
 
         {/* Quick Fire Card - Only shown after assessment */}
         {hasCompletedAssessment && (

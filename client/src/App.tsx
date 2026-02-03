@@ -10,6 +10,9 @@ import Assessment from "@/pages/Assessment";
 import Train from "@/pages/Train";
 import Game from "@/pages/Game";
 import QuickFire from "@/pages/QuickFire";
+import RoundingGame from "@/pages/RoundingGame";
+import DoublingGame from "@/pages/DoublingGame";
+import HalvingGame from "@/pages/HalvingGame";
 import Progress from "@/pages/Progress";
 import Settings from "@/pages/Settings";
 import DevMenu from "@/pages/DevMenu";
@@ -47,6 +50,9 @@ function Router() {
       <Route path="/train" component={Train} />
       <Route path="/game" component={Game} />
       <Route path="/quickfire" component={QuickFire} />
+      <Route path="/rounding" component={RoundingGame} />
+      <Route path="/doubling" component={DoublingGame} />
+      <Route path="/halving" component={HalvingGame} />
       <Route path="/progress" component={Progress} />
       <Route path="/settings" component={Settings} />
       <Route path="/dev" component={DevMenu} />
