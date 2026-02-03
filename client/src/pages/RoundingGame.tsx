@@ -67,6 +67,10 @@ export default function RoundingGame() {
   const questionStartRef = useRef<number>(Date.now());
   const startTimeRef = useRef<number>(Date.now());
   const sessionEndedRef = useRef(false);
+  const correctCountRef = useRef(0);
+  const totalCountRef = useRef(0);
+  const bestStreakRef = useRef(0);
+  const highestTierRef = useRef(0);
   
   const [result, setResult] = useState<GameResult | null>(null);
   
@@ -85,23 +89,34 @@ export default function RoundingGame() {
     setQuestion(null);
     responseTimesRef.current = [];
     sessionEndedRef.current = false;
+    correctCountRef.current = 0;
+    totalCountRef.current = 0;
+    bestStreakRef.current = 0;
+    highestTierRef.current = 0;
     setResult(null);
   }, [selectedDuration]);
   
   const nextQuestion = useCallback(() => {
-    const tier = getTier(correctCount);
+    const tier = getTier(correctCountRef.current);
     setCurrentTier(tier);
-    if (tier > highestTier) setHighestTier(tier);
+    if (tier > highestTierRef.current) {
+      highestTierRef.current = tier;
+      setHighestTier(tier);
+    }
     const q = generateRoundingQuestion(tier);
     setQuestion(q);
     setInput('');
     questionStartRef.current = Date.now();
-  }, [correctCount, highestTier]);
+  }, []);
   
   // Countdown effect
   useEffect(() => {
     if (step !== 'countdown') return;
+    if (countdown > 0 && countdown <= 3) {
+      if (settings.soundOn) AudioManager.playCountdownHorn();
+    }
     if (countdown <= 0) {
+      if (settings.soundOn) AudioManager.playGoHorn();
       setStep('active');
       startTimeRef.current = Date.now();
       nextQuestion();
@@ -109,7 +124,7 @@ export default function RoundingGame() {
     }
     const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
     return () => clearTimeout(timer);
-  }, [step, countdown, nextQuestion]);
+  }, [step, countdown, nextQuestion, settings.soundOn]);
   
   // Game timer
   useEffect(() => {
@@ -166,16 +181,21 @@ export default function RoundingGame() {
     responseTimesRef.current.push(responseTime);
     
     setTotalCount(prev => prev + 1);
+    totalCountRef.current += 1;
     
     if (isCorrect) {
       setCorrectCount(prev => prev + 1);
+      correctCountRef.current += 1;
       const newStreak = streak + 1;
       setStreak(newStreak);
-      if (newStreak > bestStreak) setBestStreak(newStreak);
+      if (newStreak > bestStreak) {
+        setBestStreak(newStreak);
+        bestStreakRef.current = newStreak;
+      }
       setFlash('correct');
       setFeedback('correct');
       
-      const newTier = getTier(correctCount + 1);
+      const newTier = getTier(correctCountRef.current);
       if (newTier > currentTier && settings.soundOn) {
         AudioManager.playStreakCelebration(3);
       }
@@ -208,17 +228,22 @@ export default function RoundingGame() {
   };
   
   const endSession = () => {
+    const finalCorrect = correctCountRef.current;
+    const finalTotal = totalCountRef.current;
+    const finalBestStreak = bestStreakRef.current;
+    const finalHighestTier = highestTierRef.current;
+    
     const times = responseTimesRef.current;
     const medianMs = times.length > 0 
       ? times.sort((a, b) => a - b)[Math.floor(times.length / 2)] 
       : 3000;
     
-    const accuracy = totalCount > 0 ? correctCount / totalCount : 0;
-    const xpEarned = correctCount * 3 + (bestStreak >= 5 ? 25 : 0);
+    const accuracy = finalTotal > 0 ? finalCorrect / finalTotal : 0;
+    const xpEarned = finalCorrect * 3 + (finalBestStreak >= 5 ? 25 : 0);
     
-    const fluencyMetrics = computeFluency(totalCount, correctCount, selectedDuration, times);
+    const fluencyMetrics = computeFluency(finalTotal, finalCorrect, selectedDuration, times);
     
-    const isNewBest = correctCount > skillDrillBests.rounding.bestScore;
+    const isNewBest = finalCorrect > skillDrillBests.rounding.bestScore;
     
     const sessionStats: SessionStats = {
       id: Math.random().toString(36).substr(2, 9),
@@ -226,8 +251,8 @@ export default function RoundingGame() {
       sessionType: 'rounding_practice',
       durationMode: selectedDuration as any,
       durationSecondsActual: selectedDuration,
-      totalQuestions: totalCount,
-      correctQuestions: correctCount,
+      totalQuestions: finalTotal,
+      correctQuestions: finalCorrect,
       accuracy,
       avgResponseTimeMs: medianMs,
       medianMs,
@@ -237,19 +262,19 @@ export default function RoundingGame() {
       levelAfter: level,
       xpIntoLevelBefore: xpIntoLevel,
       xpIntoLevelAfter: xpIntoLevel + xpEarned,
-      bestStreak
+      bestStreak: finalBestStreak
     };
     
     saveSession(sessionStats);
-    updateSkillDrillBests('rounding', correctCount, bestStreak);
+    updateSkillDrillBests('rounding', finalCorrect, finalBestStreak);
     
     setResult({
-      totalQuestions: totalCount,
-      correctQuestions: correctCount,
+      totalQuestions: finalTotal,
+      correctQuestions: finalCorrect,
       accuracy,
       medianMs,
       xpEarned,
-      highestTier: highestTier,
+      highestTier: finalHighestTier,
       isNewBest
     });
     setStep('results');
@@ -353,31 +378,26 @@ export default function RoundingGame() {
             </div>
           </Card>
           
-          <div className="flex flex-col gap-3 w-full max-w-sm">
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1 h-12"
-                onClick={() => navigate('/train')}
-              >
-                Done
-              </Button>
-              <Button
-                className="flex-1 h-12 bg-orange-500 hover:bg-orange-600"
-                onClick={() => {
-                  resetGameState();
-                  setStep('pregame');
-                }}
-              >
-                Practice Again
-              </Button>
-            </div>
+          <div className="space-y-3 mt-6 w-full max-w-sm">
             <Button
-              variant="outline"
-              className="h-12 w-full"
               onClick={() => { resetGameState(); setStep('countdown'); }}
+              className="w-full h-12 font-bold"
             >
               Play Again ({selectedDuration >= 60 ? `${selectedDuration / 60}min` : `${selectedDuration}s`})
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => { resetGameState(); setStep('pregame'); }}
+              className="w-full h-12"
+            >
+              Change Duration
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/train')}
+              className="w-full h-12 text-slate-500"
+            >
+              Done
             </Button>
           </div>
         </div>
