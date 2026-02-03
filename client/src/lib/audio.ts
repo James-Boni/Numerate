@@ -45,14 +45,23 @@ export class AudioManager {
     osc.stop(this.context.currentTime + duration + 0.05);
   }
 
+  private static correctSoundIndex = 0;
+  
   static playCorrect(streak: number = 0) {
-    const baseFreq = 880 + Math.min(streak, 10) * 30;
-    const volume = 0.2 + Math.min(streak, 10) * 0.01;
-    this.playSynth(baseFreq, 'sine', 0.12, volume, true, baseFreq * 1.5);
-    
-    if (streak >= 10) {
-      setTimeout(() => this.playSynth(baseFreq * 1.5, 'sine', 0.08, 0.15), 50);
+    // For streak milestones (5, 10, 15, 20...), play special streak sound instead
+    if (streak > 0 && streak % 5 === 0) {
+      this.playStreakMilestone(streak);
+      return;
     }
+    
+    // 3 pitch variations for regular correct answers - low, medium, high
+    // Much lower base frequencies for a warmer, less shrill sound
+    const pitches = [392.00, 440.00, 493.88]; // G4, A4, B4 - warmer tones
+    const freq = pitches[this.correctSoundIndex];
+    this.correctSoundIndex = (this.correctSoundIndex + 1) % 3;
+    
+    const volume = 0.22;
+    this.playSynth(freq, 'sine', 0.1, volume, true, freq * 1.25);
   }
 
   static playWrong() {
@@ -185,63 +194,93 @@ export class AudioManager {
     setTimeout(() => this.playSynth(1200, 'sine', 0.08, 0.15), 50);
   }
 
-  // Enhanced level-up with intensity scaling
+  // Enhanced level-up with intensity scaling - MORE JUBILANT
   static playLevelUpEnhanced(levelsGained: number = 1) {
     if (!this.context) return;
     if (this.context.state === 'suspended') this.context.resume();
     
-    // Base arpeggio - longer and more dramatic for more levels
-    const baseNotes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
-    const extendedNotes = [...baseNotes, 659.25, 783.99, 1046.50]; // Add E5, G5, C6
+    // More dramatic arpeggio - fuller and more celebratory
+    const baseNotes = [196.00, 261.63, 329.63, 392.00, 523.25]; // G3, C4, E4, G4, C5
+    const extendedNotes = [...baseNotes, 659.25, 783.99, 1046.50, 1318.51]; // Add E5, G5, C6, E6
     
     const notes = levelsGained >= 2 ? extendedNotes : baseNotes;
-    const noteDelay = levelsGained >= 2 ? 70 : 80;
-    const volume = Math.min(0.25 + levelsGained * 0.05, 0.4);
+    const noteDelay = levelsGained >= 2 ? 55 : 65;
+    const volume = Math.min(0.3 + levelsGained * 0.05, 0.45);
     
     notes.forEach((freq, i) => {
-      setTimeout(() => this.playSynth(freq, 'sine', 0.15, volume), i * noteDelay);
+      setTimeout(() => this.playSynth(freq, 'sine', 0.18, volume), i * noteDelay);
     });
     
-    // Add final chord for multi-level ups
+    // Always add triumphant final chord - bigger for more levels
+    const chordDelay = notes.length * noteDelay + 50;
     if (levelsGained >= 2) {
-      const chordDelay = notes.length * noteDelay;
       setTimeout(() => {
-        this.playSynth(523.25, 'sine', 0.3, 0.2);
-        this.playSynth(659.25, 'sine', 0.3, 0.18);
-        this.playSynth(783.99, 'sine', 0.3, 0.16);
+        // Grand major chord with octave spread
+        this.playSynth(261.63, 'sine', 0.5, 0.25); // C4 bass
+        this.playSynth(523.25, 'sine', 0.45, 0.3); // C5
+        this.playSynth(659.25, 'sine', 0.45, 0.28); // E5
+        this.playSynth(783.99, 'sine', 0.4, 0.26); // G5
+        this.playSynth(1046.50, 'sine', 0.35, 0.22); // C6
+      }, chordDelay);
+      // Add sparkle
+      setTimeout(() => {
+        this.playSynth(2093.00, 'sine', 0.15, 0.1, true, 2637.02);
+      }, chordDelay + 100);
+    } else {
+      setTimeout(() => {
+        this.playSynth(392.00, 'sine', 0.4, 0.25);
+        this.playSynth(523.25, 'sine', 0.4, 0.28);
+        this.playSynth(659.25, 'sine', 0.35, 0.25);
       }, chordDelay);
     }
   }
 
-  // Session completion fanfare - scales with performance
+  // Session completion fanfare - scales with performance - MORE JUBILANT
   static playSessionComplete(accuracy: number = 0.7) {
     if (!this.context) return;
     if (this.context.state === 'suspended') this.context.resume();
     
-    // Performance-based sound selection
+    // Performance-based sound selection - all more celebratory
     if (accuracy >= 0.9) {
-      // Triumphant fanfare for excellent performance
-      const notes = [392.00, 523.25, 659.25, 783.99, 1046.50, 1318.51];
+      // TRIUMPHANT fanfare for excellent performance - full major chord progression
+      const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50, 1318.51]; // C4 up to E6
       notes.forEach((freq, i) => {
-        setTimeout(() => this.playSynth(freq, 'sine', 0.12, 0.3), i * 50);
+        setTimeout(() => this.playSynth(freq, 'sine', 0.15, 0.35), i * 45);
       });
-      // Final flourish
+      // Big triumphant final chord
       setTimeout(() => {
-        this.playSynth(1046.50, 'sine', 0.4, 0.25);
-        this.playSynth(1318.51, 'sine', 0.35, 0.2);
-      }, 350);
+        this.playSynth(523.25, 'sine', 0.5, 0.3); // C5
+        this.playSynth(659.25, 'sine', 0.45, 0.28); // E5
+        this.playSynth(783.99, 'sine', 0.45, 0.26); // G5
+        this.playSynth(1046.50, 'sine', 0.4, 0.24); // C6
+      }, 400);
+      // Sparkle overlay
+      setTimeout(() => {
+        this.playSynth(2093.00, 'sine', 0.2, 0.12, true, 2637.02); // High shimmer
+      }, 500);
     } else if (accuracy >= 0.7) {
-      // Good job sound
-      const notes = [523.25, 659.25, 783.99, 1046.50];
+      // CELEBRATORY good job sound - ascending major with chord finish
+      const notes = [392.00, 493.88, 587.33, 783.99, 987.77]; // G4, B4, D5, G5, B5
       notes.forEach((freq, i) => {
-        setTimeout(() => this.playSynth(freq, 'sine', 0.12, 0.25), i * 70);
+        setTimeout(() => this.playSynth(freq, 'sine', 0.14, 0.3), i * 60);
       });
+      // Finishing chord
+      setTimeout(() => {
+        this.playSynth(587.33, 'sine', 0.35, 0.25);
+        this.playSynth(783.99, 'sine', 0.35, 0.22);
+        this.playSynth(987.77, 'sine', 0.3, 0.2);
+      }, 350);
     } else {
-      // Encouraging completion sound
-      const notes = [440, 523.25, 659.25];
+      // WARM encouraging completion sound - still positive
+      const notes = [349.23, 440, 523.25, 659.25]; // F4, A4, C5, E5
       notes.forEach((freq, i) => {
-        setTimeout(() => this.playSynth(freq, 'sine', 0.15, 0.2), i * 100);
+        setTimeout(() => this.playSynth(freq, 'sine', 0.15, 0.25), i * 80);
       });
+      // Soft resolution chord
+      setTimeout(() => {
+        this.playSynth(440, 'sine', 0.3, 0.18);
+        this.playSynth(523.25, 'sine', 0.3, 0.16);
+      }, 380);
     }
   }
 

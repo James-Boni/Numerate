@@ -206,8 +206,8 @@ export const useStore = create<UserState>()(
         hapticsOn: true,
         difficultyPreference: 'balanced',
         showDebugOverlay: false,
-        notificationsEnabled: false,
-        notificationTime: '09:00',
+        notificationsEnabled: true,
+        notificationTime: '12:00',
       },
       
       sessions: [],
@@ -257,8 +257,8 @@ export const useStore = create<UserState>()(
               hapticsOn: progress.hapticsOn,
               difficultyPreference: progress.difficultyPreference as 'easier' | 'balanced' | 'harder',
               showDebugOverlay: progress.showDebugOverlay,
-              notificationsEnabled: false,
-              notificationTime: '09:00'
+              notificationsEnabled: get().settings.notificationsEnabled,
+              notificationTime: get().settings.notificationTime
             }
           });
         } catch (error) {
@@ -633,8 +633,8 @@ export const useStore = create<UserState>()(
               hapticsOn: progress.hapticsOn,
               difficultyPreference: progress.difficultyPreference as 'easier' | 'balanced' | 'harder',
               showDebugOverlay: progress.showDebugOverlay,
-              notificationsEnabled: false,
-              notificationTime: '09:00'
+              notificationsEnabled: get().settings.notificationsEnabled,
+              notificationTime: get().settings.notificationTime
             },
             sessions: sessions.map(s => ({
               id: s.id,
