@@ -16,6 +16,7 @@ import { SparkleEffect } from '@/components/game/SparkleEffect';
 import { Confetti } from '@/components/game/Confetti';
 import { ReassuranceScreen } from '@/components/game/ReassuranceScreen';
 import { PaywallScreen } from '@/components/game/PaywallScreen';
+import { DailyChallengeIntro } from '@/components/game/DailyChallengeIntro';
 import { useAccountStore, isPremiumActive } from '@/lib/services/account-store';
 
 function LevelUpCelebration({ 
@@ -228,7 +229,7 @@ function CountUp({ value, duration = 1, delay = 0, onTick, suffix = '' }: {
 }
 
 export default function Game() {
-  const [step, setStep] = useState<'active' | 'results' | 'levelup' | 'reassurance' | 'paywall' | 'blocked'>('active');
+  const [step, setStep] = useState<'daily_intro' | 'active' | 'results' | 'levelup' | 'reassurance' | 'paywall' | 'blocked'>('daily_intro');
   const [results, setResults] = useState<SessionStats | null>(null);
   const [entitlementChecked, setEntitlementChecked] = useState(false);
   const [_, setLocation] = useLocation();
@@ -254,7 +255,7 @@ export default function Game() {
 
   // Block access if user has used free trial and is not premium
   useEffect(() => {
-    if (entitlementChecked && shouldBlockAccess && step === 'active') {
+    if (entitlementChecked && shouldBlockAccess && (step === 'daily_intro' || step === 'active')) {
       setStep('blocked');
     }
   }, [entitlementChecked, shouldBlockAccess, step]);
@@ -296,8 +297,9 @@ export default function Game() {
     }
   }, [step, results, settings.soundOn]);
 
-  if (step === 'active') {
-    // Wait for entitlement check before allowing session
+  // Show daily challenge intro before starting session
+  if (step === 'daily_intro') {
+    // Wait for entitlement check first
     if (!entitlementChecked) {
       return (
         <MobileLayout className="bg-white">
@@ -311,6 +313,15 @@ export default function Game() {
       );
     }
     
+    return (
+      <DailyChallengeIntro
+        streakCount={useStore.getState().streakCount}
+        onStart={() => setStep('active')}
+      />
+    );
+  }
+
+  if (step === 'active') {
     return (
       <SessionScreen 
         mode="training"
