@@ -10,6 +10,8 @@ import { clsx } from 'clsx';
 import { KeypadModern } from '@/components/game/Keypad';
 import { computeFluency } from '@/lib/logic/xp-system';
 import { Card } from '@/components/ui/card';
+import { AnswerFeedback } from '@/components/game/AnswerFeedback';
+import { StreakIndicator } from '@/components/game/StreakIndicator';
 
 interface RoundingQuestion {
   id: string;
@@ -123,6 +125,7 @@ export default function RoundingGame() {
   const [question, setQuestion] = useState<RoundingQuestion | null>(null);
   const [input, setInput] = useState('');
   const [flash, setFlash] = useState<'correct' | 'wrong' | null>(null);
+  const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   
   const [correctCount, setCorrectCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -205,7 +208,7 @@ export default function RoundingGame() {
   };
   
   const handleSubmit = () => {
-    if (!question || input === '' || step !== 'active') return;
+    if (!question || input === '' || step !== 'active' || feedback) return;
     
     const userAnswer = parseFloat(input);
     const isCorrect = Math.abs(userAnswer - question.answer) < 0.001;
@@ -222,15 +225,27 @@ export default function RoundingGame() {
         return newStreak;
       });
       setFlash('correct');
+      setFeedback('correct');
       if (settings.soundOn) AudioManager.playCorrect();
+      
+      const delay = [3, 5, 10, 15, 20].includes(streak + 1) ? 300 : 100;
+      setTimeout(() => {
+        setFlash(null);
+        setFeedback(null);
+        nextQuestion();
+      }, delay);
     } else {
       setStreak(0);
       setFlash('wrong');
+      setFeedback('wrong');
       if (settings.soundOn) AudioManager.playWrong();
+      
+      setTimeout(() => {
+        setFlash(null);
+        setFeedback(null);
+        nextQuestion();
+      }, 400);
     }
-    
-    setTimeout(() => setFlash(null), 300);
-    nextQuestion();
   };
   
   const endSession = () => {
@@ -424,9 +439,18 @@ export default function RoundingGame() {
   // Active game screen
   return (
     <MobileLayout className="bg-white overflow-hidden">
-      <AnimatePresence>
-        {flash && <FullScreenFlash type={flash} />}
-      </AnimatePresence>
+      {/* Background Flash Layer */}
+      <div 
+        className={clsx(
+          "absolute inset-x-0 top-0 bottom-[320px] z-0 transition-colors duration-150",
+          flash === 'correct' ? "bg-teal-500/10" : 
+          flash === 'wrong' ? "bg-amber-500/10" : 
+          "bg-transparent"
+        )}
+      />
+      
+      {/* Answer Feedback Overlay */}
+      <AnswerFeedback type={feedback} streak={streak} />
       
       {/* Tap anywhere to submit layer */}
       <div 
@@ -436,53 +460,56 @@ export default function RoundingGame() {
       
       <div className="relative z-20 flex flex-col h-full pointer-events-none">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b pointer-events-auto">
-          <button onClick={() => navigate('/train')} className="p-2 -ml-2">
-            <X size={24} className="text-slate-400" />
+        <div className="flex items-center justify-between px-6 py-4 pointer-events-auto">
+          <button onClick={() => navigate('/train')} className="p-2 -ml-2 text-zinc-400 hover:text-zinc-600">
+            <X size={24} />
           </button>
-          <div className="flex items-center gap-2 text-lg font-semibold">
-            <Clock size={20} className="text-orange-500" />
-            <span className={clsx(timeLeft <= 10 && "text-red-500")}>{formatTime(timeLeft)}</span>
-          </div>
-          <div className="flex items-center gap-1 text-orange-600 font-medium">
-            <Zap size={18} />
-            <span>{correctCount * 15}</span>
+          <motion.div 
+            animate={timeLeft <= 10 ? { scale: [1, 1.06, 1], color: ['#ef4444', '#f87171', '#ef4444'] } : {}}
+            transition={{ repeat: Infinity, duration: 1 }}
+            className={clsx(
+              "font-mono text-xl font-bold tabular-nums",
+              timeLeft <= 10 ? "text-rose-500" : "text-zinc-400"
+            )}
+          >
+            {formatTime(timeLeft)}
+          </motion.div>
+          <div className="flex items-center gap-3">
+            <StreakIndicator streak={streak} />
+            <div className="text-sm font-bold text-primary">XP {correctCount * 15}</div>
           </div>
         </div>
         
         {/* Question display */}
         <div className="flex-1 flex flex-col items-center justify-center p-6">
-          {question && (
-            <motion.div
-              key={question.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center space-y-6"
-            >
-              <div className="text-5xl font-bold text-slate-900">
-                {question.number}
-              </div>
-              <div className="text-xl text-slate-600">
-                to the nearest <span className="font-semibold text-orange-600">{question.roundTo}</span>
-              </div>
-              
-              {/* Answer display */}
-              <div className="h-16 flex items-center justify-center">
-                <div className={clsx(
-                  "text-4xl font-bold min-w-[120px] border-b-4 pb-2",
-                  input ? "text-slate-900 border-orange-400" : "text-slate-300 border-slate-200"
-                )}>
-                  {input || '?'}
+          <AnimatePresence mode="wait">
+            {question && (
+              <motion.div
+                key={question.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="text-center space-y-6"
+              >
+                <div className="text-5xl font-bold text-slate-900">
+                  {question.number}
                 </div>
-              </div>
-            </motion.div>
-          )}
-          
-          {/* Stats row */}
-          <div className="flex gap-6 mt-8 text-sm text-slate-500">
-            <div>Correct: <span className="font-semibold text-slate-900">{correctCount}</span></div>
-            <div>Streak: <span className="font-semibold text-orange-600">{streak}</span></div>
-          </div>
+                <div className="text-xl text-slate-600">
+                  to the nearest <span className="font-semibold text-primary">{question.roundTo}</span>
+                </div>
+                
+                {/* Answer display */}
+                <div className="h-16 flex items-center justify-center">
+                  <div className={clsx(
+                    "text-4xl font-bold min-w-[120px] border-b-4 pb-2",
+                    input ? "text-slate-900 border-primary" : "text-slate-300 border-slate-200"
+                  )}>
+                    {input || '?'}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
       
@@ -492,7 +519,7 @@ export default function RoundingGame() {
           onPress={handleKeyPress}
           onDelete={handleDelete}
           onSubmit={handleSubmit}
-          submitDisabled={!input}
+          submitDisabled={!input || !!feedback}
         />
       </div>
     </MobileLayout>
