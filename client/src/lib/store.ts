@@ -766,6 +766,29 @@ export const useStore = create<UserState>()(
             state.progression.band = getBandFromLevel(state.level);
             console.log('[MIGRATION] Synced progression level to:', state.level);
           }
+          
+          // Migration: Ensure skillDrillBests exists with defaults
+          if (!state.skillDrillBests) {
+            state.skillDrillBests = {
+              rounding: { bestScore: 0, bestStreak: 0, gamesPlayed: 0, totalCorrect: 0 },
+              doubling: { bestScore: 0, bestStreak: 0, gamesPlayed: 0, totalCorrect: 0 },
+              halving: { bestScore: 0, bestStreak: 0, gamesPlayed: 0, totalCorrect: 0 },
+            };
+            console.log('[MIGRATION] Created skillDrillBests defaults');
+          } else {
+            // Ensure each game type has all required fields
+            const defaultGameBests = { bestScore: 0, bestStreak: 0, gamesPlayed: 0, totalCorrect: 0 };
+            ['rounding', 'doubling', 'halving'].forEach((gameType) => {
+              if (!state.skillDrillBests[gameType as keyof typeof state.skillDrillBests]) {
+                state.skillDrillBests[gameType as keyof typeof state.skillDrillBests] = { ...defaultGameBests };
+              } else {
+                state.skillDrillBests[gameType as keyof typeof state.skillDrillBests] = {
+                  ...defaultGameBests,
+                  ...state.skillDrillBests[gameType as keyof typeof state.skillDrillBests]
+                };
+              }
+            });
+          }
         }
       }
     }

@@ -117,8 +117,12 @@ Preferred communication style: Simple, everyday language.
 
 **Skill Drill Session Types**: rounding_practice, doubling_practice, halving_practice
 - These do NOT count toward Progress page metrics (daily sessions only)
-- Award XP for practice motivation
+- Award minimal XP for practice motivation (3-5 XP per correct answer)
 - Personal bests stored locally via Zustand persist (device-local, not synced to backend)
+- Session duration options: 1, 2, or 3 minutes (user-selected on pre-game screen)
+- Tier system advances every 3 correct answers with tier indicator shown during gameplay
+- Results show highest tier reached, personal best celebrations, encouraging messages
+- Quick restart button allows replaying with same duration
 
 ### Progress Page System (Core System - Locked)
 **Foundational Principles**:

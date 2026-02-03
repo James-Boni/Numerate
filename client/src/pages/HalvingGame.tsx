@@ -28,6 +28,7 @@ interface GameResult {
   accuracy: number;
   medianMs: number;
   xpEarned: number;
+  highestTier: number;
 }
 
 type GameStep = 'pregame' | 'countdown' | 'active' | 'results';
@@ -49,11 +50,12 @@ function FullScreenFlash({ type }: { type: 'correct' | 'wrong' }) {
 
 export default function HalvingGame() {
   const [, navigate] = useLocation();
-  const { settings, level, saveSession, xpIntoLevel, updateSkillDrillBests } = useStore();
+  const { settings, level, saveSession, xpIntoLevel, updateSkillDrillBests, skillDrillBests } = useStore();
   
   const [step, setStep] = useState<GameStep>('pregame');
   const [countdown, setCountdown] = useState(3);
-  const [timeLeft, setTimeLeft] = useState(180);
+  const [selectedDuration, setSelectedDuration] = useState(60);
+  const [timeLeft, setTimeLeft] = useState(60);
   const [question, setQuestion] = useState<HalvingQuestion | null>(null);
   const [input, setInput] = useState('');
   const [flash, setFlash] = useState<'correct' | 'wrong' | null>(null);
@@ -63,6 +65,8 @@ export default function HalvingGame() {
   const [totalCount, setTotalCount] = useState(0);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
+  const [currentTier, setCurrentTier] = useState(0);
+  const [highestTier, setHighestTier] = useState(0);
   
   const responseTimesRef = useRef<number[]>([]);
   const questionStartRef = useRef<number>(Date.now());
@@ -71,12 +75,34 @@ export default function HalvingGame() {
   
   const [result, setResult] = useState<GameResult | null>(null);
   
+  const resetGameState = useCallback(() => {
+    setCorrectCount(0);
+    setTotalCount(0);
+    setStreak(0);
+    setBestStreak(0);
+    setCurrentTier(0);
+    setHighestTier(0);
+    setCountdown(3);
+    setTimeLeft(selectedDuration);
+    setQuestion(null);
+    setInput('');
+    setFlash(null);
+    setFeedback(null);
+    responseTimesRef.current = [];
+    sessionEndedRef.current = false;
+    setResult(null);
+  }, [selectedDuration]);
+  
   const nextQuestion = useCallback(() => {
-    const q = generateHalvingQuestion(getTier(correctCount));
+    const tier = getTier(correctCount);
+    setCurrentTier(tier);
+    if (tier > highestTier) setHighestTier(tier);
+    
+    const q = generateHalvingQuestion(tier);
     setQuestion(q);
     setInput('');
     questionStartRef.current = Date.now();
-  }, [correctCount]);
+  }, [correctCount, highestTier]);
   
   // Countdown effect
   useEffect(() => {
@@ -98,7 +124,7 @@ export default function HalvingGame() {
     const tick = () => {
       if (sessionEndedRef.current) return;
       const elapsed = Date.now() - startTimeRef.current;
-      const remaining = Math.max(0, 180000 - elapsed);
+      const remaining = Math.max(0, selectedDuration * 1000 - elapsed);
       const remainingSeconds = Math.ceil(remaining / 1000);
       setTimeLeft(remainingSeconds);
       
@@ -111,7 +137,7 @@ export default function HalvingGame() {
     tick();
     const interval = setInterval(tick, 250);
     return () => clearInterval(interval);
-  }, [step]);
+  }, [step, selectedDuration]);
   
   const handleKeyPress = (val: string) => {
     if (step !== 'active') return;
@@ -147,6 +173,12 @@ export default function HalvingGame() {
       if (newStreak > bestStreak) setBestStreak(newStreak);
       setFlash('correct');
       setFeedback('correct');
+      
+      const newTier = getTier(correctCount + 1);
+      if (newTier > currentTier && settings.soundOn) {
+        AudioManager.playStreakCelebration(3);
+      }
+      
       if (settings.soundOn) {
         AudioManager.playCorrect(newStreak);
         if ([3, 5, 10, 15, 20].includes(newStreak)) {
@@ -181,16 +213,16 @@ export default function HalvingGame() {
       : 3000;
     
     const accuracy = totalCount > 0 ? correctCount / totalCount : 0;
-    const xpEarned = correctCount * 20 + (bestStreak >= 5 ? 35 : 0);
+    const xpEarned = correctCount * 5 + (bestStreak >= 5 ? 35 : 0);
     
-    const fluencyMetrics = computeFluency(totalCount, correctCount, 180, times);
+    const fluencyMetrics = computeFluency(totalCount, correctCount, selectedDuration, times);
     
     const sessionStats: SessionStats = {
       id: Math.random().toString(36).substr(2, 9),
       date: new Date().toISOString(),
       sessionType: 'halving_practice',
-      durationMode: 180,
-      durationSecondsActual: 180,
+      durationMode: selectedDuration as 60 | 120 | 180,
+      durationSecondsActual: selectedDuration,
       totalQuestions: totalCount,
       correctQuestions: correctCount,
       accuracy,
@@ -208,12 +240,15 @@ export default function HalvingGame() {
     saveSession(sessionStats);
     updateSkillDrillBests('halving', correctCount, bestStreak);
     
+    const finalHighestTier = Math.max(highestTier, getTier(correctCount));
+    
     setResult({
       totalQuestions: totalCount,
       correctQuestions: correctCount,
       accuracy,
       medianMs,
-      xpEarned
+      xpEarned,
+      highestTier: finalHighestTier
     });
     setStep('results');
   };
@@ -222,6 +257,17 @@ export default function HalvingGame() {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+  
+  const isNewPersonalBest = result && result.correctQuestions > 0 && 
+    result.correctQuestions > (skillDrillBests.halving.bestScore || 0);
+  
+  const getEncouragingMessage = (correct: number, accuracy: number) => {
+    if (accuracy >= 0.95 && correct >= 20) return "Outstanding performance! 🌟";
+    if (accuracy >= 0.9 && correct >= 15) return "Excellent work!";
+    if (accuracy >= 0.8 && correct >= 10) return "Great job!";
+    if (correct >= 5) return "Good practice session!";
+    return "Keep practicing!";
   };
   
   // Pregame screen
@@ -233,7 +279,7 @@ export default function HalvingGame() {
           title="Halving Practice"
           description="Halve numbers as fast as you can. Difficulty increases as you go!"
           icon={<Scissors size={40} className="text-primary" />}
-          onStart={() => setStep('countdown')}
+          onStart={(duration) => { setSelectedDuration(duration); setStep('countdown'); }}
           onBack={() => navigate('/train')}
         />
       </MobileLayout>
@@ -270,7 +316,17 @@ export default function HalvingGame() {
             className="text-center space-y-2"
           >
             <h1 className="text-3xl font-bold text-slate-900">Practice Complete!</h1>
-            <p className="text-slate-600">Great work on your halving skills</p>
+            {isNewPersonalBest ? (
+              <motion.p 
+                initial={{ scale: 0.9 }} 
+                animate={{ scale: [0.9, 1.1, 1] }}
+                className="text-lg font-semibold text-amber-600"
+              >
+                🎉 New Personal Best! 🎉
+              </motion.p>
+            ) : (
+              <p className="text-slate-600">{getEncouragingMessage(result.correctQuestions, result.accuracy)}</p>
+            )}
           </motion.div>
           
           <Card className="w-full max-w-sm p-6 space-y-4">
@@ -292,6 +348,10 @@ export default function HalvingGame() {
                 <div className="text-sm text-purple-600">XP Earned</div>
               </div>
             </div>
+            
+            <div className="text-center pt-2 border-t border-slate-100">
+              <div className="text-sm text-slate-500">Highest Tier: <span className="font-semibold text-slate-700">{result.highestTier + 1}</span></div>
+            </div>
           </Card>
           
           <div className="flex gap-3 w-full max-w-sm">
@@ -303,19 +363,20 @@ export default function HalvingGame() {
               Done
             </Button>
             <Button
+              variant="outline"
+              className="flex-1 h-12"
+              onClick={() => { resetGameState(); setStep('countdown'); }}
+            >
+              Play Again ({selectedDuration / 60}min)
+            </Button>
+            <Button
               className="flex-1 h-12 bg-purple-500 hover:bg-purple-600"
               onClick={() => {
+                resetGameState();
                 setStep('pregame');
-                setCorrectCount(0);
-                setTotalCount(0);
-                setStreak(0);
-                setBestStreak(0);
-                responseTimesRef.current = [];
-                sessionEndedRef.current = false;
-                setResult(null);
               }}
             >
-              Practice Again
+              New Game
             </Button>
           </div>
         </div>
@@ -351,19 +412,27 @@ export default function HalvingGame() {
           <button onClick={() => navigate('/train')} className="p-2 -ml-2 text-zinc-400 hover:text-zinc-600">
             <X size={24} />
           </button>
-          <motion.div 
-            animate={timeLeft <= 10 ? { scale: [1, 1.06, 1], color: ['#ef4444', '#f87171', '#ef4444'] } : {}}
-            transition={{ repeat: Infinity, duration: 1 }}
-            className={clsx(
-              "font-mono text-xl font-bold tabular-nums",
-              timeLeft <= 10 ? "text-rose-500" : "text-zinc-400"
+          <div className="flex flex-col items-center">
+            <motion.div 
+              animate={timeLeft <= 10 ? { scale: [1, 1.06, 1], color: ['#ef4444', '#f87171', '#ef4444'] } : {}}
+              transition={{ repeat: Infinity, duration: 1 }}
+              className={clsx(
+                "font-mono text-xl font-bold tabular-nums",
+                timeLeft <= 10 ? "text-rose-500" : "text-zinc-400"
+              )}
+            >
+              {formatTime(timeLeft)}
+            </motion.div>
+            <div className="text-xs text-slate-400 font-medium">Tier {currentTier + 1}</div>
+            {skillDrillBests.halving.bestScore > 0 && correctCount >= skillDrillBests.halving.bestScore - 3 && correctCount < skillDrillBests.halving.bestScore && (
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-xs text-amber-600 font-medium">
+                {skillDrillBests.halving.bestScore - correctCount} more to beat your best!
+              </motion.div>
             )}
-          >
-            {formatTime(timeLeft)}
-          </motion.div>
+          </div>
           <div className="flex items-center gap-3">
             <StreakIndicator streak={streak} />
-            <AnimatedXP value={correctCount * 20} soundEnabled={settings.soundOn} />
+            <AnimatedXP value={correctCount * 5} soundEnabled={settings.soundOn} />
           </div>
         </div>
         

@@ -28,6 +28,8 @@ interface GameResult {
   accuracy: number;
   medianMs: number;
   xpEarned: number;
+  highestTier: number;
+  isNewBest: boolean;
 }
 
 type GameStep = 'pregame' | 'countdown' | 'active' | 'results';
@@ -49,11 +51,12 @@ function FullScreenFlash({ type }: { type: 'correct' | 'wrong' }) {
 
 export default function DoublingGame() {
   const [, navigate] = useLocation();
-  const { settings, level, saveSession, xpIntoLevel, updateSkillDrillBests } = useStore();
+  const { settings, level, saveSession, xpIntoLevel, updateSkillDrillBests, skillDrillBests } = useStore();
   
   const [step, setStep] = useState<GameStep>('pregame');
   const [countdown, setCountdown] = useState(3);
-  const [timeLeft, setTimeLeft] = useState(180);
+  const [selectedDuration, setSelectedDuration] = useState(60);
+  const [timeLeft, setTimeLeft] = useState(60);
   const [question, setQuestion] = useState<DoublingQuestion | null>(null);
   const [input, setInput] = useState('');
   const [flash, setFlash] = useState<'correct' | 'wrong' | null>(null);
@@ -63,6 +66,8 @@ export default function DoublingGame() {
   const [totalCount, setTotalCount] = useState(0);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
+  const [currentTier, setCurrentTier] = useState(0);
+  const [highestTier, setHighestTier] = useState(0);
   
   const responseTimesRef = useRef<number[]>([]);
   const questionStartRef = useRef<number>(Date.now());
@@ -71,12 +76,34 @@ export default function DoublingGame() {
   
   const [result, setResult] = useState<GameResult | null>(null);
   
+  const resetGameState = useCallback(() => {
+    setCorrectCount(0);
+    setTotalCount(0);
+    setStreak(0);
+    setBestStreak(0);
+    setCurrentTier(0);
+    setHighestTier(0);
+    setCountdown(3);
+    setTimeLeft(selectedDuration);
+    setQuestion(null);
+    setInput('');
+    setFlash(null);
+    setFeedback(null);
+    responseTimesRef.current = [];
+    sessionEndedRef.current = false;
+    setResult(null);
+  }, [selectedDuration]);
+  
   const nextQuestion = useCallback(() => {
-    const q = generateDoublingQuestion(getTier(correctCount));
+    const tier = getTier(correctCount);
+    setCurrentTier(tier);
+    if (tier > highestTier) setHighestTier(tier);
+    
+    const q = generateDoublingQuestion(tier);
     setQuestion(q);
     setInput('');
     questionStartRef.current = Date.now();
-  }, [correctCount]);
+  }, [correctCount, highestTier]);
   
   // Countdown effect
   useEffect(() => {
@@ -98,7 +125,7 @@ export default function DoublingGame() {
     const tick = () => {
       if (sessionEndedRef.current) return;
       const elapsed = Date.now() - startTimeRef.current;
-      const remaining = Math.max(0, 180000 - elapsed);
+      const remaining = Math.max(0, selectedDuration * 1000 - elapsed);
       const remainingSeconds = Math.ceil(remaining / 1000);
       setTimeLeft(remainingSeconds);
       
@@ -111,7 +138,7 @@ export default function DoublingGame() {
     tick();
     const interval = setInterval(tick, 250);
     return () => clearInterval(interval);
-  }, [step]);
+  }, [step, selectedDuration]);
   
   const handleKeyPress = (val: string) => {
     if (step !== 'active') return;
@@ -147,6 +174,12 @@ export default function DoublingGame() {
       if (newStreak > bestStreak) setBestStreak(newStreak);
       setFlash('correct');
       setFeedback('correct');
+      
+      const newTier = getTier(correctCount + 1);
+      if (newTier > currentTier && settings.soundOn) {
+        AudioManager.playStreakCelebration(3);
+      }
+      
       if (settings.soundOn) {
         AudioManager.playCorrect(newStreak);
         if ([3, 5, 10, 15, 20].includes(newStreak)) {
@@ -181,16 +214,18 @@ export default function DoublingGame() {
       : 3000;
     
     const accuracy = totalCount > 0 ? correctCount / totalCount : 0;
-    const xpEarned = correctCount * 18 + (bestStreak >= 5 ? 30 : 0);
+    const xpEarned = correctCount * 4 + (bestStreak >= 5 ? 30 : 0);
     
-    const fluencyMetrics = computeFluency(totalCount, correctCount, 180, times);
+    const fluencyMetrics = computeFluency(totalCount, correctCount, selectedDuration, times);
+    
+    const isNewBest = correctCount > skillDrillBests.doubling.bestScore;
     
     const sessionStats: SessionStats = {
       id: Math.random().toString(36).substr(2, 9),
       date: new Date().toISOString(),
       sessionType: 'doubling_practice',
-      durationMode: 180,
-      durationSecondsActual: 180,
+      durationMode: selectedDuration as 60 | 120 | 180,
+      durationSecondsActual: selectedDuration,
       totalQuestions: totalCount,
       correctQuestions: correctCount,
       accuracy,
@@ -213,7 +248,9 @@ export default function DoublingGame() {
       correctQuestions: correctCount,
       accuracy,
       medianMs,
-      xpEarned
+      xpEarned,
+      highestTier: highestTier,
+      isNewBest
     });
     setStep('results');
   };
@@ -222,6 +259,15 @@ export default function DoublingGame() {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+  
+  const getPerformanceMessage = (correct: number, accuracy: number, tier: number) => {
+    if (tier >= 5 && accuracy >= 0.9) return "Outstanding performance! You're a doubling master! 🏆";
+    if (tier >= 4 && accuracy >= 0.85) return "Excellent work! You've reached advanced levels! ⭐";
+    if (tier >= 3 && accuracy >= 0.8) return "Great job! You're building strong doubling skills! 💪";
+    if (tier >= 2 && accuracy >= 0.7) return "Nice progress! Keep practicing to level up! 📈";
+    if (correct >= 10) return "Good start! Practice more to improve your speed! 🎯";
+    return "Keep going! Every practice session makes you stronger! 💫";
   };
   
   // Pregame screen
@@ -233,7 +279,7 @@ export default function DoublingGame() {
           title="Doubling Practice"
           description="Double numbers as fast as you can. Difficulty increases as you go!"
           icon={<Copy size={40} className="text-primary" />}
-          onStart={() => setStep('countdown')}
+          onStart={(duration) => { setSelectedDuration(duration); setStep('countdown'); }}
           onBack={() => navigate('/train')}
         />
       </MobileLayout>
@@ -270,7 +316,16 @@ export default function DoublingGame() {
             className="text-center space-y-2"
           >
             <h1 className="text-3xl font-bold text-slate-900">Practice Complete!</h1>
-            <p className="text-slate-600">Great work on your doubling skills</p>
+            {result.isNewBest && (
+              <motion.p 
+                initial={{ scale: 0.9, opacity: 0 }} 
+                animate={{ scale: 1, opacity: 1 }}
+                className="text-lg font-semibold text-amber-600"
+              >
+                🎉 New Personal Best! 🎉
+              </motion.p>
+            )}
+            <p className="text-slate-600">{getPerformanceMessage(result.correctQuestions, result.accuracy, result.highestTier)}</p>
           </motion.div>
           
           <Card className="w-full max-w-sm p-6 space-y-4">
@@ -287,35 +342,40 @@ export default function DoublingGame() {
                 <div className="text-3xl font-bold text-slate-900">{(result.medianMs / 1000).toFixed(1)}s</div>
                 <div className="text-sm text-slate-600">Avg Speed</div>
               </div>
-              <div className="text-center p-4 bg-blue-50 rounded-xl">
-                <div className="text-3xl font-bold text-blue-600">+{result.xpEarned}</div>
-                <div className="text-sm text-blue-600">XP Earned</div>
+              <div className="text-center p-4 bg-purple-50 rounded-xl">
+                <div className="text-3xl font-bold text-purple-600">{result.highestTier + 1}</div>
+                <div className="text-sm text-purple-600">Highest Tier</div>
               </div>
+            </div>
+            <div className="text-center p-4 bg-blue-50 rounded-xl">
+              <div className="text-3xl font-bold text-blue-600">+{result.xpEarned}</div>
+              <div className="text-sm text-blue-600">XP Earned</div>
             </div>
           </Card>
           
-          <div className="flex gap-3 w-full max-w-sm">
+          <div className="flex flex-col gap-3 w-full max-w-sm">
+            <Button
+              className="w-full h-12 bg-blue-500 hover:bg-blue-600"
+              onClick={() => { resetGameState(); setStep('countdown'); }}
+            >
+              Play Again ({selectedDuration >= 60 ? `${selectedDuration / 60}min` : `${selectedDuration}s`})
+            </Button>
             <Button
               variant="outline"
-              className="flex-1 h-12"
+              className="w-full h-12"
+              onClick={() => {
+                resetGameState();
+                setStep('pregame');
+              }}
+            >
+              Change Duration
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full h-12"
               onClick={() => navigate('/train')}
             >
               Done
-            </Button>
-            <Button
-              className="flex-1 h-12 bg-blue-500 hover:bg-blue-600"
-              onClick={() => {
-                setStep('pregame');
-                setCorrectCount(0);
-                setTotalCount(0);
-                setStreak(0);
-                setBestStreak(0);
-                responseTimesRef.current = [];
-                sessionEndedRef.current = false;
-                setResult(null);
-              }}
-            >
-              Practice Again
             </Button>
           </div>
         </div>
@@ -351,19 +411,27 @@ export default function DoublingGame() {
           <button onClick={() => navigate('/train')} className="p-2 -ml-2 text-zinc-400 hover:text-zinc-600">
             <X size={24} />
           </button>
-          <motion.div 
-            animate={timeLeft <= 10 ? { scale: [1, 1.06, 1], color: ['#ef4444', '#f87171', '#ef4444'] } : {}}
-            transition={{ repeat: Infinity, duration: 1 }}
-            className={clsx(
-              "font-mono text-xl font-bold tabular-nums",
-              timeLeft <= 10 ? "text-rose-500" : "text-zinc-400"
+          <div className="flex flex-col items-center">
+            <motion.div 
+              animate={timeLeft <= 10 ? { scale: [1, 1.06, 1], color: ['#ef4444', '#f87171', '#ef4444'] } : {}}
+              transition={{ repeat: Infinity, duration: 1 }}
+              className={clsx(
+                "font-mono text-xl font-bold tabular-nums",
+                timeLeft <= 10 ? "text-rose-500" : "text-zinc-400"
+              )}
+            >
+              {formatTime(timeLeft)}
+            </motion.div>
+            <div className="text-xs text-slate-400 font-medium">Tier {currentTier + 1}</div>
+            {skillDrillBests.doubling.bestScore > 0 && correctCount >= skillDrillBests.doubling.bestScore - 3 && correctCount < skillDrillBests.doubling.bestScore && (
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-xs text-amber-600 font-medium">
+                {skillDrillBests.doubling.bestScore - correctCount} more to beat your best!
+              </motion.div>
             )}
-          >
-            {formatTime(timeLeft)}
-          </motion.div>
+          </div>
           <div className="flex items-center gap-3">
             <StreakIndicator streak={streak} />
-            <AnimatedXP value={correctCount * 18} soundEnabled={settings.soundOn} />
+            <AnimatedXP value={correctCount * 4} soundEnabled={settings.soundOn} />
           </div>
         </div>
         

@@ -181,28 +181,18 @@ export default function Train() {
 
               {/* Doubling Practice */}
               <Card 
-                className={`p-4 border-none shadow-none rounded-2xl transition-transform ${
-                  level >= 13 
-                    ? 'bg-gradient-to-br from-purple-50 to-violet-50 cursor-pointer active:scale-[0.98]' 
-                    : 'bg-slate-50 opacity-60'
-                }`}
-                onClick={() => level >= 13 && setLocation('/doubling')}
+                className="p-4 border-none shadow-none rounded-2xl transition-transform bg-gradient-to-br from-purple-50 to-violet-50 cursor-pointer active:scale-[0.98]"
+                onClick={() => setLocation('/doubling')}
                 data-testid="card-doubling-practice"
               >
                 <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                    level >= 13 ? 'bg-purple-100' : 'bg-slate-200'
-                  }`}>
-                    {level >= 13 ? (
-                      <Copy size={24} className="text-purple-500" />
-                    ) : (
-                      <Lock size={20} className="text-slate-400" />
-                    )}
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-purple-100">
+                    <Copy size={24} className="text-purple-500" />
                   </div>
                   <div className="flex-1">
                     <h4 className="text-slate-900 font-bold">Doubling</h4>
                     <p className="text-slate-500 text-xs">
-                      {level >= 13 ? 'Double your way to faster multiplication' : 'Unlocks at Level 13'}
+                      Double your way to faster multiplication
                     </p>
                   </div>
                   <ChevronRight size={20} className="text-slate-400" />
@@ -211,28 +201,18 @@ export default function Train() {
 
               {/* Halving Practice */}
               <Card 
-                className={`p-4 border-none shadow-none rounded-2xl transition-transform ${
-                  level >= 21 
-                    ? 'bg-gradient-to-br from-green-50 to-emerald-50 cursor-pointer active:scale-[0.98]' 
-                    : 'bg-slate-50 opacity-60'
-                }`}
-                onClick={() => level >= 21 && setLocation('/halving')}
+                className="p-4 border-none shadow-none rounded-2xl transition-transform bg-gradient-to-br from-green-50 to-emerald-50 cursor-pointer active:scale-[0.98]"
+                onClick={() => setLocation('/halving')}
                 data-testid="card-halving-practice"
               >
                 <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                    level >= 21 ? 'bg-green-100' : 'bg-slate-200'
-                  }`}>
-                    {level >= 21 ? (
-                      <Scissors size={24} className="text-green-500" />
-                    ) : (
-                      <Lock size={20} className="text-slate-400" />
-                    )}
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-green-100">
+                    <Scissors size={24} className="text-green-500" />
                   </div>
                   <div className="flex-1">
                     <h4 className="text-slate-900 font-bold">Halving</h4>
                     <p className="text-slate-500 text-xs">
-                      {level >= 21 ? 'Halve your way to faster division' : 'Unlocks at Level 21'}
+                      Halve your way to faster division
                     </p>
                   </div>
                   <ChevronRight size={20} className="text-slate-400" />
