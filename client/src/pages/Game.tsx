@@ -17,7 +17,9 @@ import { Confetti } from '@/components/game/Confetti';
 import { ReassuranceScreen } from '@/components/game/ReassuranceScreen';
 import { PaywallScreen } from '@/components/game/PaywallScreen';
 import { DailyChallengeIntro } from '@/components/game/DailyChallengeIntro';
+import { StrategyLesson } from '@/components/game/StrategyLesson';
 import { useAccountStore, isPremiumActive } from '@/lib/services/account-store';
+import { detectWeakness, WeaknessPattern } from '@/lib/logic/weakness-detector';
 
 function LevelUpCelebration({ 
   levelBefore, 
@@ -229,11 +231,12 @@ function CountUp({ value, duration = 1, delay = 0, onTick, suffix = '' }: {
 }
 
 export default function Game() {
-  const [step, setStep] = useState<'daily_intro' | 'active' | 'results' | 'levelup' | 'reassurance' | 'paywall' | 'blocked'>('daily_intro');
+  const [step, setStep] = useState<'daily_intro' | 'active' | 'results' | 'strategy' | 'levelup' | 'reassurance' | 'paywall' | 'blocked'>('daily_intro');
   const [results, setResults] = useState<SessionStats | null>(null);
+  const [detectedWeakness, setDetectedWeakness] = useState<WeaknessPattern | null>(null);
   const [entitlementChecked, setEntitlementChecked] = useState(false);
   const [_, setLocation] = useLocation();
-  const { currentTier, saveSession, settings, hasUsedFreeDaily, markFreeTrialUsed } = useStore();
+  const { currentTier, saveSession, settings, hasUsedFreeDaily, markFreeTrialUsed, seenStrategies, markStrategySeen } = useStore();
   const { entitlement, refreshEntitlement } = useAccountStore();
   const revealRun = React.useRef(false);
   const levelUpShownRef = React.useRef(false);
@@ -264,6 +267,16 @@ export default function Game() {
     console.log(`[SESSION_FLOW] Training complete: ${Date.now()}`, stats);
     saveSession(stats);
     setResults(stats);
+    
+    // Detect weakness patterns for coaching (filter out already-seen strategies)
+    if (stats.questionResults && stats.questionResults.length > 0) {
+      const weakness = detectWeakness(stats.questionResults, seenStrategies);
+      if (weakness) {
+        console.log('[COACHING] Weakness detected:', weakness);
+        setDetectedWeakness(weakness);
+      }
+    }
+    
     setStep('results');
   };
 
@@ -329,6 +342,31 @@ export default function Game() {
         initialTier={currentTier}
         onComplete={handleComplete}
         onExit={() => setLocation('/train')}
+      />
+    );
+  }
+
+  // Strategy lesson step (shown after results if weakness detected)
+  if (step === 'strategy' && detectedWeakness) {
+    return (
+      <StrategyLesson
+        strategyId={detectedWeakness.strategyId}
+        onComplete={() => {
+          // Mark strategy as seen so it won't show again
+          markStrategySeen(detectedWeakness.strategyId);
+          // Clear weakness so it doesn't show again, then continue flow
+          setDetectedWeakness(null);
+          const hasLevelUp = results && (results.levelUpCount ?? 0) > 0;
+          if (hasLevelUp && !levelUpShownRef.current) {
+            levelUpShownRef.current = true;
+            setStep('levelup');
+          } else if (isFirstFreeSession) {
+            markFreeTrialUsed();
+            setStep('reassurance');
+          } else {
+            setLocation('/train');
+          }
+        }}
       />
     );
   }
@@ -486,7 +524,10 @@ export default function Game() {
             size="lg" 
             className="w-full h-14 text-lg font-semibold rounded-2xl shadow-lg shadow-primary/10 mt-4"
             onClick={() => {
-              if (hasLevelUp && !levelUpShownRef.current) {
+              // Flow: results → strategy (if weakness) → levelup (if applicable) → reassurance/train
+              if (detectedWeakness) {
+                setStep('strategy');
+              } else if (hasLevelUp && !levelUpShownRef.current) {
                 levelUpShownRef.current = true;
                 setStep('levelup');
               } else if (isFirstFreeSession) {
@@ -497,7 +538,7 @@ export default function Game() {
               }
             }}
           >
-            {hasLevelUp && !levelUpShownRef.current ? 'View Level Up!' : 'Continue'}
+            {detectedWeakness ? 'See Tip' : hasLevelUp && !levelUpShownRef.current ? 'View Level Up!' : 'Continue'}
           </Button>
         </motion.div>
 

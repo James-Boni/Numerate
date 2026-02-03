@@ -61,9 +61,16 @@ Preferred communication style: Simple, everyday language.
 - Short, unobtrusive sounds for correct/incorrect feedback
 - Respects user sound toggle preferences
 
+**Coaching System (Strategy Lessons)**:
+- Weakness detection analyzes session question results for patterns
+- 6 animated strategy lessons: Place Value Split, Make Tens, Count Up, Compensation, Distributive Split, Nines Trick
+- Lessons appear after session results (before level up) when weakness detected
+- Each strategy shown only once per user (tracked in seenStrategies)
+- Key files: `weakness-detector.ts`, `strategy-content.ts`, `StrategyLesson.tsx`
+
 ### Application Flow
 1. Welcome → Assessment (3-minute placement test) → Starting level assignment
-2. Daily Training → Timed sessions (1, 2, or 3 minutes) → Session summary with animated results
+2. Daily Training → Daily Challenge Intro → Timed session (3 minutes) → Session summary → Strategy Lesson (if weakness detected) → Level Up celebration → Reassurance/Paywall (first session)
 3. Progress tracking → Time-bound metrics, level journey, performance insights
 
 ### Progress Page System (Core System - Locked)

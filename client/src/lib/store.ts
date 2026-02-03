@@ -24,6 +24,14 @@ export interface UserSettings {
   showDebugOverlay: boolean;
 }
 
+export interface QuestionResult {
+  operation: 'add' | 'sub' | 'mul' | 'div';
+  operandA: number;
+  operandB: number;
+  isCorrect: boolean;
+  responseTimeMs: number;
+}
+
 export interface SessionStats {
   id: string;
   date: string; // ISO string
@@ -56,6 +64,7 @@ export interface SessionStats {
   metBonus?: boolean;
   valid?: boolean;
   responseTimes?: number[];
+  questionResults?: QuestionResult[];
 }
 
 export interface UserState {
@@ -82,6 +91,9 @@ export interface UserState {
   
   // Paywall
   hasUsedFreeDaily: boolean;
+  
+  // Coaching/Strategy tracking
+  seenStrategies: string[]; // Strategy IDs user has already seen
   
   // New Progression Engine State
   progression: ProgressionState;
@@ -112,6 +124,9 @@ export interface UserState {
   
   // Paywall Actions
   markFreeTrialUsed: () => void;
+  
+  // Coaching Actions
+  markStrategySeen: (strategyId: string) => void;
   
   // Sync Actions
   syncWithBackend: () => Promise<void>;
@@ -150,6 +165,8 @@ export const useStore = create<UserState>()(
       
       hasUsedFreeDaily: false,
       
+      seenStrategies: [],
+      
       progression: { ...INITIAL_PROGRESSION_STATE },
       
       settings: {
@@ -179,6 +196,7 @@ export const useStore = create<UserState>()(
             streakCount: progress.streakCount,
             lastStreakDate: progress.lastStreakDate?.toString() || null,
             hasUsedFreeDaily: progress.hasUsedFreeDaily ?? false,
+            seenStrategies: (progress.seenStrategies as string[]) ?? [],
             progression: {
               level: progress.level,
               band: progress.band,
@@ -399,6 +417,13 @@ export const useStore = create<UserState>()(
         }
       },
       
+      markStrategySeen: (strategyId: string) => {
+        const state = get();
+        if (!state.seenStrategies.includes(strategyId)) {
+          set({ seenStrategies: [...state.seenStrategies, strategyId] });
+        }
+      },
+      
       syncWithBackend: async () => {
         const state = get();
         if (!state.uid) return;
@@ -420,6 +445,7 @@ export const useStore = create<UserState>()(
             poorStreak: state.progression.poorStreak,
             history: state.progression.history as any,
             hasUsedFreeDaily: state.hasUsedFreeDaily,
+            seenStrategies: state.seenStrategies,
             soundOn: state.settings.soundOn,
             hapticsOn: state.settings.hapticsOn,
             difficultyPreference: state.settings.difficultyPreference,
@@ -469,6 +495,7 @@ export const useStore = create<UserState>()(
             streakCount: progress.streakCount,
             lastStreakDate: progress.lastStreakDate?.toString() || null,
             hasUsedFreeDaily: progress.hasUsedFreeDaily ?? false,
+            seenStrategies: (progress.seenStrategies as string[]) ?? [],
             progression: {
               level: progress.level,
               band: progress.band,

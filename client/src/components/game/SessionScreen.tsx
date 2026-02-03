@@ -6,7 +6,7 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { KeypadModern } from '@/components/game/Keypad';
 import { generateQuestion, calculateXP, Question, TIERS } from '@/lib/game-logic';
 import { generateQuestionForLevel, GeneratedQuestionMeta } from '@/lib/logic/generator_adapter';
-import { useStore, SessionStats } from '@/lib/store';
+import { useStore, SessionStats, QuestionResult } from '@/lib/store';
 
 import { AudioManager } from '@/lib/audio';
 import { computeFluencyComponents, computeFluencyScore, computeSessionXP } from '@/lib/logic/progression';
@@ -69,6 +69,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   
   const opCountsRef = useRef<OpCounts>({ add: 0, sub: 0, mul: 0, div: 0 });
   const operandStatsRef = useRef<OperandStats>({ minOperand: Infinity, maxOperand: 0, operandSum: 0, count: 0 });
+  const questionResultsRef = useRef<QuestionResult[]>([]);
   const [difficultyParams, setDifficultyParams] = useState<DifficultyParams | null>(null);
   const [currentOpCounts, setCurrentOpCounts] = useState<OpCounts>({ add: 0, sub: 0, mul: 0, div: 0 });
   
@@ -314,6 +315,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       metBonus: xpResult.meetsExcellence || xpResult.meetsElite,
       valid: xpResult.isValid,
       responseTimes: [...responseTimesRef.current],
+      questionResults: [...questionResultsRef.current],
     };
     
     onComplete(stats);
@@ -339,6 +341,19 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       question?.id || 'unknown', 
       currentQuestionMetaRef.current.targetTimeMs
     );
+
+    // Track question result for weakness detection
+    if ((question as any)?.meta) {
+      const meta = (question as any).meta;
+      const op = meta.operation === 'percent' || meta.operation === 'multi' ? 'mul' : meta.operation;
+      questionResultsRef.current.push({
+        operation: op as 'add' | 'sub' | 'mul' | 'div',
+        operandA: meta.operandA,
+        operandB: meta.operandB,
+        isCorrect,
+        responseTimeMs: timeTaken,
+      });
+    }
 
     console.log("[ANSWER_RECORDED]", { 
       isCorrect, 
