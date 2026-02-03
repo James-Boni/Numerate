@@ -27,7 +27,7 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-48 h-48"
+        className="w-56 h-56"
       >
         <img 
           src="/numerate-logo.png" 

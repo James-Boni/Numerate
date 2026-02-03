@@ -42,7 +42,7 @@ export default function Welcome() {
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="w-36 h-36"
+            className="w-44 h-44"
         >
             <img 
               src="/numerate-logo.png" 
