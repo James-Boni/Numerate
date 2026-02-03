@@ -448,66 +448,76 @@ export default function HalvingGame() {
   
   // Active game screen
   return (
-    <MobileLayout className="bg-white">
+    <MobileLayout className="bg-white overflow-hidden">
       <AnimatePresence>
         {flash && <FullScreenFlash type={flash} />}
       </AnimatePresence>
       
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
-        <button onClick={() => navigate('/train')} className="p-2 -ml-2">
-          <X size={24} className="text-slate-400" />
-        </button>
-        <div className="flex items-center gap-2 text-lg font-semibold">
-          <Clock size={20} className="text-purple-500" />
-          <span className={clsx(timeLeft <= 10 && "text-red-500")}>{formatTime(timeLeft)}</span>
-        </div>
-        <div className="flex items-center gap-1 text-purple-600 font-medium">
-          <Zap size={18} />
-          <span>{correctCount * 20}</span>
-        </div>
-      </div>
+      {/* Tap anywhere to submit layer */}
+      <div 
+        className="absolute inset-x-0 top-0 bottom-[320px] z-10 cursor-pointer"
+        onClick={() => input && handleSubmit()}
+      />
       
-      {/* Question display */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
-        {question && (
-          <motion.div
-            key={question.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center space-y-6"
-          >
-            <div className="text-lg text-slate-500 font-medium">Halve this number</div>
-            <div className="text-6xl font-bold text-slate-900">
-              {question.number % 1 === 0 ? question.number : question.number.toFixed(1)}
-            </div>
-            
-            {/* Answer display */}
-            <div className="h-16 flex items-center justify-center">
-              <div className={clsx(
-                "text-4xl font-bold min-w-[120px] border-b-4 pb-2",
-                input ? "text-slate-900 border-purple-400" : "text-slate-300 border-slate-200"
-              )}>
-                {input || '?'}
-              </div>
-            </div>
-          </motion.div>
-        )}
+      <div className="relative z-20 flex flex-col h-full pointer-events-none">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b pointer-events-auto">
+          <button onClick={() => navigate('/train')} className="p-2 -ml-2">
+            <X size={24} className="text-slate-400" />
+          </button>
+          <div className="flex items-center gap-2 text-lg font-semibold">
+            <Clock size={20} className="text-purple-500" />
+            <span className={clsx(timeLeft <= 10 && "text-red-500")}>{formatTime(timeLeft)}</span>
+          </div>
+          <div className="flex items-center gap-1 text-purple-600 font-medium">
+            <Zap size={18} />
+            <span>{correctCount * 20}</span>
+          </div>
+        </div>
         
-        {/* Stats row */}
-        <div className="flex gap-6 mt-8 text-sm text-slate-500">
-          <div>Correct: <span className="font-semibold text-slate-900">{correctCount}</span></div>
-          <div>Streak: <span className="font-semibold text-purple-600">{streak}</span></div>
+        {/* Question display */}
+        <div className="flex-1 flex flex-col items-center justify-center p-6">
+          {question && (
+            <motion.div
+              key={question.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center space-y-6"
+            >
+              <div className="text-lg text-slate-500 font-medium">Halve this number</div>
+              <div className="text-6xl font-bold text-slate-900">
+                {question.number % 1 === 0 ? question.number : question.number.toFixed(1)}
+              </div>
+              
+              {/* Answer display */}
+              <div className="h-16 flex items-center justify-center">
+                <div className={clsx(
+                  "text-4xl font-bold min-w-[120px] border-b-4 pb-2",
+                  input ? "text-slate-900 border-purple-400" : "text-slate-300 border-slate-200"
+                )}>
+                  {input || '?'}
+                </div>
+              </div>
+            </motion.div>
+          )}
+          
+          {/* Stats row */}
+          <div className="flex gap-6 mt-8 text-sm text-slate-500">
+            <div>Correct: <span className="font-semibold text-slate-900">{correctCount}</span></div>
+            <div>Streak: <span className="font-semibold text-purple-600">{streak}</span></div>
+          </div>
         </div>
       </div>
       
       {/* Keypad */}
-      <KeypadModern
-        onPress={handleKeyPress}
-        onDelete={handleDelete}
-        onSubmit={handleSubmit}
-        submitDisabled={!input}
-      />
+      <div className="relative z-20 pointer-events-auto">
+        <KeypadModern
+          onPress={handleKeyPress}
+          onDelete={handleDelete}
+          onSubmit={handleSubmit}
+          submitDisabled={!input}
+        />
+      </div>
     </MobileLayout>
   );
 }
