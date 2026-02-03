@@ -111,6 +111,13 @@ export interface UserState {
     highestFluencyDate: string | null;
   };
   
+  // Skill Drill Personal Bests
+  skillDrillBests: {
+    rounding: { bestScore: number; bestStreak: number; gamesPlayed: number; totalCorrect: number; };
+    doubling: { bestScore: number; bestStreak: number; gamesPlayed: number; totalCorrect: number; };
+    halving: { bestScore: number; bestStreak: number; gamesPlayed: number; totalCorrect: number; };
+  };
+  
   // New Progression Engine State
   progression: ProgressionState;
 
@@ -146,6 +153,7 @@ export interface UserState {
   
   // Personal Records Actions
   checkAndUpdatePersonalBests: (session: SessionStats) => string[];
+  updateSkillDrillBests: (gameType: 'rounding' | 'doubling' | 'halving', score: number, streak: number) => boolean;
   
   // Sync Actions
   syncWithBackend: () => Promise<void>;
@@ -199,6 +207,12 @@ export const useStore = create<UserState>()(
         highestFluencyDate: null
       },
       
+      skillDrillBests: {
+        rounding: { bestScore: 0, bestStreak: 0, gamesPlayed: 0, totalCorrect: 0 },
+        doubling: { bestScore: 0, bestStreak: 0, gamesPlayed: 0, totalCorrect: 0 },
+        halving: { bestScore: 0, bestStreak: 0, gamesPlayed: 0, totalCorrect: 0 },
+      },
+      
       progression: { ...INITIAL_PROGRESSION_STATE },
       
       settings: {
@@ -243,6 +257,7 @@ export const useStore = create<UserState>()(
               highestFluencyScore: null,
               highestFluencyDate: null
             },
+            skillDrillBests: get().skillDrillBests,
             progression: {
               level: progress.level,
               band: progress.band,
@@ -534,6 +549,32 @@ export const useStore = create<UserState>()(
         return newRecords;
       },
       
+      updateSkillDrillBests: (gameType: 'rounding' | 'doubling' | 'halving', score: number, streak: number): boolean => {
+        const state = get();
+        const currentBests = { ...state.skillDrillBests };
+        const gameBests = { ...currentBests[gameType] };
+        let isNewBest = false;
+        
+        // Update games played and total correct
+        gameBests.gamesPlayed += 1;
+        gameBests.totalCorrect += score;
+        
+        // Check for new bests
+        if (score > gameBests.bestScore) {
+          gameBests.bestScore = score;
+          isNewBest = true;
+        }
+        if (streak > gameBests.bestStreak) {
+          gameBests.bestStreak = streak;
+          isNewBest = true;
+        }
+        
+        currentBests[gameType] = gameBests;
+        set({ skillDrillBests: currentBests });
+        
+        return isNewBest;
+      },
+      
       syncWithBackend: async () => {
         const state = get();
         if (!state.uid) return;
@@ -619,6 +660,7 @@ export const useStore = create<UserState>()(
               highestFluencyScore: null,
               highestFluencyDate: null
             },
+            skillDrillBests: get().skillDrillBests,
             progression: {
               level: progress.level,
               band: progress.band,

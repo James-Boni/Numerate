@@ -4,7 +4,7 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { useLocation } from 'wouter';
 import { useStore, SessionStats } from '@/lib/store';
 import { Button } from '@/components/ui/button';
-import { X, Clock, CircleDot, Zap, ChevronLeft, Lock, Scissors } from 'lucide-react';
+import { X, Scissors } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { clsx } from 'clsx';
 import { KeypadModern } from '@/components/game/Keypad';
@@ -13,6 +13,8 @@ import { Card } from '@/components/ui/card';
 import { AnswerFeedback } from '@/components/game/AnswerFeedback';
 import { StreakIndicator } from '@/components/game/StreakIndicator';
 import { AnimatedXP } from '@/components/game/AnimatedXP';
+import { SkillDrillPreGame } from '@/components/game/SkillDrillPreGame';
+import { generateHalvingQuestion, getTier } from '@/lib/skill-drill-difficulty';
 
 interface HalvingQuestion {
   id: string;
@@ -28,64 +30,7 @@ interface GameResult {
   xpEarned: number;
 }
 
-type GameStep = 'locked' | 'intro' | 'countdown' | 'active' | 'results';
-
-function generateHalvingQuestion(level: number): HalvingQuestion {
-  // Scale difficulty based on level
-  // L21-30: Small whole numbers that halve nicely (4-100)
-  // L31-40: Include odd numbers (results in .5)
-  // L41-60: Larger numbers with decimals
-  // L61+: Complex decimals
-  
-  let number: number;
-  
-  if (level < 31) {
-    // Even numbers only - clean halves
-    number = (Math.floor(Math.random() * 49) + 2) * 2; // 4 to 100, all even
-  } else if (level < 41) {
-    // Include odd numbers (results will be .5)
-    if (Math.random() < 0.4) {
-      // Odd number
-      number = Math.floor(Math.random() * 97) + 3; // 3 to 100
-      if (number % 2 === 0) number++; // Make odd
-    } else {
-      // Even number
-      number = (Math.floor(Math.random() * 99) + 2) * 2; // 4 to 200, even
-    }
-  } else if (level < 61) {
-    // Larger numbers, some decimals
-    if (Math.random() < 0.3) {
-      // Decimal that halves nicely
-      const base = Math.floor(Math.random() * 200) + 10;
-      number = base + 0.5;
-    } else if (Math.random() < 0.5) {
-      // Odd number
-      number = Math.floor(Math.random() * 197) + 3;
-      if (number % 2 === 0) number++;
-    } else {
-      // Even number
-      number = (Math.floor(Math.random() * 199) + 2) * 2; // Up to 400
-    }
-  } else {
-    // Complex - any number including decimals
-    if (Math.random() < 0.4) {
-      // Decimal
-      const base = Math.floor(Math.random() * 300) + 10;
-      const decimal = Math.round(Math.random() * 9) / 10;
-      number = base + decimal;
-    } else {
-      number = Math.floor(Math.random() * 500) + 10;
-    }
-  }
-  
-  const answer = number / 2;
-  
-  return {
-    id: Math.random().toString(36).substr(2, 9),
-    number,
-    answer
-  };
-}
+type GameStep = 'pregame' | 'countdown' | 'active' | 'results';
 
 function FullScreenFlash({ type }: { type: 'correct' | 'wrong' }) {
   return (
@@ -102,15 +47,11 @@ function FullScreenFlash({ type }: { type: 'correct' | 'wrong' }) {
   );
 }
 
-const UNLOCK_LEVEL = 21;
-
 export default function HalvingGame() {
   const [, navigate] = useLocation();
-  const { settings, level, saveSession, xpIntoLevel } = useStore();
+  const { settings, level, saveSession, xpIntoLevel, updateSkillDrillBests } = useStore();
   
-  const isLocked = level < UNLOCK_LEVEL;
-  
-  const [step, setStep] = useState<GameStep>(isLocked ? 'locked' : 'intro');
+  const [step, setStep] = useState<GameStep>('pregame');
   const [countdown, setCountdown] = useState(3);
   const [timeLeft, setTimeLeft] = useState(180);
   const [question, setQuestion] = useState<HalvingQuestion | null>(null);
@@ -131,11 +72,11 @@ export default function HalvingGame() {
   const [result, setResult] = useState<GameResult | null>(null);
   
   const nextQuestion = useCallback(() => {
-    const q = generateHalvingQuestion(level);
+    const q = generateHalvingQuestion(getTier(correctCount));
     setQuestion(q);
     setInput('');
     questionStartRef.current = Date.now();
-  }, [level]);
+  }, [correctCount]);
   
   // Countdown effect
   useEffect(() => {
@@ -265,6 +206,7 @@ export default function HalvingGame() {
     };
     
     saveSession(sessionStats);
+    updateSkillDrillBests('halving', correctCount, bestStreak);
     
     setResult({
       totalQuestions: totalCount,
@@ -282,102 +224,18 @@ export default function HalvingGame() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
   
-  // Locked screen
-  if (step === 'locked') {
+  // Pregame screen
+  if (step === 'pregame') {
     return (
       <MobileLayout className="bg-gradient-to-b from-purple-50 to-white">
-        <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="w-24 h-24 rounded-3xl bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center shadow-lg"
-          >
-            <Lock size={48} className="text-white" />
-          </motion.div>
-          
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold text-slate-900">Halving Practice</h1>
-            <p className="text-slate-600">Unlocks at Level {UNLOCK_LEVEL}</p>
-          </div>
-          
-          <Card className="w-full max-w-sm p-6 text-center">
-            <p className="text-slate-600">
-              You're currently at Level {level}. Keep practicing to unlock this skill drill!
-            </p>
-            <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-purple-400 rounded-full transition-all"
-                style={{ width: `${(level / UNLOCK_LEVEL) * 100}%` }}
-              />
-            </div>
-            <p className="text-sm text-slate-500 mt-2">{UNLOCK_LEVEL - level} levels to go</p>
-          </Card>
-          
-          <Button
-            variant="ghost"
-            className="text-slate-500"
-            onClick={() => navigate('/train')}
-          >
-            <ChevronLeft size={18} />
-            Back to Train
-          </Button>
-        </div>
-      </MobileLayout>
-    );
-  }
-  
-  // Intro screen
-  if (step === 'intro') {
-    return (
-      <MobileLayout className="bg-gradient-to-b from-purple-50 to-white">
-        <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="w-24 h-24 rounded-3xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center shadow-lg"
-          >
-            <Scissors size={48} className="text-white" />
-          </motion.div>
-          
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold text-slate-900">Halving Practice</h1>
-            <p className="text-slate-600">Halve each number as fast as you can</p>
-          </div>
-          
-          <Card className="w-full max-w-sm p-6 space-y-4">
-            <div className="space-y-3 text-sm text-slate-600">
-              <div className="flex items-center gap-3">
-                <Clock size={18} className="text-purple-500" />
-                <span>3 minutes of focused practice</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <CircleDot size={18} className="text-purple-500" />
-                <span>See a number, halve it</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Zap size={18} className="text-purple-500" />
-                <span>20 XP per correct answer</span>
-              </div>
-            </div>
-          </Card>
-          
-          <Button
-            size="lg"
-            className="w-full max-w-sm h-14 text-lg bg-purple-500 hover:bg-purple-600"
-            onClick={() => setStep('countdown')}
-          >
-            Start Practice
-          </Button>
-          
-          <Button
-            variant="ghost"
-            className="text-slate-500"
-            onClick={() => navigate('/train')}
-          >
-            <ChevronLeft size={18} />
-            Back to Train
-          </Button>
-        </div>
+        <SkillDrillPreGame
+          gameType="halving"
+          title="Halving Practice"
+          description="Halve numbers as fast as you can. Difficulty increases as you go!"
+          icon={<Scissors size={40} className="text-primary" />}
+          onStart={() => setStep('countdown')}
+          onBack={() => navigate('/train')}
+        />
       </MobileLayout>
     );
   }
@@ -447,7 +305,7 @@ export default function HalvingGame() {
             <Button
               className="flex-1 h-12 bg-purple-500 hover:bg-purple-600"
               onClick={() => {
-                setStep('intro');
+                setStep('pregame');
                 setCorrectCount(0);
                 setTotalCount(0);
                 setStreak(0);

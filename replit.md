@@ -79,42 +79,46 @@ Preferred communication style: Simple, everyday language.
 ### Application Flow
 1. Welcome → Assessment (3-minute placement test) → Starting level assignment
 2. Daily Training → Daily Challenge Intro → Timed session (3 minutes) → Session summary → Strategy Lesson (if weakness detected) → Level Up celebration → Reassurance/Paywall (first session)
-3. Skill Drills → Rounding, Doubling (L13+), Halving (L21+) practice modes
+3. Skill Drills → Rounding, Doubling, Halving practice modes (all unlocked)
 4. Progress tracking → Time-bound metrics, level journey, performance insights
 
 ### Skill Drill Game Modes
 **Rounding Practice** (`/rounding`):
-- Available to all users after assessment
-- 3-minute timed sessions: show a number, user rounds it
-- Question format: "778.9 to the nearest 10" → answer: 780
-- Rounding targets scale by level: nearest 10 (L1+), 100 (L11+), 1dp (L21+), 1000/2dp (L31+)
-- Numbers increase in complexity with level
+- Available immediately (no level lock)
+- 3-minute timed sessions with tier-based difficulty scaling
+- Tier advances every 3 correct answers (endless scaling)
+- Rounding targets: 10, 100, 1000, 10000, 0.1, 0.01 (progressively unlocked by tier)
+- Numbers scale to 5+ digits at higher tiers
 - 15 XP per correct answer
-- Key file: `RoundingGame.tsx`
+- Pre-game screen shows personal bests before starting
+- Key files: `RoundingGame.tsx`, `skill-drill-difficulty.ts`
 
 **Doubling Practice** (`/doubling`):
-- Unlocks at Level 13 (when multiplication introduced)
-- 3-minute timed sessions: flash a number, user doubles it
-- Question format: see "150" → answer: 300
-- L13-20: whole numbers 2-50
-- L21-30: larger numbers 10-200
-- L31+: includes decimals (e.g., 12.5 → 25)
+- Available immediately (no level lock)
+- 3-minute timed sessions with tier-based difficulty scaling
+- Tier advances every 3 correct answers (endless scaling)
+- Tier 0-1: whole numbers 2-50
+- Tier 2-3: 20-150, some .5 decimals
+- Tier 4+: larger numbers, .25/.75 decimals, unfriendly numbers
 - 18 XP per correct answer
-- Key file: `DoublingGame.tsx`
+- Pre-game screen shows personal bests before starting
+- Key files: `DoublingGame.tsx`, `skill-drill-difficulty.ts`
 
 **Halving Practice** (`/halving`):
-- Unlocks at Level 21 (when division introduced)
-- 3-minute timed sessions: flash a number, user halves it
-- Question format: see "15" → answer: 7.5
-- Embraces decimal answers (odd numbers give .5 results)
-- L21-30: even numbers only (clean halves)
-- L31+: includes odd numbers and decimals
+- Available immediately (no level lock)
+- 3-minute timed sessions with tier-based difficulty scaling
+- Tier advances every 3 correct answers (endless scaling)
+- Tier 0-1: even numbers 10-100 (clean halves)
+- Tier 2-3: includes odd numbers (creates .5 results)
+- Tier 6+: decimals creating .25/.75 results
 - 20 XP per correct answer
-- Key file: `HalvingGame.tsx`
+- Pre-game screen shows personal bests before starting
+- Key files: `HalvingGame.tsx`, `skill-drill-difficulty.ts`
 
 **Skill Drill Session Types**: rounding_practice, doubling_practice, halving_practice
 - These do NOT count toward Progress page metrics (daily sessions only)
 - Award XP for practice motivation
+- Personal bests stored locally via Zustand persist (device-local, not synced to backend)
 
 ### Progress Page System (Core System - Locked)
 **Foundational Principles**:

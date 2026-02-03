@@ -4,7 +4,7 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { useLocation } from 'wouter';
 import { useStore, SessionStats } from '@/lib/store';
 import { Button } from '@/components/ui/button';
-import { X, Clock, CircleDot, Zap, ChevronRight, ChevronLeft, Target } from 'lucide-react';
+import { X, Target } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { clsx } from 'clsx';
 import { KeypadModern } from '@/components/game/Keypad';
@@ -13,14 +13,8 @@ import { Card } from '@/components/ui/card';
 import { AnswerFeedback } from '@/components/game/AnswerFeedback';
 import { StreakIndicator } from '@/components/game/StreakIndicator';
 import { AnimatedXP } from '@/components/game/AnimatedXP';
-
-interface RoundingQuestion {
-  id: string;
-  number: number;
-  roundTo: string;
-  answer: number;
-  text: string;
-}
+import { SkillDrillPreGame } from '@/components/game/SkillDrillPreGame';
+import { generateRoundingQuestion, getTier, RoundingQuestion } from '@/lib/skill-drill-difficulty';
 
 interface GameResult {
   totalQuestions: number;
@@ -30,76 +24,7 @@ interface GameResult {
   xpEarned: number;
 }
 
-type GameStep = 'intro' | 'countdown' | 'active' | 'results';
-
-function generateRoundingQuestion(level: number): RoundingQuestion {
-  // Determine complexity based on level
-  // L1-10: Round whole numbers to nearest 10
-  // L11-20: Round to nearest 10 or 100
-  // L21-30: Add decimals, round to nearest 10, 100, or 1dp
-  // L31-50: Round to 10, 100, 1000, 1dp, 2dp
-  // L51+: All rounding types including more complex decimals
-  
-  const roundingTypes: { target: string; divisor: number; decimals: number }[] = [];
-  
-  // Always available
-  roundingTypes.push({ target: '10', divisor: 10, decimals: 0 });
-  
-  if (level >= 11) {
-    roundingTypes.push({ target: '100', divisor: 100, decimals: 0 });
-  }
-  if (level >= 21) {
-    roundingTypes.push({ target: '1 decimal place', divisor: 0.1, decimals: 1 });
-  }
-  if (level >= 31) {
-    roundingTypes.push({ target: '1000', divisor: 1000, decimals: 0 });
-    roundingTypes.push({ target: '2 decimal places', divisor: 0.01, decimals: 2 });
-  }
-  
-  const selectedType = roundingTypes[Math.floor(Math.random() * roundingTypes.length)];
-  
-  // Generate a number appropriate for the rounding type
-  let number: number;
-  let answer: number;
-  
-  if (selectedType.divisor >= 1) {
-    // Rounding to nearest 10, 100, 1000
-    const maxBase = Math.min(100 + level * 20, 10000);
-    const minBase = selectedType.divisor;
-    number = Math.floor(Math.random() * (maxBase - minBase) + minBase);
-    
-    // Add some decimals at higher levels
-    if (level >= 21 && Math.random() < 0.5) {
-      number = number + Math.round(Math.random() * 99) / 100;
-    }
-    
-    answer = Math.round(number / selectedType.divisor) * selectedType.divisor;
-  } else {
-    // Rounding to decimal places
-    const decimalPlaces = selectedType.decimals;
-    const maxBase = Math.min(10 + level * 5, 1000);
-    
-    // Generate number with more decimal places than we're rounding to
-    const extraDecimals = decimalPlaces + 1 + Math.floor(Math.random() * 2);
-    number = Math.floor(Math.random() * maxBase) + 
-             Math.round(Math.random() * Math.pow(10, extraDecimals)) / Math.pow(10, extraDecimals);
-    
-    answer = Math.round(number * Math.pow(10, decimalPlaces)) / Math.pow(10, decimalPlaces);
-  }
-  
-  // Format the display number appropriately
-  const displayNumber = selectedType.divisor >= 1 
-    ? (level >= 21 && number % 1 !== 0 ? number.toFixed(2) : number.toString())
-    : number.toFixed(selectedType.decimals + Math.floor(Math.random() * 2) + 1);
-  
-  return {
-    id: Math.random().toString(36).substr(2, 9),
-    number: parseFloat(displayNumber),
-    roundTo: selectedType.target,
-    answer,
-    text: `Round ${displayNumber} to the nearest ${selectedType.target}`
-  };
-}
+type GameStep = 'pregame' | 'countdown' | 'active' | 'results';
 
 function FullScreenFlash({ type }: { type: 'correct' | 'wrong' }) {
   return (
@@ -118,9 +43,9 @@ function FullScreenFlash({ type }: { type: 'correct' | 'wrong' }) {
 
 export default function RoundingGame() {
   const [, navigate] = useLocation();
-  const { settings, level, saveSession, xpIntoLevel } = useStore();
+  const { settings, level, saveSession, xpIntoLevel, updateSkillDrillBests } = useStore();
   
-  const [step, setStep] = useState<GameStep>('intro');
+  const [step, setStep] = useState<GameStep>('pregame');
   const [countdown, setCountdown] = useState(3);
   const [timeLeft, setTimeLeft] = useState(180);
   const [question, setQuestion] = useState<RoundingQuestion | null>(null);
@@ -141,11 +66,11 @@ export default function RoundingGame() {
   const [result, setResult] = useState<GameResult | null>(null);
   
   const nextQuestion = useCallback(() => {
-    const q = generateRoundingQuestion(level);
+    const q = generateRoundingQuestion(getTier(correctCount));
     setQuestion(q);
     setInput('');
     questionStartRef.current = Date.now();
-  }, [level]);
+  }, [correctCount]);
   
   // Countdown effect
   useEffect(() => {
@@ -284,6 +209,7 @@ export default function RoundingGame() {
     };
     
     saveSession(sessionStats);
+    updateSkillDrillBests('rounding', correctCount, bestStreak);
     
     setResult({
       totalQuestions: totalCount,
@@ -301,58 +227,18 @@ export default function RoundingGame() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
   
-  // Intro screen
-  if (step === 'intro') {
+  // Pregame screen
+  if (step === 'pregame') {
     return (
-      <MobileLayout className="bg-gradient-to-b from-orange-50 to-white">
-        <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="w-24 h-24 rounded-3xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow-lg"
-          >
-            <Target size={48} className="text-white" />
-          </motion.div>
-          
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold text-slate-900">Rounding Practice</h1>
-            <p className="text-slate-600">Round numbers quickly and accurately</p>
-          </div>
-          
-          <Card className="w-full max-w-sm p-6 space-y-4">
-            <div className="space-y-3 text-sm text-slate-600">
-              <div className="flex items-center gap-3">
-                <Clock size={18} className="text-orange-500" />
-                <span>3 minutes of focused practice</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <CircleDot size={18} className="text-orange-500" />
-                <span>Round to nearest 10, 100, decimals</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Zap size={18} className="text-orange-500" />
-                <span>15 XP per correct answer</span>
-              </div>
-            </div>
-          </Card>
-          
-          <Button
-            size="lg"
-            className="w-full max-w-sm h-14 text-lg bg-orange-500 hover:bg-orange-600"
-            onClick={() => setStep('countdown')}
-          >
-            Start Practice
-          </Button>
-          
-          <Button
-            variant="ghost"
-            className="text-slate-500"
-            onClick={() => navigate('/train')}
-          >
-            <ChevronLeft size={18} />
-            Back to Train
-          </Button>
-        </div>
+      <MobileLayout className="bg-gradient-to-b from-slate-50 to-white">
+        <SkillDrillPreGame
+          gameType="rounding"
+          title="Rounding Practice"
+          description="Round numbers as fast as you can. Difficulty increases as you go!"
+          icon={<Target size={40} className="text-primary" />}
+          onStart={() => setStep('countdown')}
+          onBack={() => navigate('/train')}
+        />
       </MobileLayout>
     );
   }
@@ -422,7 +308,7 @@ export default function RoundingGame() {
             <Button
               className="flex-1 h-12 bg-orange-500 hover:bg-orange-600"
               onClick={() => {
-                setStep('intro');
+                setStep('pregame');
                 setCorrectCount(0);
                 setTotalCount(0);
                 setStreak(0);

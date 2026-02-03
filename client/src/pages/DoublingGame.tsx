@@ -4,7 +4,7 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { useLocation } from 'wouter';
 import { useStore, SessionStats } from '@/lib/store';
 import { Button } from '@/components/ui/button';
-import { X, Clock, CircleDot, Zap, ChevronLeft, Lock, Copy } from 'lucide-react';
+import { X, Copy } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { clsx } from 'clsx';
 import { KeypadModern } from '@/components/game/Keypad';
@@ -13,6 +13,8 @@ import { Card } from '@/components/ui/card';
 import { AnswerFeedback } from '@/components/game/AnswerFeedback';
 import { StreakIndicator } from '@/components/game/StreakIndicator';
 import { AnimatedXP } from '@/components/game/AnimatedXP';
+import { SkillDrillPreGame } from '@/components/game/SkillDrillPreGame';
+import { generateDoublingQuestion, getTier } from '@/lib/skill-drill-difficulty';
 
 interface DoublingQuestion {
   id: string;
@@ -28,55 +30,7 @@ interface GameResult {
   xpEarned: number;
 }
 
-type GameStep = 'locked' | 'intro' | 'countdown' | 'active' | 'results';
-
-function generateDoublingQuestion(level: number): DoublingQuestion {
-  // Scale difficulty based on level
-  // L13-20: Small whole numbers (2-50)
-  // L21-30: Larger numbers (10-200)
-  // L31-50: Include decimals (5.5, 12.75, etc.)
-  // L51+: Complex decimals and larger numbers
-  
-  let number: number;
-  
-  if (level < 21) {
-    // Simple whole numbers
-    number = Math.floor(Math.random() * 48) + 2; // 2 to 50
-  } else if (level < 31) {
-    // Larger whole numbers
-    const base = Math.floor(Math.random() * 190) + 10; // 10 to 200
-    number = base;
-  } else if (level < 51) {
-    // Include some decimals
-    if (Math.random() < 0.4) {
-      // Decimal number
-      const base = Math.floor(Math.random() * 100) + 5;
-      const decimal = Math.random() < 0.5 ? 0.5 : 0.25;
-      number = base + decimal;
-    } else {
-      // Larger whole number
-      number = Math.floor(Math.random() * 300) + 20;
-    }
-  } else {
-    // Complex decimals and larger numbers
-    if (Math.random() < 0.5) {
-      // Decimal with 1-2 places
-      const base = Math.floor(Math.random() * 200) + 10;
-      const decimal = Math.round(Math.random() * 99) / 100;
-      number = base + decimal;
-    } else {
-      number = Math.floor(Math.random() * 500) + 50;
-    }
-  }
-  
-  const answer = number * 2;
-  
-  return {
-    id: Math.random().toString(36).substr(2, 9),
-    number,
-    answer
-  };
-}
+type GameStep = 'pregame' | 'countdown' | 'active' | 'results';
 
 function FullScreenFlash({ type }: { type: 'correct' | 'wrong' }) {
   return (
@@ -93,15 +47,11 @@ function FullScreenFlash({ type }: { type: 'correct' | 'wrong' }) {
   );
 }
 
-const UNLOCK_LEVEL = 13;
-
 export default function DoublingGame() {
   const [, navigate] = useLocation();
-  const { settings, level, saveSession, xpIntoLevel } = useStore();
+  const { settings, level, saveSession, xpIntoLevel, updateSkillDrillBests } = useStore();
   
-  const isLocked = level < UNLOCK_LEVEL;
-  
-  const [step, setStep] = useState<GameStep>(isLocked ? 'locked' : 'intro');
+  const [step, setStep] = useState<GameStep>('pregame');
   const [countdown, setCountdown] = useState(3);
   const [timeLeft, setTimeLeft] = useState(180);
   const [question, setQuestion] = useState<DoublingQuestion | null>(null);
@@ -122,11 +72,11 @@ export default function DoublingGame() {
   const [result, setResult] = useState<GameResult | null>(null);
   
   const nextQuestion = useCallback(() => {
-    const q = generateDoublingQuestion(level);
+    const q = generateDoublingQuestion(getTier(correctCount));
     setQuestion(q);
     setInput('');
     questionStartRef.current = Date.now();
-  }, [level]);
+  }, [correctCount]);
   
   // Countdown effect
   useEffect(() => {
@@ -256,6 +206,7 @@ export default function DoublingGame() {
     };
     
     saveSession(sessionStats);
+    updateSkillDrillBests('doubling', correctCount, bestStreak);
     
     setResult({
       totalQuestions: totalCount,
@@ -273,102 +224,18 @@ export default function DoublingGame() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
   
-  // Locked screen
-  if (step === 'locked') {
+  // Pregame screen
+  if (step === 'pregame') {
     return (
       <MobileLayout className="bg-gradient-to-b from-blue-50 to-white">
-        <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="w-24 h-24 rounded-3xl bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center shadow-lg"
-          >
-            <Lock size={48} className="text-white" />
-          </motion.div>
-          
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold text-slate-900">Doubling Practice</h1>
-            <p className="text-slate-600">Unlocks at Level {UNLOCK_LEVEL}</p>
-          </div>
-          
-          <Card className="w-full max-w-sm p-6 text-center">
-            <p className="text-slate-600">
-              You're currently at Level {level}. Keep practicing to unlock this skill drill!
-            </p>
-            <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-blue-400 rounded-full transition-all"
-                style={{ width: `${(level / UNLOCK_LEVEL) * 100}%` }}
-              />
-            </div>
-            <p className="text-sm text-slate-500 mt-2">{UNLOCK_LEVEL - level} levels to go</p>
-          </Card>
-          
-          <Button
-            variant="ghost"
-            className="text-slate-500"
-            onClick={() => navigate('/train')}
-          >
-            <ChevronLeft size={18} />
-            Back to Train
-          </Button>
-        </div>
-      </MobileLayout>
-    );
-  }
-  
-  // Intro screen
-  if (step === 'intro') {
-    return (
-      <MobileLayout className="bg-gradient-to-b from-blue-50 to-white">
-        <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-lg"
-          >
-            <Copy size={48} className="text-white" />
-          </motion.div>
-          
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold text-slate-900">Doubling Practice</h1>
-            <p className="text-slate-600">Double each number as fast as you can</p>
-          </div>
-          
-          <Card className="w-full max-w-sm p-6 space-y-4">
-            <div className="space-y-3 text-sm text-slate-600">
-              <div className="flex items-center gap-3">
-                <Clock size={18} className="text-blue-500" />
-                <span>3 minutes of focused practice</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <CircleDot size={18} className="text-blue-500" />
-                <span>See a number, double it</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Zap size={18} className="text-blue-500" />
-                <span>18 XP per correct answer</span>
-              </div>
-            </div>
-          </Card>
-          
-          <Button
-            size="lg"
-            className="w-full max-w-sm h-14 text-lg bg-blue-500 hover:bg-blue-600"
-            onClick={() => setStep('countdown')}
-          >
-            Start Practice
-          </Button>
-          
-          <Button
-            variant="ghost"
-            className="text-slate-500"
-            onClick={() => navigate('/train')}
-          >
-            <ChevronLeft size={18} />
-            Back to Train
-          </Button>
-        </div>
+        <SkillDrillPreGame
+          gameType="doubling"
+          title="Doubling Practice"
+          description="Double numbers as fast as you can. Difficulty increases as you go!"
+          icon={<Copy size={40} className="text-primary" />}
+          onStart={() => setStep('countdown')}
+          onBack={() => navigate('/train')}
+        />
       </MobileLayout>
     );
   }
@@ -438,7 +305,7 @@ export default function DoublingGame() {
             <Button
               className="flex-1 h-12 bg-blue-500 hover:bg-blue-600"
               onClick={() => {
-                setStep('intro');
+                setStep('pregame');
                 setCorrectCount(0);
                 setTotalCount(0);
                 setStreak(0);
