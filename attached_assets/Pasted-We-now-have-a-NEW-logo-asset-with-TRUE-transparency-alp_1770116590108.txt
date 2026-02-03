@@ -1,0 +1,62 @@
+We now have a NEW logo asset with TRUE transparency (alpha channel). The previous logo asset with a white rounded-square background must be fully replaced.
+
+This is a replacement task, not a styling task.
+
+====================================================================
+A) REPLACE THE LOGO ASSET
+====================================================================
+1) Locate the existing Numerate logo asset used for:
+- loading / splash screen
+- any in-app logo usage
+- placement or celebration screens
+
+2) Remove the old logo asset entirely (the one with a white rounded-square baked into the image).
+
+3) Replace it with the newly uploaded transparent logo asset.
+- This asset already has transparency.
+- Do NOT modify it.
+- Do NOT wrap it in a background container.
+
+====================================================================
+B) STRICT RENDERING RULES (VERY IMPORTANT)
+====================================================================
+When rendering the logo:
+
+❌ Do NOT:
+- add a background color
+- add a white container
+- add a rounded rectangle behind it
+- simulate transparency with matching colors
+
+✅ DO:
+- render the image directly
+- allow the page background to show through naturally
+
+The logo should appear as JUST the brain shape.
+
+====================================================================
+C) SPLASH / LOADING SCREEN
+====================================================================
+- Keep the splash screen background white.
+- Place the transparent logo centered on the screen.
+- There must be NO visible box or border around the logo.
+- The logo should blend seamlessly into the white background.
+
+====================================================================
+D) ACCEPTANCE TEST (MANDATORY)
+====================================================================
+1) Render the logo on a pure white background.
+2) There must be NO visible bounding box.
+3) Zoom in: no white pixels outside the brain silhouette.
+4) Compare old vs new — the harsh border must be completely gone.
+
+If ANY white rounded square is visible, the task is NOT complete.
+
+====================================================================
+E) REPORT BACK
+====================================================================
+Confirm:
+- Old logo asset removed
+- New transparent asset is in use
+- File path(s) where the logo is referenced
+- That no container background is applied

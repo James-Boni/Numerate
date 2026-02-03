@@ -7,8 +7,6 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 
-import logo from "@assets/14e70c85-398b-4621-bc62-abe9331510f8_1769016302023.png";
-
 export default function Welcome() {
   const [_, setLocation] = useLocation();
   const login = useStore(s => s.login);
@@ -44,16 +42,12 @@ export default function Welcome() {
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="w-36 h-36 flex items-center justify-center"
+            className="w-36 h-36"
         >
             <img 
-              src={logo} 
+              src="/numerate-logo.png" 
               alt="Numerate Logo" 
               className="w-full h-full object-contain" 
-              style={{ 
-                mixBlendMode: 'multiply',
-                filter: 'drop-shadow(0 8px 20px rgba(0, 166, 153, 0.25))'
-              }} 
             />
         </motion.div>
 

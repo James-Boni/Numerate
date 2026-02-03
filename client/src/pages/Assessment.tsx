@@ -10,7 +10,6 @@ import { ClipboardCheck, Zap, Target, TrendingUp } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { clsx } from 'clsx';
 import { computeStartingPlacement, getPlacementMessageByLevel, PlacementResult } from '@/lib/logic/placement';
-import logo from "@assets/14e70c85-398b-4621-bc62-abe9331510f8_1769016302023.png";
 
 function CountUp({ value, duration = 1, delay = 0, onTick, prefix = '', suffix = '' }: { 
   value: number, 
@@ -219,10 +218,10 @@ export default function Assessment() {
             transition={{ duration: 0.3 }}
           >
             <img 
-              src={logo} 
+              src="/numerate-logo.png" 
               alt="" 
               className="w-full h-full object-contain" 
-              style={{ mixBlendMode: 'multiply', opacity: 0.5 }} 
+              style={{ opacity: 0.7 }} 
             />
           </motion.div>
           <h1 className="text-2xl font-bold text-slate-800">Assessment Complete</h1>

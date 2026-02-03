@@ -15,8 +15,6 @@ import Settings from "@/pages/Settings";
 import DevMenu from "@/pages/DevMenu";
 import { motion, AnimatePresence } from 'framer-motion';
 
-import logo from "@assets/14e70c85-398b-4621-bc62-abe9331510f8_1769016302023.png";
-
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
   useEffect(() => {
     const timer = setTimeout(onFinish, 1500);
@@ -24,21 +22,17 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
   }, [onFinish]);
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-slate-50 to-white z-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-48 h-48 flex items-center justify-center"
+        className="w-48 h-48"
       >
         <img 
-          src={logo} 
+          src="/numerate-logo.png" 
           alt="Numerate Logo" 
           className="w-full h-full object-contain" 
-          style={{ 
-            mixBlendMode: 'multiply',
-            filter: 'drop-shadow(0 10px 25px rgba(0, 166, 153, 0.3))'
-          }} 
         />
       </motion.div>
     </div>
