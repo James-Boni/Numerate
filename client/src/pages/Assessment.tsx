@@ -353,7 +353,7 @@ export default function Assessment() {
             <Button 
               size="lg" 
               className="w-full h-14 text-lg font-semibold rounded-xl shadow-lg shadow-primary/20"
-              onClick={() => setLocation('/train')}
+              onClick={() => setLocation('/game')}
               data-testid="button-start-training"
             >
               Start Daily Training
@@ -376,7 +376,7 @@ export default function Assessment() {
                   if (placement) {
                     completeAssessment(placement.competenceGroup, placement.startingLevel, results!);
                   }
-                  setLocation('/train');
+                  setLocation('/game');
                 }}
                 data-testid="button-continue-anyway"
               >
