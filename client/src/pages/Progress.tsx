@@ -232,14 +232,24 @@ function generateInsight(trends: TrendAnalysis, sparseData: boolean, range: Time
     return { text: "More data will appear as you train.", rule: "sparse_data" };
   }
   
-  const { accuracyTrend, speedTrend, throughputTrend, difficultyChange, consistencyImproving } = trends;
+  const { accuracyTrend, speedTrend, throughputTrend, difficultyChange, consistencyImproving,
+          startAccuracy, endAccuracy, startSpeedSec, endSpeedSec } = trends;
   
-  if (accuracyTrend === 'improving' && difficultyChange) {
-    return { text: "Accuracy is improving, even as questions become harder.", rule: "accuracy_up_difficulty_up" };
+  const accuracyChange = Math.round((endAccuracy - startAccuracy) * 100);
+  const speedChange = startSpeedSec > 0 ? Math.round(((startSpeedSec - endSpeedSec) / startSpeedSec) * 100) : 0;
+  
+  if (accuracyTrend === 'improving' && difficultyChange && accuracyChange > 0) {
+    return { 
+      text: `Accuracy improved by ${accuracyChange}%, even as questions got harder.`, 
+      rule: "accuracy_up_difficulty_up" 
+    };
   }
   
-  if (speedTrend === 'improving' && (accuracyTrend === 'stable' || accuracyTrend === 'improving')) {
-    return { text: "You're answering faster without sacrificing accuracy.", rule: "speed_up_accuracy_stable" };
+  if (speedTrend === 'improving' && speedChange > 0 && (accuracyTrend === 'stable' || accuracyTrend === 'improving')) {
+    return { 
+      text: `You're answering ${speedChange}% faster without sacrificing accuracy.`, 
+      rule: "speed_up_accuracy_stable" 
+    };
   }
   
   if (speedTrend === 'dipping' && difficultyChange) {
@@ -258,8 +268,18 @@ function generateInsight(trends: TrendAnalysis, sparseData: boolean, range: Time
     return { text: "Stability is a sign you're consolidating skills.", rule: "plateau" };
   }
   
-  if ((accuracyTrend === 'improving' || speedTrend === 'improving') && !difficultyChange) {
-    return { text: "You're making steady progress across multiple areas.", rule: "general_improvement" };
+  if (accuracyTrend === 'improving' && !difficultyChange && accuracyChange > 0) {
+    return { 
+      text: `Your accuracy improved by ${accuracyChange}% over this period.`, 
+      rule: "accuracy_improvement" 
+    };
+  }
+  
+  if (speedTrend === 'improving' && !difficultyChange && speedChange > 0) {
+    return { 
+      text: `You're ${speedChange}% faster than when this period started.`, 
+      rule: "speed_improvement" 
+    };
   }
   
   return { text: "Keep training — patterns become clearer with more sessions.", rule: "fallback" };

@@ -194,7 +194,7 @@ export class AudioManager {
     setTimeout(() => this.playSynth(1200, 'sine', 0.08, 0.15), 50);
   }
 
-  // Enhanced level-up with intensity scaling - MORE JUBILANT
+  // Enhanced level-up with intensity scaling - MORE JUBILANT AND DECISIVE
   static playLevelUpEnhanced(levelsGained: number = 1) {
     if (!this.context) return;
     if (this.context.state === 'suspended') this.context.resume();
@@ -204,8 +204,8 @@ export class AudioManager {
     const extendedNotes = [...baseNotes, 659.25, 783.99, 1046.50, 1318.51]; // Add E5, G5, C6, E6
     
     const notes = levelsGained >= 2 ? extendedNotes : baseNotes;
-    const noteDelay = levelsGained >= 2 ? 55 : 65;
-    const volume = Math.min(0.3 + levelsGained * 0.05, 0.45);
+    const noteDelay = levelsGained >= 2 ? 60 : 75;
+    const volume = Math.min(0.35 + levelsGained * 0.06, 0.50);
     
     notes.forEach((freq, i) => {
       setTimeout(() => this.playSynth(freq, 'sine', 0.18, volume), i * noteDelay);

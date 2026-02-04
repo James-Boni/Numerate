@@ -52,7 +52,7 @@ function LevelUpCelebration({
 
     let currentLevel = levelBefore;
     let totalDuration = 0;
-    const baseStepDuration = levelUpCount > 1 ? 400 : 600;
+    const baseStepDuration = levelUpCount > 1 ? 600 : 900;
 
     const animateLevel = (lvl: number, isLast: boolean) => {
       const xpNeeded = xpRequiredToAdvance(lvl);
@@ -120,15 +120,15 @@ function LevelUpCelebration({
     <MobileLayout className="bg-gradient-to-b from-primary/5 to-white overflow-hidden">
       <Confetti active={showConfetti} originX={50} originY={40} count={levelUpCount > 1 ? 80 : 50} />
       
-      {/* Screen flash on level up */}
+      {/* Screen flash on level up - stronger contrast */}
       <AnimatePresence>
         {showGlow && (
           <motion.div
-            className="absolute inset-0 bg-primary/10 pointer-events-none z-10"
+            className="absolute inset-0 bg-primary/20 pointer-events-none z-10"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            animate={{ opacity: [0, 1, 0.6] }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.5, times: [0, 0.3, 1] }}
           />
         )}
       </AnimatePresence>
@@ -203,15 +203,15 @@ function LevelUpCelebration({
             key={displayLevel}
             initial={{ scale: 0.5, opacity: 0, rotate: -10 }}
             animate={{ 
-              scale: animationPhase === 'complete' ? [1, 1.15, 1] : 1, 
+              scale: animationPhase === 'complete' ? [1, 1.25, 1.1] : 1, 
               opacity: 1, 
               rotate: 0 
             }}
             transition={{ 
               type: 'spring', 
-              stiffness: 300, 
-              damping: 15,
-              scale: { delay: 0.1, duration: 0.4 }
+              stiffness: 250, 
+              damping: 12,
+              scale: { delay: 0.1, duration: 0.6 }
             }}
           >
             {displayLevel}
@@ -272,7 +272,7 @@ function LevelUpCelebration({
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: animationPhase === 'complete' ? 1 : 0, y: animationPhase === 'complete' ? 0 : 20 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.8 }}
         >
           <Button 
             size="lg" 

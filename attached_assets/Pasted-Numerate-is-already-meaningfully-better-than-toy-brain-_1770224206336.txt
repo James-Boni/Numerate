@@ -1,0 +1,187 @@
+Numerate is already meaningfully better than “toy” brain apps, but it is not yet emotionally compelling enough to justify a paywall in its current form.
+
+That’s good news — because the gap is fixable, and it’s not about adding features. It’s about tightening flow, difficulty signalling, and reward clarity.
+
+You’re closer than you probably feel.
+
+What’s working well (you should keep these)
+1. Core loop is sound
+
+Assessment → placement → daily training → progress
+
+This is fundamentally correct
+
+Nothing feels conceptually wrong or misguided
+
+You are not building the wrong product.
+
+2. Input speed + low friction is good
+
+Number entry is fast
+
+Confirmation feels immediate
+
+No unnecessary UI taps
+
+This is critical for a maths fluency app, and you’ve nailed it.
+
+3. Visual language is calm and credible
+
+Colours are not gimmicky
+
+UI feels “serious” rather than gamey
+
+This suits your target user (adults who feel bad at maths)
+
+Do not turn this into Duolingo-style chaos.
+
+Where the app is currently leaking value
+
+These are the real problems, ordered by impact.
+
+🔴 1. Difficulty does not feel tied to level yet
+
+This is the biggest issue — and you already sensed it.
+
+From the video:
+
+Level changes, but question texture barely changes
+
+At higher levels, the cognitive effort doesn’t rise fast enough
+
+Users won’t trust the system if L20 doesn’t feel different from L10
+
+Even if the generator technically changes, perception is what matters.
+
+Why this is dangerous
+
+If users don’t feel difficulty rising:
+
+levels feel arbitrary
+
+progress feels hollow
+
+paying feels unjustified
+
+What to fix (without new features)
+
+Increase minimum complexity per level band
+
+Reduce “freebie” questions aggressively at higher levels
+
+Make harder operations visibly harder (digit length, carries, division structure)
+
+Level must be something the user can sense without being told.
+
+🔴 2. Reward moments are too quiet
+
+This is the second biggest issue.
+
+In the recording:
+
+XP increases, but it’s understated
+
+Level changes don’t land emotionally
+
+The user’s brain doesn’t get a clear “YES, that mattered” signal
+
+Right now it feels like:
+
+“I did a thing. Numbers changed.”
+
+You want:
+
+“I did a thing. That meant something.”
+
+Concrete problems
+
+XP number changes too subtly
+
+Level-up moments are visually similar to normal progression
+
+Sounds are present but not decisive
+
+What to fix
+
+Stronger contrast between:
+
+normal XP gain
+
+level-up XP crossing
+
+One unmistakable “level-up” moment
+
+Slight pause + emphasis when leveling occurs
+
+This is not about fireworks — it’s about clarity.
+
+🟠 3. Progress page is informative but not instructive
+
+The Progress page shows data, but it doesn’t yet teach the user how to read it.
+
+From the video:
+
+Charts exist, but meaning is implicit
+
+User must infer improvement
+
+No clear “then vs now” framing
+
+Why this matters
+
+People don’t pay for charts.
+They pay for confidence that effort → improvement.
+
+What to improve
+
+Clear comparison language:
+
+“You’re answering X% faster than last week”
+
+“Accuracy improved even as difficulty increased”
+
+Emphasise trends, not raw values
+
+Make one insight the headline, not all metrics equal
+
+You already planned this — it’s the right next move.
+
+🟠 4. Cinematic moments need tightening (not expanding)
+
+You have the right idea with cinematic placement and transitions — but timing is slightly off.
+
+From the recording:
+
+Some moments linger a fraction too long
+
+Others pass too quickly to register
+
+Rule of thumb
+
+Success moments: slow down by ~15%
+
+Routine transitions: speed up by ~10–20%
+
+This keeps flow intact while still rewarding effort.
+
+🟡 5. Quick Fire mode is conceptually good but not yet essential
+
+Quick Fire:
+
+is fun
+
+trains speed
+
+does not currently add perceived value beyond the Daily
+
+That’s fine — but it should feel like training, not another obligation.
+
+I’d recommend:
+
+De-emphasising it in UI for now
+
+Positioning it as optional speed practice
+
+Making sure it does not influence core progress metrics (you already identified this)
+
+This is not a blocker for launch.

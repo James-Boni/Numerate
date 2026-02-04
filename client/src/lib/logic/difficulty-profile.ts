@@ -82,8 +82,8 @@ function getFoundationProfile(level: number): DifficultyProfile {
     band: 0,
     opWeights: { add: 0.75 - t * 0.05, sub: 0.25 + t * 0.05, mul: 0, div: 0, percent: 0 },
     addSub: {
-      min: 1,
-      max: 10 + level * 2,
+      min: 2 + level,
+      max: 10 + level * 3,
       allowNegatives: false,
       requireCarryBorrow: false,
       decimals: 0
@@ -93,8 +93,8 @@ function getFoundationProfile(level: number): DifficultyProfile {
     percent: { enabled: false, baseMin: 0, baseMax: 0, percentValues: [], allowChange: false },
     fractions: { enabled: false, denominators: [], addSubOnly: true },
     multiStep: { enabled: false, maxSteps: 1, probability: 0 },
-    minComplexityScore: 1,
-    description: `L${level}: Foundation - Simple add/sub 0-${10 + level * 2}`
+    minComplexityScore: 2 + Math.floor(level / 2),
+    description: `L${level}: Foundation - Simple add/sub ${2 + level}-${10 + level * 3}`
   };
 }
 
@@ -112,10 +112,10 @@ function getCarryBorrowProfile(level: number): DifficultyProfile {
       percent: 0 
     },
     addSub: {
-      min: 5 + (level - 6) * 3,
-      max: 20 + (level - 6) * 8,
+      min: 10 + (level - 6) * 5,
+      max: 30 + (level - 6) * 10,
       allowNegatives: false,
-      requireCarryBorrow: level >= 8,
+      requireCarryBorrow: level >= 7,
       decimals: 0
     },
     mul: { 
@@ -129,8 +129,8 @@ function getCarryBorrowProfile(level: number): DifficultyProfile {
     percent: { enabled: false, baseMin: 0, baseMax: 0, percentValues: [], allowChange: false },
     fractions: { enabled: false, denominators: [], addSubOnly: true },
     multiStep: { enabled: false, maxSteps: 1, probability: 0 },
-    minComplexityScore: 2 + t,
-    description: `L${level}: Carry/Borrow - add/sub up to ${20 + (level - 6) * 8}${level >= 9 ? ', tables begin' : ''}`
+    minComplexityScore: 4 + Math.floor(t * 2),
+    description: `L${level}: Carry/Borrow - add/sub ${10 + (level - 6) * 5}-${30 + (level - 6) * 10}${level >= 9 ? ', tables begin' : ''}`
   };
 }
 
@@ -149,8 +149,8 @@ function getIntermediateProfile(level: number): DifficultyProfile {
       percent: 0 
     },
     addSub: {
-      min: 15 + (level - 11) * 5,
-      max: 60 + (level - 11) * 8,
+      min: 25 + (level - 11) * 6,
+      max: 80 + (level - 11) * 10,
       allowNegatives: false,
       requireCarryBorrow: true,
       decimals: 0
@@ -173,7 +173,7 @@ function getIntermediateProfile(level: number): DifficultyProfile {
     percent: { enabled: false, baseMin: 0, baseMax: 0, percentValues: [], allowChange: false },
     fractions: { enabled: false, denominators: [], addSubOnly: true },
     multiStep: { enabled: false, maxSteps: 1, probability: 0 },
-    minComplexityScore: 3 + t * 2,
+    minComplexityScore: 5 + Math.floor(t * 3),
     description: `L${level}: Intermediate - 2-digit ops, mul ${12 + (level - 11) * 2}x${9 + Math.floor((level - 11) / 2)}`
   };
 }
@@ -185,8 +185,8 @@ function getTwoDigitMulProfile(level: number): DifficultyProfile {
     band: 2,
     opWeights: { add: 0.25, sub: 0.25, mul: 0.30, div: 0.20, percent: 0 },
     addSub: {
-      min: 30 + (level - 21) * 8,
-      max: 100 + (level - 21) * 15,
+      min: 50 + (level - 21) * 10,
+      max: 150 + (level - 21) * 18,
       allowNegatives: false,
       requireCarryBorrow: true,
       decimals: 0
@@ -209,7 +209,7 @@ function getTwoDigitMulProfile(level: number): DifficultyProfile {
     percent: { enabled: false, baseMin: 0, baseMax: 0, percentValues: [], allowChange: false },
     fractions: { enabled: false, denominators: [], addSubOnly: true },
     multiStep: { enabled: false, maxSteps: 1, probability: 0 },
-    minComplexityScore: 5 + t * 2,
+    minComplexityScore: 7 + Math.floor(t * 3),
     description: `L${level}: Two-digit mul - ${25 + (level - 21) * 5}x${12 + (level - 21)}, div to ${12 + Math.floor((level - 21) / 2)}`
   };
 }
@@ -221,8 +221,8 @@ function getAdvancedProfile(level: number): DifficultyProfile {
     band: 3,
     opWeights: { add: 0.20, sub: 0.20, mul: 0.35, div: 0.25, percent: 0 },
     addSub: {
-      min: 50 + (level - 31) * 10,
-      max: 200 + (level - 31) * 20,
+      min: 80 + (level - 31) * 12,
+      max: 250 + (level - 31) * 25,
       allowNegatives: level >= 35,
       requireCarryBorrow: true,
       decimals: 0
@@ -245,7 +245,7 @@ function getAdvancedProfile(level: number): DifficultyProfile {
     percent: { enabled: false, baseMin: 0, baseMax: 0, percentValues: [], allowChange: false },
     fractions: { enabled: false, denominators: [], addSubOnly: true },
     multiStep: { enabled: false, maxSteps: 1, probability: 0 },
-    minComplexityScore: 7 + t * 2,
+    minComplexityScore: 9 + Math.floor(t * 3),
     description: `L${level}: Advanced - 2x2 digit mul, negatives${level >= 35 ? ' enabled' : ' soon'}`
   };
 }
