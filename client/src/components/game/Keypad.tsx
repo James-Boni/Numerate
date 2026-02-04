@@ -43,54 +43,69 @@ export function Keypad({ onPress, onDelete, onSubmit, disabled, submitDisabled }
 // Let's make a big Submit button below the keypad or floated.
 
 export function KeypadModern({ onPress, onDelete, onSubmit, disabled, submitDisabled }: KeypadProps) {
-  const keys = [
-    '1', '2', '3', '⌫',
-    '4', '5', '6', '±',
-    '7', '8', '9', '.',
-    '', '0', '', ''
-  ];
-
-  const filteredKeys = keys.filter(k => k !== '');
-  const gridCols = 'grid-cols-4';
-
   return (
-    <div className="w-full bg-secondary/30 pb-safe pt-2">
-      <div className={clsx("grid gap-[1px] bg-zinc-200/50", gridCols)}>
-        {filteredKeys.map((k, idx) => {
-          const isAction = k === '⌫' || k === '±' || k === '.';
-          const isZero = k === '0';
-          return (
-            <motion.button
-              key={`${k}-${idx}`}
-              whileTap={{ backgroundColor: "rgba(0,0,0,0.1)" }}
-              onClick={() => k === '⌫' ? onDelete() : onPress(k)}
-              disabled={disabled}
-              className={clsx(
-                "h-16 text-2xl font-medium flex items-center justify-center bg-white active:bg-zinc-100 transition-colors focus:outline-none touch-manipulation",
-                isAction && "bg-zinc-50 text-slate-600",
-                isZero && "col-span-2"
-              )}
-            >
-              {k === '⌫' ? <Delete strokeWidth={1.5} /> : k}
-            </motion.button>
-          );
-        })}
-      </div>
-      <div className="p-4 bg-white">
+    <div className="w-full bg-white pb-safe">
+      <div className="grid grid-cols-4 gap-[1px] bg-zinc-200">
+        {/* Row 1 */}
+        <KeyButton onClick={() => onPress('1')} disabled={disabled}>1</KeyButton>
+        <KeyButton onClick={() => onPress('2')} disabled={disabled}>2</KeyButton>
+        <KeyButton onClick={() => onPress('3')} disabled={disabled}>3</KeyButton>
+        <KeyButton onClick={onDelete} disabled={disabled} variant="action">
+          <Delete strokeWidth={1.5} className="w-7 h-7" />
+        </KeyButton>
+        
+        {/* Row 2 */}
+        <KeyButton onClick={() => onPress('4')} disabled={disabled}>4</KeyButton>
+        <KeyButton onClick={() => onPress('5')} disabled={disabled}>5</KeyButton>
+        <KeyButton onClick={() => onPress('6')} disabled={disabled}>6</KeyButton>
+        <KeyButton onClick={() => onPress('±')} disabled={disabled} variant="action">±</KeyButton>
+        
+        {/* Row 3 */}
+        <KeyButton onClick={() => onPress('7')} disabled={disabled}>7</KeyButton>
+        <KeyButton onClick={() => onPress('8')} disabled={disabled}>8</KeyButton>
+        <KeyButton onClick={() => onPress('9')} disabled={disabled}>9</KeyButton>
+        <KeyButton onClick={() => onPress('.')} disabled={disabled} variant="action">.</KeyButton>
+        
+        {/* Row 4 - 0 spans 2 columns */}
+        <KeyButton onClick={() => onPress('0')} disabled={disabled} className="col-span-2">0</KeyButton>
         <motion.button
-            whileTap={{ scale: 0.98 }}
-            onClick={onSubmit}
-            disabled={disabled || submitDisabled}
-            className={clsx(
-              "w-full h-14 rounded-xl flex items-center justify-center text-lg font-semibold tracking-wide shadow-sm transition-all",
-              "bg-primary text-primary-foreground",
-              (disabled || submitDisabled) && "opacity-50 grayscale"
-            )}
+          whileTap={{ scale: 0.97 }}
+          onClick={onSubmit}
+          disabled={disabled || submitDisabled}
+          className={clsx(
+            "col-span-2 h-[72px] text-xl font-bold flex items-center justify-center bg-primary text-primary-foreground active:bg-primary/90 transition-colors focus:outline-none touch-manipulation",
+            (disabled || submitDisabled) && "opacity-50"
+          )}
         >
-          Submit Answer
+          Submit
         </motion.button>
       </div>
     </div>
+  );
+}
+
+interface KeyButtonProps {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  variant?: 'number' | 'action';
+  className?: string;
+}
+
+function KeyButton({ children, onClick, disabled, variant = 'number', className }: KeyButtonProps) {
+  return (
+    <motion.button
+      whileTap={{ backgroundColor: "rgba(0,0,0,0.08)" }}
+      onClick={onClick}
+      disabled={disabled}
+      className={clsx(
+        "h-[72px] text-3xl font-medium flex items-center justify-center bg-white active:bg-zinc-100 transition-colors focus:outline-none touch-manipulation select-none",
+        variant === 'action' && "bg-zinc-50 text-slate-600 text-2xl",
+        className
+      )}
+    >
+      {children}
+    </motion.button>
   );
 }
 
