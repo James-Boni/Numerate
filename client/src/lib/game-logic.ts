@@ -1,11 +1,56 @@
 // --- Constants ---
 export const TIERS = 10;
 
+export interface AnswerFormat {
+  dpRequired: 0 | 1 | 2;
+  roundingMode: 'exact' | 'round';
+  allowNegative: boolean;
+}
+
 export interface Question {
   id: string;
   text: string;
   answer: number;
   operation: 'add' | 'sub' | 'mul' | 'div';
+  answerFormat?: AnswerFormat;
+}
+
+export function validateAnswer(userInput: string, correctAnswer: number, format: AnswerFormat): boolean {
+  const userValue = parseFloat(userInput);
+  if (isNaN(userValue)) return false;
+  
+  if (!format.allowNegative && userValue < 0) return false;
+  
+  if (format.dpRequired === 0) {
+    if (!Number.isInteger(userValue)) return false;
+    return userValue === Math.round(correctAnswer);
+  }
+  
+  if (format.roundingMode === 'round') {
+    const factor = Math.pow(10, format.dpRequired);
+    const userRounded = Math.round(userValue * factor) / factor;
+    const correctRounded = Math.round(correctAnswer * factor) / factor;
+    return userRounded === correctRounded;
+  } else {
+    const tolerance = Math.pow(10, -(format.dpRequired + 1));
+    return Math.abs(userValue - correctAnswer) <= tolerance;
+  }
+}
+
+export const DEFAULT_ANSWER_FORMAT: AnswerFormat = {
+  dpRequired: 0,
+  roundingMode: 'exact',
+  allowNegative: false
+};
+
+export function getAnswerFormatLabel(format: AnswerFormat): string | null {
+  if (format.dpRequired === 0) {
+    return null;
+  }
+  if (format.dpRequired === 1) {
+    return "Answer to 1 decimal place";
+  }
+  return "Answer to 2 decimal places";
 }
 
 // --- Generators ---

@@ -62,17 +62,15 @@ export interface DifficultyProfile {
 export function getDifficultyProfile(level: number): DifficultyProfile {
   const clampedLevel = Math.max(1, Math.min(100, level));
   
-  if (clampedLevel <= 5) return getFoundationProfile(clampedLevel);
-  if (clampedLevel <= 10) return getCarryBorrowProfile(clampedLevel);
-  if (clampedLevel <= 20) return getIntermediateProfile(clampedLevel);
-  if (clampedLevel <= 30) return getTwoDigitMulProfile(clampedLevel);
-  if (clampedLevel <= 40) return getAdvancedProfile(clampedLevel);
-  if (clampedLevel <= 50) return getHardProfile(clampedLevel);
-  if (clampedLevel <= 60) return getVeryHardProfile(clampedLevel);
-  if (clampedLevel <= 70) return getEliteEntryProfile(clampedLevel);
-  if (clampedLevel <= 80) return getEliteProfile(clampedLevel);
-  if (clampedLevel <= 90) return getVeryEliteProfile(clampedLevel);
-  return getPeakProfile(clampedLevel);
+  if (clampedLevel <= 4) return getFoundationAllOpsProfile(clampedLevel);
+  if (clampedLevel <= 8) return getEarlyNegativesProfile(clampedLevel);
+  if (clampedLevel <= 15) return getPercentFractionsProfile(clampedLevel);
+  if (clampedLevel <= 25) return getMagnitudeRampProfile(clampedLevel);
+  if (clampedLevel <= 35) return getDecimal1dpIntroProfile(clampedLevel);
+  if (clampedLevel <= 45) return getDecimal1dpNormalProfile(clampedLevel);
+  if (clampedLevel <= 60) return getDecimal2dpProfile(clampedLevel);
+  if (clampedLevel <= 80) return getAdvancedDecimalProfile(clampedLevel);
+  return getMasteryProfile(clampedLevel);
 }
 
 function getFoundationProfile(level: number): DifficultyProfile {
@@ -532,6 +530,214 @@ function getPeakProfile(level: number): DifficultyProfile {
     },
     minComplexityScore: 19 + t * 2,
     description: `L${level}: Peak - Multi-step ${Math.round(multiStepProb * 100)}%, 3x3/4x2 mul, 6-digit div`
+  };
+}
+
+function getFoundationAllOpsProfile(level: number): DifficultyProfile {
+  return {
+    level,
+    band: 0,
+    opWeights: { add: 0.30, sub: 0.30, mul: 0.20, div: 0.20, percent: 0 },
+    addSub: {
+      min: 1,
+      max: 10 + level * 2,
+      allowNegatives: false,
+      requireCarryBorrow: false,
+      decimals: 0
+    },
+    mul: { enabled: true, aMin: 1, aMax: 5, bMin: 1, bMax: 5 },
+    div: { enabled: true, dividendMin: 4, dividendMax: 25, divisorMin: 2, divisorMax: 5, allowRemainder: false },
+    percent: { enabled: false, baseMin: 0, baseMax: 0, percentValues: [], allowChange: false },
+    fractions: { enabled: false, denominators: [], addSubOnly: true },
+    multiStep: { enabled: false, maxSteps: 1, probability: 0 },
+    minComplexityScore: 2,
+    description: `L${level}: Foundation - All ops (1-${10 + level * 2}), integer answers`
+  };
+}
+
+function getEarlyNegativesProfile(level: number): DifficultyProfile {
+  const t = (level - 5) / 3;
+  return {
+    level,
+    band: 1,
+    opWeights: { add: 0.28, sub: 0.28, mul: 0.22, div: 0.22, percent: 0 },
+    addSub: {
+      min: 10,
+      max: 50 + level * 5,
+      allowNegatives: true,
+      requireCarryBorrow: level >= 7,
+      decimals: 0
+    },
+    mul: { enabled: true, aMin: 2, aMax: 9, bMin: 2, bMax: 9 },
+    div: { enabled: true, dividendMin: 10, dividendMax: 81, divisorMin: 2, divisorMax: 9, allowRemainder: false },
+    percent: { enabled: false, baseMin: 0, baseMax: 0, percentValues: [], allowChange: false },
+    fractions: { enabled: false, denominators: [], addSubOnly: true },
+    multiStep: { enabled: false, maxSteps: 1, probability: 0 },
+    minComplexityScore: 4 + Math.floor(t * 2),
+    description: `L${level}: Early Negatives - Bigger numbers (10-${50 + level * 5}), negatives introduced`
+  };
+}
+
+function getPercentFractionsProfile(level: number): DifficultyProfile {
+  const t = (level - 9) / 6;
+  const percentValues = level <= 11 ? [10, 25, 50] : level <= 13 ? [10, 20, 25, 50, 75] : [5, 10, 15, 20, 25, 50, 75];
+  return {
+    level,
+    band: 2,
+    opWeights: { add: 0.22, sub: 0.22, mul: 0.20, div: 0.20, percent: 0.16 },
+    addSub: {
+      min: 20,
+      max: 100 + level * 10,
+      allowNegatives: true,
+      requireCarryBorrow: true,
+      decimals: 0
+    },
+    mul: { enabled: true, aMin: 2, aMax: 12, bMin: 2, bMax: 12 },
+    div: { enabled: true, dividendMin: 20, dividendMax: 144, divisorMin: 2, divisorMax: 12, allowRemainder: false },
+    percent: { enabled: true, baseMin: 20, baseMax: 200, percentValues, allowChange: level >= 13 },
+    fractions: { enabled: true, denominators: level <= 11 ? [2, 4] : [2, 3, 4, 5], addSubOnly: true },
+    multiStep: { enabled: false, maxSteps: 1, probability: 0 },
+    minComplexityScore: 5 + Math.floor(t * 2),
+    description: `L${level}: Percent & Fractions - Still integer answers`
+  };
+}
+
+function getMagnitudeRampProfile(level: number): DifficultyProfile {
+  const t = (level - 16) / 9;
+  const maxAddSub = 200 + (level - 16) * 50;
+  return {
+    level,
+    band: 3,
+    opWeights: { add: 0.20, sub: 0.20, mul: 0.22, div: 0.22, percent: 0.16 },
+    addSub: {
+      min: 50,
+      max: maxAddSub,
+      allowNegatives: true,
+      requireCarryBorrow: true,
+      decimals: 0
+    },
+    mul: { enabled: true, aMin: 5, aMax: 20 + level - 16, bMin: 5, bMax: 15 + Math.floor((level - 16) / 2) },
+    div: { enabled: true, dividendMin: 50, dividendMax: 500 + (level - 16) * 50, divisorMin: 3, divisorMax: 15, allowRemainder: false },
+    percent: { enabled: true, baseMin: 50, baseMax: 500, percentValues: [5, 10, 12.5, 15, 20, 25, 30, 50, 75], allowChange: true },
+    fractions: { enabled: true, denominators: [2, 3, 4, 5, 8, 10], addSubOnly: false },
+    multiStep: { enabled: level >= 20, maxSteps: 2, probability: 0.1 },
+    minComplexityScore: 7 + Math.floor(t * 2),
+    description: `L${level}: Magnitude Ramp - Large numbers (up to ${maxAddSub}), 2-digit mul`
+  };
+}
+
+function getDecimal1dpIntroProfile(level: number): DifficultyProfile {
+  const t = (level - 26) / 9;
+  return {
+    level,
+    band: 4,
+    opWeights: { add: 0.18, sub: 0.18, mul: 0.22, div: 0.25, percent: 0.17 },
+    addSub: {
+      min: 100,
+      max: 500 + (level - 26) * 50,
+      allowNegatives: true,
+      requireCarryBorrow: true,
+      decimals: 1
+    },
+    mul: { enabled: true, aMin: 10, aMax: 30 + level - 26, bMin: 5, bMax: 20 },
+    div: { enabled: true, dividendMin: 100, dividendMax: 1000, divisorMin: 2, divisorMax: 20, allowRemainder: true },
+    percent: { enabled: true, baseMin: 100, baseMax: 1000, percentValues: [5, 10, 12.5, 15, 20, 25, 30, 33, 50, 66, 75], allowChange: true },
+    fractions: { enabled: true, denominators: [2, 3, 4, 5, 6, 8, 10], addSubOnly: false },
+    multiStep: { enabled: true, maxSteps: 2, probability: 0.15 },
+    minComplexityScore: 9 + Math.floor(t * 2),
+    description: `L${level}: 1dp Decimals Intro - Division rounds to 1 decimal place`
+  };
+}
+
+function getDecimal1dpNormalProfile(level: number): DifficultyProfile {
+  const t = (level - 36) / 9;
+  return {
+    level,
+    band: 5,
+    opWeights: { add: 0.16, sub: 0.16, mul: 0.24, div: 0.26, percent: 0.18 },
+    addSub: {
+      min: 200,
+      max: 1000 + (level - 36) * 100,
+      allowNegatives: true,
+      requireCarryBorrow: true,
+      decimals: 1
+    },
+    mul: { enabled: true, aMin: 15, aMax: 50, bMin: 10, bMax: 30 },
+    div: { enabled: true, dividendMin: 200, dividendMax: 2000, divisorMin: 3, divisorMax: 25, allowRemainder: true },
+    percent: { enabled: true, baseMin: 200, baseMax: 2000, percentValues: [5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 30, 33, 40, 50, 60, 66, 75, 80, 90], allowChange: true },
+    fractions: { enabled: true, denominators: [2, 3, 4, 5, 6, 7, 8, 9, 10, 12], addSubOnly: false },
+    multiStep: { enabled: true, maxSteps: 2, probability: 0.20 },
+    minComplexityScore: 11 + Math.floor(t * 2),
+    description: `L${level}: 1dp Normal - Decimals are standard`
+  };
+}
+
+function getDecimal2dpProfile(level: number): DifficultyProfile {
+  const t = (level - 46) / 14;
+  return {
+    level,
+    band: 6,
+    opWeights: { add: 0.14, sub: 0.14, mul: 0.26, div: 0.28, percent: 0.18 },
+    addSub: {
+      min: 500,
+      max: 2000 + (level - 46) * 200,
+      allowNegatives: true,
+      requireCarryBorrow: true,
+      decimals: 2
+    },
+    mul: { enabled: true, aMin: 20, aMax: 100, bMin: 10, bMax: 50 },
+    div: { enabled: true, dividendMin: 500, dividendMax: 5000, divisorMin: 3, divisorMax: 50, allowRemainder: true },
+    percent: { enabled: true, baseMin: 500, baseMax: 5000, percentValues: [2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 30, 33, 40, 50, 60, 66, 75, 80, 90], allowChange: true },
+    fractions: { enabled: true, denominators: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 20], addSubOnly: false },
+    multiStep: { enabled: true, maxSteps: 3, probability: 0.25 },
+    minComplexityScore: 13 + Math.floor(t * 2),
+    description: `L${level}: 2dp Decimals - Division rounds to 2 decimal places`
+  };
+}
+
+function getAdvancedDecimalProfile(level: number): DifficultyProfile {
+  const t = (level - 61) / 19;
+  return {
+    level,
+    band: 7,
+    opWeights: { add: 0.12, sub: 0.12, mul: 0.28, div: 0.30, percent: 0.18 },
+    addSub: {
+      min: 1000,
+      max: 5000 + (level - 61) * 500,
+      allowNegatives: true,
+      requireCarryBorrow: true,
+      decimals: 2
+    },
+    mul: { enabled: true, aMin: 50, aMax: 200, bMin: 20, bMax: 100 },
+    div: { enabled: true, dividendMin: 1000, dividendMax: 10000, divisorMin: 5, divisorMax: 100, allowRemainder: true },
+    percent: { enabled: true, baseMin: 1000, baseMax: 10000, percentValues: [2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 30, 33, 40, 50, 60, 66, 75, 80, 90], allowChange: true },
+    fractions: { enabled: true, denominators: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 20, 25], addSubOnly: false },
+    multiStep: { enabled: true, maxSteps: 3, probability: 0.30 },
+    minComplexityScore: 16 + Math.floor(t * 2),
+    description: `L${level}: Advanced - Large numbers, complex operations`
+  };
+}
+
+function getMasteryProfile(level: number): DifficultyProfile {
+  const t = (level - 81) / 19;
+  return {
+    level,
+    band: 8,
+    opWeights: { add: 0.10, sub: 0.10, mul: 0.30, div: 0.32, percent: 0.18 },
+    addSub: {
+      min: 2000,
+      max: 10000 + (level - 81) * 1000,
+      allowNegatives: true,
+      requireCarryBorrow: true,
+      decimals: 2
+    },
+    mul: { enabled: true, aMin: 100, aMax: 500, bMin: 50, bMax: 200 },
+    div: { enabled: true, dividendMin: 5000, dividendMax: 50000, divisorMin: 10, divisorMax: 200, allowRemainder: true },
+    percent: { enabled: true, baseMin: 5000, baseMax: 50000, percentValues: [2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 30, 33, 40, 50, 60, 66, 75, 80, 90], allowChange: true },
+    fractions: { enabled: true, denominators: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 20, 25, 50], addSubOnly: false },
+    multiStep: { enabled: true, maxSteps: 4, probability: 0.35 },
+    minComplexityScore: 18 + Math.floor(t * 2),
+    description: `L${level}: Mastery - Expert-level arithmetic`
   };
 }
 

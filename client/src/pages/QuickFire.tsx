@@ -11,12 +11,14 @@ import { generateQuestionForLevel } from '@/lib/logic/generator_adapter';
 import { KeypadModern } from '@/components/game/Keypad';
 import { computeFluency } from '@/lib/logic/xp-system';
 import { Card } from '@/components/ui/card';
+import { validateAnswer, DEFAULT_ANSWER_FORMAT, AnswerFormat } from '@/lib/game-logic';
 
 interface Question {
   id: string;
   text: string;
   answer: number;
   operation: string;
+  answerFormat?: AnswerFormat;
 }
 
 interface QuickFireResult {
@@ -167,6 +169,7 @@ export default function QuickFire() {
       text: result.text,
       answer: result.answer,
       operation: result.operation,
+      answerFormat: result.answerFormat,
     };
     setQuestion(newQuestion);
     setInput('');
@@ -311,8 +314,8 @@ export default function QuickFire() {
     const now = performance.now();
     const responseTime = now - questionStartTimeRef.current;
     
-    const val = parseFloat(input);
-    const isCorrect = Math.abs(val - question.answer) < 0.001;
+    const answerFormat = question.answerFormat ?? DEFAULT_ANSWER_FORMAT;
+    const isCorrect = validateAnswer(input, question.answer, answerFormat);
     
     totalCountRef.current += 1;
     responseTimesRef.current.push(responseTime);

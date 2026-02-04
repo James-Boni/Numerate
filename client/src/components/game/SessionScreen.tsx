@@ -4,7 +4,7 @@ import { X, Check } from 'lucide-react';
 import { clsx } from 'clsx';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { KeypadModern } from '@/components/game/Keypad';
-import { generateQuestion, calculateXP, Question, TIERS } from '@/lib/game-logic';
+import { generateQuestion, calculateXP, Question, TIERS, getAnswerFormatLabel, AnswerFormat, validateAnswer, DEFAULT_ANSWER_FORMAT } from '@/lib/game-logic';
 import { generateQuestionForLevel, GeneratedQuestionMeta } from '@/lib/logic/generator_adapter';
 import { useStore, SessionStats, QuestionResult } from '@/lib/store';
 
@@ -326,8 +326,8 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
     if (!question || feedback) return;
     if (!input) return;
     
-    const val = parseFloat(input);
-    const isCorrect = Math.abs(val - (question?.answer ?? 0)) < 0.001;
+    const answerFormat = question.answerFormat ?? DEFAULT_ANSWER_FORMAT;
+    const isCorrect = validateAnswer(input, question.answer, answerFormat);
     const timeTaken = Date.now() - questionStartTimeRef.current;
     
     // Update refs FIRST (synchronous) before state
@@ -423,9 +423,25 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
 
   const handleKeyPress = (k: string) => {
     if (feedback) return;
-    // Play tap sound IMMEDIATELY on key press
     if (settings.soundOn) AudioManager.playTap();
-    if (input.length < 6) setInput(prev => prev + k);
+    
+    if (k === '±') {
+      setInput(prev => {
+        if (prev.startsWith('-')) {
+          return prev.slice(1);
+        } else {
+          return '-' + prev;
+        }
+      });
+      return;
+    }
+    
+    if (k === '.' && input.includes('.')) return;
+    
+    const maxLen = input.startsWith('-') ? 8 : 7;
+    if (input.replace('-', '').length < maxLen) {
+      setInput(prev => prev + k);
+    }
   };
 
   return (
@@ -507,6 +523,12 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
                           {question.text}
                       </h2>
                       
+                      {question.answerFormat && getAnswerFormatLabel(question.answerFormat) && (
+                        <p className="text-sm text-slate-500 -mt-8">
+                          {getAnswerFormatLabel(question.answerFormat)}
+                        </p>
+                      )}
+                      
                       <div className={clsx(
                         "h-24 flex items-center justify-center text-7xl font-mono font-medium transition-all",
                         feedback === 'correct' ? "text-teal-600" :
@@ -535,6 +557,8 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
             onSubmit={() => handleSubmit()}
             submitDisabled={input.length === 0}
             disabled={feedback !== null}
+            showNegative={question?.answerFormat?.allowNegative ?? false}
+            showDecimal={(question?.answerFormat?.dpRequired ?? 0) > 0}
           />
         </div>
       </div>

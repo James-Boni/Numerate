@@ -42,28 +42,47 @@ export function Keypad({ onPress, onDelete, onSubmit, disabled, submitDisabled }
 // User spec: "Submit on Enter/Done + explicit Submit button"
 // Let's make a big Submit button below the keypad or floated.
 
-export function KeypadModern({ onPress, onDelete, onSubmit, disabled, submitDisabled }: KeypadProps) {
-  const rows = [
-    ['1', '2', '3'],
-    ['4', '5', '6'],
-    ['7', '8', '9'],
-    ['.', '0', '⌫']
-  ];
+interface KeypadModernProps extends KeypadProps {
+  showNegative?: boolean;
+  showDecimal?: boolean;
+}
+
+export function KeypadModern({ onPress, onDelete, onSubmit, disabled, submitDisabled, showNegative = false, showDecimal = true }: KeypadModernProps) {
+  const use4Cols = showNegative && showDecimal;
+  
+  const keys = use4Cols 
+    ? [
+        '1', '2', '3', '⌫',
+        '4', '5', '6', '±',
+        '7', '8', '9', '.',
+        '', '0', '', ''
+      ]
+    : [
+        '1', '2', '3',
+        '4', '5', '6',
+        '7', '8', '9',
+        showNegative ? '±' : (showDecimal ? '.' : ''), '0', '⌫'
+      ];
+
+  const filteredKeys = keys.filter(k => k !== '');
+  const gridCols = use4Cols ? 'grid-cols-4' : 'grid-cols-3';
 
   return (
     <div className="w-full bg-secondary/30 pb-safe pt-2">
-      <div className="grid grid-cols-3 gap-[1px] bg-zinc-200/50"> {/* Gap creates grid lines look if bg is different */}
-        {rows.flat().map((k) => {
-          const isAction = k === '⌫' || k === 'OK';
+      <div className={clsx("grid gap-[1px] bg-zinc-200/50", gridCols)}>
+        {filteredKeys.map((k, idx) => {
+          const isAction = k === '⌫' || k === '±' || k === '.';
+          const isZero = k === '0' && use4Cols;
           return (
             <motion.button
-              key={k}
+              key={`${k}-${idx}`}
               whileTap={{ backgroundColor: "rgba(0,0,0,0.1)" }}
               onClick={() => k === '⌫' ? onDelete() : onPress(k)}
               disabled={disabled}
               className={clsx(
                 "h-16 text-2xl font-medium flex items-center justify-center bg-white active:bg-zinc-100 transition-colors focus:outline-none touch-manipulation",
-                isAction && "bg-zinc-50"
+                isAction && "bg-zinc-50 text-slate-600",
+                isZero && "col-span-2"
               )}
             >
               {k === '⌫' ? <Delete strokeWidth={1.5} /> : k}

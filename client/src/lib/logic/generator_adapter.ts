@@ -1,5 +1,6 @@
-import { Question } from '../game-logic';
+import { Question, AnswerFormat } from '../game-logic';
 import { getDifficultyProfile, DifficultyProfile, computeQuestionComplexity } from './difficulty-profile';
+import { getLevelCapabilities, LevelCapabilities } from './level-capabilities';
 
 const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 const randomFloat = (min: number, max: number, decimals: number) => {
@@ -273,11 +274,76 @@ function selectOperation(profile: DifficultyProfile): 'add' | 'sub' | 'mul' | 'd
   return 'percent';
 }
 
+function validateAgainstCapabilities(
+  answer: number, 
+  op: string, 
+  caps: LevelCapabilities
+): boolean {
+  if (answer < 0 && !caps.allowNegativeAnswers) {
+    return false;
+  }
+  
+  if (answer < 0 && caps.negativeMagnitudeLimit && Math.abs(answer) > caps.negativeMagnitudeLimit) {
+    return false;
+  }
+  
+  const hasDecimals = answer !== Math.floor(answer);
+  if (hasDecimals && !caps.allowDecimals) {
+    return false;
+  }
+  
+  if (hasDecimals) {
+    const decimalPart = Math.abs(answer) - Math.floor(Math.abs(answer));
+    const dpCount = decimalPart.toString().split('.')[1]?.length || 0;
+    if (dpCount > caps.decimalDpMax) {
+      return false;
+    }
+  }
+  
+  if (op === 'div' && hasDecimals && caps.divisionMode === 'integerOnly') {
+    return false;
+  }
+  
+  if (op === 'percent' && !caps.percentEnabled) {
+    return false;
+  }
+  
+  return true;
+}
+
+function deriveAnswerFormatFromCaps(caps: LevelCapabilities, op: string, answer: number): AnswerFormat {
+  const allowNegative = caps.allowNegativeAnswers;
+  
+  if (op === 'div' && caps.divisionMode !== 'integerOnly') {
+    const dpRequired = caps.divisionMode === 'round2dp' ? 2 : 1;
+    return {
+      dpRequired: dpRequired as 0 | 1 | 2,
+      roundingMode: 'round',
+      allowNegative
+    };
+  }
+  
+  if (caps.allowDecimals && answer !== Math.floor(answer)) {
+    return {
+      dpRequired: caps.decimalDpMax,
+      roundingMode: 'exact',
+      allowNegative
+    };
+  }
+  
+  return {
+    dpRequired: 0,
+    roundingMode: 'exact',
+    allowNegative
+  };
+}
+
 export const generateQuestionForLevel = (
   level: number,
   history: { templateId?: string, text?: string }[] = []
-): Question & { targetTimeMs: number; dp: number; meta: GeneratedQuestionMeta } => {
+): Question & { targetTimeMs: number; dp: number; meta: GeneratedQuestionMeta; answerFormat: AnswerFormat } => {
   const profile = getDifficultyProfile(level);
+  const caps = getLevelCapabilities(level);
   
   const recentSignatures = new Set(
     history.slice(0, 10).map(h => h.text ? generateSignature(h.text) : '')
@@ -286,7 +352,7 @@ export const generateQuestionForLevel = (
   let generated: { text: string; answer: number; operandA: number; operandB: number };
   let op: 'add' | 'sub' | 'mul' | 'div' | 'percent' | 'multi';
   let attempts = 0;
-  const MAX_ATTEMPTS = 30;
+  const MAX_ATTEMPTS = 50;
   
   do {
     if (profile.multiStep.enabled && Math.random() < profile.multiStep.probability) {
@@ -294,6 +360,10 @@ export const generateQuestionForLevel = (
       op = 'multi';
     } else {
       op = selectOperation(profile);
+      
+      if (op === 'percent' && !caps.percentEnabled) {
+        op = 'mul';
+      }
       
       switch (op) {
         case 'add':
@@ -315,6 +385,10 @@ export const generateQuestionForLevel = (
     }
     
     attempts++;
+    
+    if (!validateAgainstCapabilities(generated.answer, op, caps)) {
+      continue;
+    }
     
     const sig = generateSignature(generated.text);
     if (!recentSignatures.has(sig)) {
@@ -362,12 +436,14 @@ export const generateQuestionForLevel = (
   lastGeneratedMeta = meta;
   
   const baseOp = op === 'multi' ? 'mul' : op === 'percent' ? 'mul' : op;
+  const answerFormat = deriveAnswerFormatFromCaps(caps, op, generated.answer);
   
   return {
     id: Math.random().toString(36).substr(2, 9),
     text: generated.text,
     answer: generated.answer,
     operation: baseOp as 'add' | 'sub' | 'mul' | 'div',
+    answerFormat,
     targetTimeMs,
     dp,
     meta
