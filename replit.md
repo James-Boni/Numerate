@@ -239,3 +239,39 @@ Scaffolding for future iOS integration (SIWA + IAP):
 - Internal UUID as primary key (not Apple subject identifier)
 - Entitlement status derived from entitlement fields only
 - Offline-first with sync queue for failed network requests
+
+## Capacitor iOS Integration
+
+The project is configured with Capacitor to wrap the React web app as a native iOS application.
+
+### Configuration
+- **App ID**: com.example.numerate (change to your own before publishing)
+- **App Name**: Numerate
+- **Web Directory**: dist/public (Vite build output)
+- **Config File**: capacitor.config.ts (root directory)
+
+### iOS Project Structure
+- `ios/App/App.xcworkspace` - Xcode workspace (use this to open project)
+- `ios/App/App/` - Native iOS app code and web assets
+- `ios/App/Podfile` - CocoaPods dependencies
+
+### Build Commands (Run on Mac with Xcode)
+1. Install dependencies: `npm install`
+2. Build web assets: `npx vite build`
+3. Sync to iOS: `npx cap sync ios`
+4. Open in Xcode: `npx cap open ios`
+
+### Routing
+- Uses Wouter for client-side routing
+- Capacitor automatically handles SPA routing by serving local assets
+- All routes work offline once bundled
+
+### iOS-Specific Configuration
+- Safe area handling: contentInset set to "automatic"
+- Status bar: Uses teal (#0d9488) background color
+- Zoom prevention: Handled via viewport meta tag in index.html
+
+### Future iOS Integrations (Scaffolding Ready)
+- Sign in with Apple (SIWA): See `client/src/lib/services/auth-service.ts`
+- In-App Purchases (IAP): See `client/src/lib/services/billing-service.ts`
+- Secure storage: Uses localStorage, ready for SecureStore with Expo/Capacitor plugins
