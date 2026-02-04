@@ -1,0 +1,58 @@
+You are helping me convert my existing React + Vite mobile-first web app (currently served as a PWA-style site on Replit) into an iOS app project that I can open in Xcode and eventually upload to TestFlight/App Store.
+
+IMPORTANT CONTEXT
+- This is not a React Native app. It is React + Vite running in the browser (URL works as a normal website).
+- I want to keep the codebase mostly unchanged and wrap it using Capacitor.
+- The goal for this task is: produce an Xcode-compatible iOS project that runs the *bundled* web assets locally (NOT a webview that loads a remote URL at runtime).
+- My later goals are Sign in with Apple (SIWA) + Apple In-App Purchases (IAP), but for now just create the correct Capacitor iOS shell, with a clean foundation for native integrations.
+
+TASKS (DO THESE IN ORDER)
+1) Add Capacitor to the existing Vite project:
+   - Install @capacitor/core, @capacitor/cli, and @capacitor/ios.
+   - Initialize Capacitor with:
+     - appName: Numerate
+     - appId: com.<myname>.numerate (use a placeholder like com.example.numerate if you must; I will replace later)
+   - Configure Capacitor to use Vite’s build output folder (likely "dist") as the webDir.
+
+2) Ensure the app runs from local bundled assets:
+   - Configure the iOS app to load local web assets produced by `npm run build`, not the remote Replit URL.
+   - Add build + sync scripts:
+     - build: `vite build`
+     - cap:sync: `npx cap sync ios`
+     - cap:open: `npx cap open ios`
+   - Make sure `npm run build` then `npx cap sync ios` results in the iOS project using the latest dist output.
+
+3) Routing / deep link handling:
+   - The app uses client-side routing (e.g. /assessment). Ensure Capacitor routing works with Vite build so that direct navigation to routes does not 404 inside the native wrapper.
+   - If needed, adjust Vite base path / history fallback so the built app works inside the iOS wrapper.
+
+4) iOS project generation:
+   - Add the iOS platform: `npx cap add ios`
+   - Confirm an `ios/` folder is created with an Xcode project/workspace.
+   - Provide exact instructions for how I open and run it in Xcode.
+
+5) App-like behaviour (avoid “simple web wrapper” problems):
+   - Ensure the iOS build behaves like an app:
+     - correct status bar / safe area handling
+     - prevent accidental zoom (if that’s currently handled in the web app, keep it)
+   - Do NOT simply embed a remote website URL in a webview.
+   - Confirm the build works offline (at least it should load the UI without network).
+
+OUTPUT REQUIREMENTS
+- Tell me exactly which files you changed/added.
+- Show the final `capacitor.config` (or capacitor.config.ts/json) and confirm webDir points to dist.
+- Provide step-by-step commands I should run in Replit to generate the iOS project:
+  - npm install
+  - npm run build
+  - npx cap sync ios
+  - npx cap open ios
+- List any required environment tweaks for Replit (if any).
+
+DO NOT DO
+- Do not migrate to React Native or Expo.
+- Do not redesign my UI.
+- Do not add SIWA or IAP yet.
+- Do not rely on the remote Replit URL at runtime.
+
+GOAL CHECK
+At the end, I should have an iOS project that I can open in Xcode and run on a simulator/device, showing my Numerate app from bundled assets.
