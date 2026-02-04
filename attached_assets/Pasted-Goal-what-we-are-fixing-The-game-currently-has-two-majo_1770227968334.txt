@@ -1,0 +1,445 @@
+Goal (what we are fixing)
+
+The game currently has two major issues:
+
+The game stays too easy for too long.
+Players spend many levels answering questions that do not feel like they are getting harder at a steady pace.
+
+After around level ~30, the game suddenly becomes much harder in an inconsistent and unfair way.
+Players start receiving questions that:
+
+require knowledge the game has not taught yet (no guidance),
+
+require answer formats the game cannot accept properly (especially decimals),
+
+mix very easy questions with very hard questions randomly (feels chaotic rather than designed).
+
+We want the game to feel like a smooth training program:
+
+difficulty should increase steadily,
+
+new skills should be introduced with teaching,
+
+the input system must always be able to accept the correct answer,
+
+the types of questions should be balanced so training feels complete (add/sub/mul/div plus % and fractions).
+
+Non-negotiable design rule
+
+The game must never generate a question that the user cannot answer using the current input keypad and validation logic.
+
+That includes:
+
+negative answers (requires a “-” input),
+
+decimal answers (requires “.” input and decimal-aware validation),
+
+questions requiring rounding rules (must be clearly communicated and validated correctly).
+
+If the generator can produce something, the UI and validator must support it.
+If the UI/validator do not support it yet, the generator must not produce it.
+
+Part 1 — Fix answer input and answer checking (UI + validator)
+1.1 Add missing keypad functionality
+
+The keypad must include:
+
+digits 0–9
+
+decimal point .
+
+negative sign - (or a toggle ±)
+
+backspace
+
+clear (optional but recommended)
+
+Without the minus sign, any question that produces a negative result becomes impossible.
+
+1.2 Define “answer format” rules for every question
+
+Every generated question must include metadata that tells the game exactly how the answer should be entered and validated.
+
+Each question must specify:
+
+dpRequired (decimal places required): 0, 1, or 2
+
+roundingMode: "exact" or "round"
+
+allowNegative: true/false (this must match level rules)
+
+What these mean
+
+If dpRequired = 0 → the game expects an integer answer (no decimals).
+
+If dpRequired = 1 → the game expects a number with 1 decimal place.
+
+If dpRequired = 2 → the game expects a number with 2 decimal places.
+
+If roundingMode = "exact" → user must enter the correct exact value at that decimal precision.
+
+If roundingMode = "round" → user is expected to round the correct answer to that decimal precision.
+
+1.3 The UI must explicitly tell the user the answer format
+
+Whenever dpRequired is not 0, show a label under the question:
+
+“Answer to 1 decimal place”
+
+“Answer to 2 decimal places”
+
+If dpRequired = 0, show:
+
+“Answer as an integer”
+
+This removes confusion and prevents trust-breaking experiences.
+
+1.4 Answer validation must use the same rules the UI communicates
+
+We must prevent the current problem where the game “expects rounding” but does not tell the user, or rejects exact answers.
+
+Validation behavior (explicit)
+
+Convert the user’s typed answer into a number.
+
+If conversion fails → mark wrong.
+
+Compute the correct numeric answer.
+
+If dpRequired = 0:
+
+correct if userAnswer === expectedAnswer
+
+If dpRequired > 0:
+
+If roundingMode = "round":
+
+compare round(userAnswer, dpRequired) to round(expectedAnswer, dpRequired)
+
+If roundingMode = "exact":
+
+compare exact decimal strings at dpRequired OR use a tiny tolerance:
+
+abs(user - expected) <= 10^(-(dpRequired+1))
+
+Important: choose one approach and be consistent.
+
+Part 2 — Create strict level-based “capabilities” (guardrails)
+
+Right now the generator is allowed to create questions that do not match:
+
+the player’s ability,
+
+the game’s current supported formats,
+
+the intended difficulty ramp.
+
+We fix this by defining, for every level, a “capability profile” that says exactly what is allowed.
+
+2.1 Define a “capabilities object”
+
+For any given level, generate a config like this:
+
+allowNegativeAnswers: boolean
+
+allowDecimals: boolean
+
+decimalDpMax: 0|1|2
+
+divisionMode: "integerOnly" | "round1dp" | "round2dp"
+
+percentEnabled: boolean
+
+fractionsEnabled: boolean
+
+numberRanges (min/max digits for each operation)
+
+This config is the single source of truth.
+
+2.2 Generator must obey capabilities
+
+A question can only be created if it satisfies the current level’s capabilities.
+
+Examples:
+
+If allowNegativeAnswers = false → never generate a negative result.
+
+If divisionMode = "integerOnly" → only generate division with integer answers.
+
+If decimalDpMax = 0 → do not generate any decimal answers.
+
+This prevents “game not ready for its own questions.”
+
+Part 3 — Fix difficulty progression (main problem)
+3.1 We keep ALL operations from level 1
+
+You do NOT want levels 1–8 to be only addition and subtraction.
+So we will include:
+
+addition
+
+subtraction
+
+multiplication
+
+division
+from level 1, but they will be scaled by number size and complexity.
+
+3.2 Difficulty should ramp through magnitude BEFORE decimals
+
+The correct difficulty progression is:
+
+Increase number sizes and complexity first (bigger digits, less obvious factor pairs)
+
+Introduce decimals later (first 1 decimal place, then 2 decimal places much later)
+
+Decimals are an advanced skill in mental arithmetic, so they should not appear too early, and they must be taught when introduced.
+
+Part 4 — Explicit level bands that solve the “too easy too long” and “spike after 30”
+
+Below is a complete blueprint you can implement.
+
+Levels 1–4 (All ops, small numbers, integer answers only)
+
+Allowed:
+
+Add/sub: 1–10
+
+Mul: 1×1 to 5×5
+
+Div: integer-only (e.g. 12÷3, 20÷5)
+No:
+
+decimals
+
+percent
+
+fractions
+
+negative answers
+
+Difficulty increases by slightly increasing speed expectations and mixing operations, not by introducing new concepts.
+
+Levels 5–8 (All ops, bigger integers, introduce negative answers in controlled way)
+
+Allowed:
+
+Add/sub: 10–99
+
+Mul: up to 9×9, plus 2-digit × 1-digit (e.g. 16×7)
+
+Div: integer-only with less obvious construction
+Negatives:
+
+enabled, but tightly controlled:
+
+ensure negative results are small in magnitude (example limit: ≥ -20)
+
+No:
+
+decimals
+
+percent
+
+fractions
+
+This makes the game harder much earlier, without introducing decimals.
+
+Levels 9–15 (Introduce percent and fractions, still integer answers only)
+
+This meets your requirement: start % after level 8.
+
+Allowed:
+
+Add/sub: mix 2-digit and 3-digit numbers
+
+Mul: more 2-digit × 1-digit, some 2×2
+
+Div: still integer-only
+Percent enabled:
+
+start with “friendly percent” only:
+
+10%, 25%, 50%, 75% of numbers designed to give integer outputs
+Fractions enabled:
+
+start with “friendly fractions”:
+
+1/2, 1/3, 1/4, 3/4 of numbers designed to give integer outputs
+Negatives:
+
+allowed with controlled magnitude (example: ≥ -50)
+
+No decimals yet.
+
+Levels 16–25 (Steepen difficulty early by increasing magnitude)
+
+This band is what fixes “easy for too long.”
+
+Allowed:
+
+Add/sub: 3–4 digit numbers
+
+Mul: 2-digit × 2-digit becomes common
+
+Div: still integer-only but with bigger numbers
+Percent:
+
+introduce less friendly ones gradually (e.g. 15%, 12.5%) but still keep many integer outputs
+Fractions:
+
+expand variety but still keep most results “clean” (not many decimals)
+
+Negatives:
+
+allowed with wider magnitude (example: ≥ -200)
+
+Still no decimal answers for division. We’re raising difficulty through bigger integer arithmetic first.
+
+Levels 26–35 (Bridge band to prevent the spike at ~30)
+
+This is critical. This is where your game currently spikes.
+We prevent the spike by introducing harder concepts one at a time with teaching.
+
+Allowed:
+
+All operations continue, with larger magnitudes
+New concepts introduced here:
+
+Decimal multiplication (max 1dp answers)
+
+Division with rounding to 1dp (only after a tutorial gate)
+
+Rules:
+
+Division should NOT require 2dp answers here.
+
+If decimals appear, the UI must say “Answer to 1 decimal place.”
+
+Validator must correctly support 1dp.
+
+Negatives:
+
+allowed, scaled with level.
+
+Levels 36–45 (1 decimal place becomes normal)
+
+Allowed:
+
+Division rounding to 1dp is normal
+
+Decimal multiplication more frequent
+
+Percent increase/decrease questions can appear
+
+Fractions can become more complex
+
+At this point, the player has been taught the new concept, so it is fair to test it regularly.
+
+Levels 46+ (2 decimal place answers are now allowed)
+
+This is where you introduce:
+
+division rounding to 2dp
+
+more complex decimal operations
+
+At this level, 2dp is appropriate because:
+
+player has already mastered 1dp rounding earlier,
+
+the game is now in advanced territory.
+
+Part 5 — Prevent “easy + extremely hard” mixtures (question tiering)
+
+To stop the feeling of getting a level-15 question at level-30 and then a brutal 2dp division immediately after, do this:
+
+Every generated question gets a difficulty tier:
+
+core (main difficulty for this level band)
+
+stretch (slightly harder than core)
+
+review (slightly easier than core)
+
+Distribution:
+
+80% core
+
+15% stretch
+
+5% review
+
+Hard rule:
+
+Stretch questions must never introduce a new concept.
+
+New concepts can only appear after the tutorial gate.
+
+This ensures progression feels intentional.
+
+Part 6 — Ensure balanced operation distribution (no streaks)
+
+Instead of randomly choosing operations each time, create a scheduler.
+
+Rules:
+
+Every session should include all operations that are enabled.
+
+No more than 3 questions in a row should be the same operation.
+
+Each operation should meet a minimum count per session once unlocked.
+
+Example (adjustable):
+
+In early levels, 25% each of + − × ÷
+
+After % and fractions unlock, add them as additional categories with their own weights.
+
+This ensures training is well-rounded.
+
+Part 7 — Teach new concepts before testing them (tutorial gates)
+
+Whenever a new concept first appears (examples):
+
+negative numbers
+
+percent questions
+
+fraction questions
+
+decimal multiplication
+
+division rounding to 1dp
+
+division rounding to 2dp
+
+The game must do this sequence before the normal timed game begins:
+
+Show a full screen “New concept unlocked” modal
+
+Show a short animated explanation/example
+
+Give 2 guided practice questions (untimed)
+
+Start the normal game
+
+Store a flag so the tutorial only appears once per concept per user.
+
+This directly fixes: “after level 30 it gets harder with no guidance.”
+
+Implementation summary (what Replit should build)
+
+Replit should implement:
+
+A level→capabilities function or table.
+
+A question generator that obeys capabilities.
+
+A question object that includes answer format metadata.
+
+A validator that uses those same metadata rules.
+
+An operation scheduler that enforces balanced distribution and anti-streak.
+
+A tutorial gate system that triggers before new concepts.
