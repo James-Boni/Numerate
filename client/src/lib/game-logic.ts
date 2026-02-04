@@ -7,12 +7,34 @@ export interface AnswerFormat {
   allowNegative: boolean;
 }
 
+export type QuestionTier = 'review' | 'core' | 'stretch';
+
 export interface Question {
   id: string;
   text: string;
   answer: number;
   operation: 'add' | 'sub' | 'mul' | 'div';
   answerFormat?: AnswerFormat;
+  tier?: QuestionTier;
+}
+
+export function selectQuestionTier(sessionQuestionIndex: number): QuestionTier {
+  if (sessionQuestionIndex < 2) {
+    return 'review';
+  }
+  
+  const roll = Math.random();
+  if (roll < 0.80) return 'core';
+  if (roll < 0.95) return 'stretch';
+  return 'review';
+}
+
+export function getTierXpMultiplier(tier: QuestionTier): number {
+  switch (tier) {
+    case 'stretch': return 1.5;
+    case 'core': return 1.0;
+    case 'review': return 0.5;
+  }
 }
 
 export function validateAnswer(userInput: string, correctAnswer: number, format: AnswerFormat): boolean {

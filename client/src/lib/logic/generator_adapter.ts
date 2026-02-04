@@ -1,6 +1,17 @@
-import { Question, AnswerFormat } from '../game-logic';
+import { Question, AnswerFormat, QuestionTier } from '../game-logic';
 import { getDifficultyProfile, DifficultyProfile, computeQuestionComplexity } from './difficulty-profile';
 import { getLevelCapabilities, LevelCapabilities } from './level-capabilities';
+
+function getEffectiveLevelForTier(level: number, tier: QuestionTier): number {
+  switch (tier) {
+    case 'review':
+      return Math.max(1, level - 3);
+    case 'core':
+      return level;
+    case 'stretch':
+      return Math.min(100, level + 2);
+  }
+}
 
 const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 const randomFloat = (min: number, max: number, decimals: number) => {
@@ -254,24 +265,67 @@ let lastGeneratedMeta: GeneratedQuestionMeta | null = null;
 
 export const getLastGeneratedMeta = () => lastGeneratedMeta;
 
-function selectOperation(profile: DifficultyProfile): 'add' | 'sub' | 'mul' | 'div' | 'percent' {
+type Operation = 'add' | 'sub' | 'mul' | 'div' | 'percent';
+const recentOperations: Operation[] = [];
+const MAX_STREAK = 3;
+
+function selectOperation(profile: DifficultyProfile): Operation {
   const { opWeights } = profile;
-  const rand = Math.random();
+  
+  const adjustedWeights = { ...opWeights };
+  
+  if (recentOperations.length >= MAX_STREAK) {
+    const lastOps = recentOperations.slice(-MAX_STREAK);
+    const isStreak = lastOps.every(op => op === lastOps[0]);
+    if (isStreak) {
+      const streakOp = lastOps[0];
+      adjustedWeights[streakOp] = 0;
+    }
+  }
+  
+  if (recentOperations.length >= 2) {
+    const last2 = recentOperations.slice(-2);
+    if (last2[0] === last2[1]) {
+      adjustedWeights[last2[0]] *= 0.3;
+    }
+  }
+  
+  const total = adjustedWeights.add + adjustedWeights.sub + adjustedWeights.mul + adjustedWeights.div + adjustedWeights.percent;
+  if (total === 0) {
+    const ops: Operation[] = ['add', 'sub', 'mul', 'div'];
+    const result = ops[Math.floor(Math.random() * ops.length)];
+    recordOperation(result);
+    return result;
+  }
+  
+  const rand = Math.random() * total;
   let cumulative = 0;
   
-  cumulative += opWeights.add;
-  if (rand < cumulative) return 'add';
+  cumulative += adjustedWeights.add;
+  if (rand < cumulative) { recordOperation('add'); return 'add'; }
   
-  cumulative += opWeights.sub;
-  if (rand < cumulative) return 'sub';
+  cumulative += adjustedWeights.sub;
+  if (rand < cumulative) { recordOperation('sub'); return 'sub'; }
   
-  cumulative += opWeights.mul;
-  if (rand < cumulative) return 'mul';
+  cumulative += adjustedWeights.mul;
+  if (rand < cumulative) { recordOperation('mul'); return 'mul'; }
   
-  cumulative += opWeights.div;
-  if (rand < cumulative) return 'div';
+  cumulative += adjustedWeights.div;
+  if (rand < cumulative) { recordOperation('div'); return 'div'; }
   
+  recordOperation('percent');
   return 'percent';
+}
+
+function recordOperation(op: Operation) {
+  recentOperations.push(op);
+  if (recentOperations.length > 10) {
+    recentOperations.shift();
+  }
+}
+
+export function resetOperationScheduler() {
+  recentOperations.length = 0;
 }
 
 function validateAgainstCapabilities(
@@ -340,10 +394,12 @@ function deriveAnswerFormatFromCaps(caps: LevelCapabilities, op: string, answer:
 
 export const generateQuestionForLevel = (
   level: number,
-  history: { templateId?: string, text?: string }[] = []
-): Question & { targetTimeMs: number; dp: number; meta: GeneratedQuestionMeta; answerFormat: AnswerFormat } => {
-  const profile = getDifficultyProfile(level);
-  const caps = getLevelCapabilities(level);
+  history: { templateId?: string, text?: string }[] = [],
+  tier: QuestionTier = 'core'
+): Question & { targetTimeMs: number; dp: number; meta: GeneratedQuestionMeta; answerFormat: AnswerFormat; tier: QuestionTier } => {
+  const effectiveLevel = getEffectiveLevelForTier(level, tier);
+  const profile = getDifficultyProfile(effectiveLevel);
+  const caps = getLevelCapabilities(effectiveLevel);
   
   const recentSignatures = new Set(
     history.slice(0, 10).map(h => h.text ? generateSignature(h.text) : '')
@@ -409,8 +465,8 @@ export const generateQuestionForLevel = (
     }
   } while (attempts < MAX_ATTEMPTS);
   
-  const targetTimeMs = getTargetTimeForLevel(level, op);
-  const dp = getDpForLevel(level, op);
+  const targetTimeMs = getTargetTimeForLevel(effectiveLevel, op);
+  const dp = getDpForLevel(effectiveLevel, op);
   
   const complexity = computeQuestionComplexity(
     op,
@@ -428,7 +484,7 @@ export const generateQuestionForLevel = (
     operandA: generated.operandA,
     operandB: generated.operandB,
     answer: generated.answer,
-    level,
+    level: effectiveLevel,
     complexityScore: complexity,
     difficultyProfile: profile
   };
@@ -444,6 +500,7 @@ export const generateQuestionForLevel = (
     answer: generated.answer,
     operation: baseOp as 'add' | 'sub' | 'mul' | 'div',
     answerFormat,
+    tier,
     targetTimeMs,
     dp,
     meta

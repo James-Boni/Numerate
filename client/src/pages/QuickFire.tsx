@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button';
 import { X, Clock, Trophy, Flame, Plus, AlertTriangle } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { clsx } from 'clsx';
-import { generateQuestionForLevel } from '@/lib/logic/generator_adapter';
+import { generateQuestionForLevel, resetOperationScheduler } from '@/lib/logic/generator_adapter';
 import { KeypadModern } from '@/components/game/Keypad';
 import { computeFluency } from '@/lib/logic/xp-system';
 import { Card } from '@/components/ui/card';
-import { validateAnswer, DEFAULT_ANSWER_FORMAT, AnswerFormat } from '@/lib/game-logic';
+import { validateAnswer, DEFAULT_ANSWER_FORMAT, AnswerFormat, QuestionTier, selectQuestionTier } from '@/lib/game-logic';
 
 interface Question {
   id: string;
@@ -19,6 +19,7 @@ interface Question {
   answer: number;
   operation: string;
   answerFormat?: AnswerFormat;
+  tier?: QuestionTier;
 }
 
 interface QuickFireResult {
@@ -162,14 +163,19 @@ export default function QuickFire() {
     }
   }, [hasCompletedAssessment, setLocation]);
 
+  const questionCountRef = useRef(0);
+  
   const generateNextQuestion = useCallback(() => {
-    const result = generateQuestionForLevel(level);
+    const tier = selectQuestionTier(questionCountRef.current);
+    questionCountRef.current++;
+    const result = generateQuestionForLevel(level, [], tier);
     const newQuestion: Question = {
       id: Math.random().toString(36).substr(2, 9),
       text: result.text,
       answer: result.answer,
       operation: result.operation,
       answerFormat: result.answerFormat,
+      tier: result.tier,
     };
     setQuestion(newQuestion);
     setInput('');
@@ -369,6 +375,8 @@ export default function QuickFire() {
   }, [input, feedback, handleSubmit]);
 
   const startCountdown = useCallback(() => {
+    resetOperationScheduler();
+    questionCountRef.current = 0;
     setStep('countdown');
     setCountdownNumber(3);
     

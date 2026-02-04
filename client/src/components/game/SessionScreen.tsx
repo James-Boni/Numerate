@@ -4,8 +4,8 @@ import { X, Check } from 'lucide-react';
 import { clsx } from 'clsx';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { KeypadModern } from '@/components/game/Keypad';
-import { generateQuestion, calculateXP, Question, TIERS, getAnswerFormatLabel, AnswerFormat, validateAnswer, DEFAULT_ANSWER_FORMAT } from '@/lib/game-logic';
-import { generateQuestionForLevel, GeneratedQuestionMeta } from '@/lib/logic/generator_adapter';
+import { generateQuestion, calculateXP, Question, TIERS, getAnswerFormatLabel, AnswerFormat, validateAnswer, DEFAULT_ANSWER_FORMAT, selectQuestionTier, QuestionTier } from '@/lib/game-logic';
+import { generateQuestionForLevel, GeneratedQuestionMeta, resetOperationScheduler } from '@/lib/logic/generator_adapter';
 import { useStore, SessionStats, QuestionResult } from '@/lib/store';
 
 import { AudioManager } from '@/lib/audio';
@@ -71,6 +71,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   const opCountsRef = useRef<OpCounts>({ add: 0, sub: 0, mul: 0, div: 0 });
   const operandStatsRef = useRef<OperandStats>({ minOperand: Infinity, maxOperand: 0, operandSum: 0, count: 0 });
   const questionResultsRef = useRef<QuestionResult[]>([]);
+  const tierCountsRef = useRef({ stretch: 0, core: 0, review: 0 });
   const [difficultyParams, setDifficultyParams] = useState<DifficultyParams | null>(null);
   const [currentOpCounts, setCurrentOpCounts] = useState<OpCounts>({ add: 0, sub: 0, mul: 0, div: 0 });
   
@@ -121,6 +122,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   const sessionEndedRef = useRef(false);
   
   useEffect(() => {
+    resetOperationScheduler();
     nextQuestion();
     setIsActive(true);
     startTimeRef.current = Date.now();
@@ -159,9 +161,11 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
 
   const nextQuestion = () => {
     if (mode === 'training') {
+      const tier = selectQuestionTier(totalCountRef.current);
       const q = generateQuestionForLevel(
         currentLevel,
-        recentQuestionsRef.current
+        recentQuestionsRef.current,
+        tier
       );
       setQuestion(q);
       currentQuestionMetaRef.current = { targetTimeMs: q.targetTimeMs, dp: q.dp, id: q.id };
@@ -372,7 +376,12 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
         }
       }
       
-      const xp = calculateXP(true, timeTaken, streak);
+      const tier = question.tier || 'core';
+      tierCountsRef.current[tier]++;
+      
+      const tierMultiplier = tier === 'stretch' ? 1.5 : tier === 'review' ? 0.5 : 1.0;
+      const baseXp = calculateXP(true, timeTaken, streak);
+      const xp = Math.round(baseXp * tierMultiplier);
       scoreRef.current += xp;
       setScore(scoreRef.current);
       
@@ -519,6 +528,17 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
                       exit={{ opacity: 0 }}
                       className="flex flex-col items-center gap-12"
                   >
+                      {question.tier && question.tier !== 'core' && (
+                        <span className={clsx(
+                          "absolute top-4 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-xs font-medium",
+                          question.tier === 'stretch' ? "bg-purple-100 text-purple-600" :
+                          question.tier === 'review' ? "bg-blue-100 text-blue-600" :
+                          "bg-slate-100 text-slate-600"
+                        )}>
+                          {question.tier === 'stretch' ? 'Stretch' : 'Review'}
+                        </span>
+                      )}
+                      
                       <h2 className="text-6xl font-bold tracking-tight text-foreground/80">
                           {question.text}
                       </h2>
