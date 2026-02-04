@@ -14,7 +14,6 @@ import { xpRequiredToAdvance } from '@/lib/logic/xp-system';
 import { ContextualMessage } from '@/components/game/ContextualMessage';
 import { SparkleEffect } from '@/components/game/SparkleEffect';
 import { Confetti } from '@/components/game/Confetti';
-import { ReassuranceScreen } from '@/components/game/ReassuranceScreen';
 import { PaywallScreen } from '@/components/game/PaywallScreen';
 import { DailyChallengeIntro } from '@/components/game/DailyChallengeIntro';
 import { StrategyLesson } from '@/components/game/StrategyLesson';
@@ -326,14 +325,14 @@ function CountUp({ value, duration = 1, delay = 0, onTick, suffix = '' }: {
 }
 
 export default function Game() {
-  const [step, setStep] = useState<'daily_intro' | 'active' | 'results' | 'streak_milestone' | 'strategy' | 'levelup' | 'reassurance' | 'paywall' | 'blocked'>('daily_intro');
+  const [step, setStep] = useState<'daily_intro' | 'active' | 'results' | 'streak_milestone' | 'strategy' | 'levelup' | 'paywall'>('daily_intro');
   const [results, setResults] = useState<SessionStats | null>(null);
   const [detectedWeakness, setDetectedWeakness] = useState<WeaknessPattern | null>(null);
   const [newPersonalRecords, setNewPersonalRecords] = useState<string[]>([]);
   const [entitlementChecked, setEntitlementChecked] = useState(false);
   const [streakMilestoneReached, setStreakMilestoneReached] = useState<number | null>(null);
   const [_, setLocation] = useLocation();
-  const { currentTier, saveSession, settings, hasUsedFreeDaily, markFreeTrialUsed, seenStrategies, markStrategySeen, checkAndUpdatePersonalBests, streakCount } = useStore();
+  const { currentTier, saveSession, settings, seenStrategies, markStrategySeen, checkAndUpdatePersonalBests, streakCount } = useStore();
   const { entitlement, refreshEntitlement } = useAccountStore();
   const revealRun = React.useRef(false);
   const levelUpShownRef = React.useRef(false);
@@ -356,17 +355,8 @@ export default function Game() {
     }
   }, [step]);
 
-  // Determine if this is first free session AFTER entitlement is checked
+  // Check if user has premium subscription
   const isPremium = isPremiumActive(entitlement);
-  const isFirstFreeSession = !hasUsedFreeDaily && !isPremium;
-  const shouldBlockAccess = hasUsedFreeDaily && !isPremium;
-
-  // Block access if user has used free trial and is not premium
-  useEffect(() => {
-    if (entitlementChecked && shouldBlockAccess && (step === 'daily_intro' || step === 'active')) {
-      setStep('blocked');
-    }
-  }, [entitlementChecked, shouldBlockAccess, step]);
 
   const handleComplete = (stats: SessionStats) => {
     console.log(`[SESSION_FLOW] Training complete: ${Date.now()}`, stats);
@@ -448,7 +438,14 @@ export default function Game() {
     return (
       <DailyChallengeIntro
         streakCount={useStore.getState().streakCount}
-        onStart={() => setStep('active')}
+        onStart={() => {
+          // Show paywall before starting daily session (if not premium)
+          if (!isPremium) {
+            setStep('paywall');
+          } else {
+            setStep('active');
+          }
+        }}
       />
     );
   }
@@ -479,9 +476,6 @@ export default function Game() {
           if (hasLevelUp && !levelUpShownRef.current) {
             levelUpShownRef.current = true;
             setStep('levelup');
-          } else if (isFirstFreeSession) {
-            markFreeTrialUsed();
-            setStep('reassurance');
           } else {
             setLocation('/train');
           }
@@ -506,9 +500,6 @@ export default function Game() {
             if (hasLevelUp && !levelUpShownRef.current) {
               levelUpShownRef.current = true;
               setStep('levelup');
-            } else if (isFirstFreeSession) {
-              markFreeTrialUsed();
-              setStep('reassurance');
             } else {
               setLocation('/train');
             }
@@ -528,44 +519,25 @@ export default function Game() {
         xpIntoLevelAfter={results.xpIntoLevelAfter ?? 0}
         levelUpCount={results.levelUpCount ?? 1}
         onComplete={() => {
-          if (isFirstFreeSession) {
-            markFreeTrialUsed();
-            setStep('reassurance');
-          } else {
-            setLocation('/train');
-          }
+          setLocation('/train');
         }}
         soundOn={settings.soundOn}
       />
     );
   }
 
-  if (step === 'reassurance') {
-    return (
-      <ReassuranceScreen 
-        onContinue={() => setStep('paywall')}
-      />
-    );
-  }
-
-  if (step === 'paywall' || step === 'blocked') {
+  if (step === 'paywall') {
     return (
       <PaywallScreen 
         onSubscribed={() => {
-          if (step === 'blocked') {
-            setStep('active');
-          } else {
-            setLocation('/train');
-          }
+          // After subscribing, start the daily session
+          setStep('active');
         }}
         onRestore={() => {
-          if (step === 'blocked') {
-            setStep('active');
-          } else {
-            setLocation('/train');
-          }
+          // After restoring purchase, start the daily session
+          setStep('active');
         }}
-        onDismiss={step === 'blocked' ? undefined : () => setLocation('/train')}
+        onDismiss={() => setLocation('/train')}
       />
     );
   }
@@ -754,9 +726,6 @@ export default function Game() {
               } else if (hasLevelUp && !levelUpShownRef.current) {
                 levelUpShownRef.current = true;
                 setStep('levelup');
-              } else if (isFirstFreeSession) {
-                markFreeTrialUsed();
-                setStep('reassurance');
               } else {
                 setLocation('/train');
               }
