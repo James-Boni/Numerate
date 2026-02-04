@@ -11,7 +11,7 @@ import { generateQuestionForLevel, resetOperationScheduler } from '@/lib/logic/g
 import { KeypadModern } from '@/components/game/Keypad';
 import { computeFluency } from '@/lib/logic/xp-system';
 import { Card } from '@/components/ui/card';
-import { validateAnswer, DEFAULT_ANSWER_FORMAT, AnswerFormat, QuestionTier, selectQuestionTier } from '@/lib/game-logic';
+import { validateAnswer, DEFAULT_ANSWER_FORMAT, AnswerFormat, QuestionTier, selectQuestionTier, getAnswerFormatLabel } from '@/lib/game-logic';
 
 interface Question {
   id: string;
@@ -680,6 +680,11 @@ export default function QuickFire() {
               >
                 {question?.text} = ?
               </motion.div>
+              {question?.answerFormat && getAnswerFormatLabel(question.answerFormat) && (
+                <p className="text-sm text-slate-500 mt-2">
+                  {getAnswerFormatLabel(question.answerFormat)}
+                </p>
+              )}
             </div>
 
             <div className="text-center bg-white">

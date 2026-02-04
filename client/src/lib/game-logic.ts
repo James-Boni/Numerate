@@ -48,6 +48,15 @@ export function validateAnswer(userInput: string, correctAnswer: number, format:
     return userValue === Math.round(correctAnswer);
   }
   
+  if (!userInput.includes('.')) {
+    return false;
+  }
+  
+  const decimalPart = userInput.split('.')[1] || '';
+  if (decimalPart.length < format.dpRequired) {
+    return false;
+  }
+  
   if (format.roundingMode === 'round') {
     const factor = Math.pow(10, format.dpRequired);
     const userRounded = Math.round(userValue * factor) / factor;

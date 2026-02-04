@@ -166,24 +166,25 @@ function generateDivQuestion(profile: DifficultyProfile): { text: string; answer
   
   const divisor = randomInt(divisorMin, divisorMax);
   
-  let quotient: number;
   let dividend: number;
+  let answer: number;
   
   if (allowRemainder && Math.random() < 0.3) {
     const baseQuotient = randomInt(Math.max(2, Math.floor(profile.div.dividendMin / divisor)), 
                                     Math.floor(profile.div.dividendMax / divisor));
     const remainder = randomInt(1, divisor - 1);
     dividend = divisor * baseQuotient + remainder;
-    quotient = baseQuotient;
+    answer = dividend / divisor;
   } else {
-    quotient = randomInt(Math.max(2, Math.floor(profile.div.dividendMin / divisor)), 
+    const quotient = randomInt(Math.max(2, Math.floor(profile.div.dividendMin / divisor)), 
                          Math.floor(profile.div.dividendMax / divisor));
     dividend = divisor * quotient;
+    answer = quotient;
   }
   
   return { 
     text: `${dividend} ÷ ${divisor}`, 
-    answer: quotient,
+    answer,
     operandA: dividend,
     operandB: divisor
   };

@@ -577,8 +577,6 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
             onSubmit={() => handleSubmit()}
             submitDisabled={input.length === 0}
             disabled={feedback !== null}
-            showNegative={question?.answerFormat?.allowNegative ?? false}
-            showDecimal={(question?.answerFormat?.dpRequired ?? 0) > 0}
           />
         </div>
       </div>

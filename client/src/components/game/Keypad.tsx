@@ -42,37 +42,23 @@ export function Keypad({ onPress, onDelete, onSubmit, disabled, submitDisabled }
 // User spec: "Submit on Enter/Done + explicit Submit button"
 // Let's make a big Submit button below the keypad or floated.
 
-interface KeypadModernProps extends KeypadProps {
-  showNegative?: boolean;
-  showDecimal?: boolean;
-}
-
-export function KeypadModern({ onPress, onDelete, onSubmit, disabled, submitDisabled, showNegative = false, showDecimal = true }: KeypadModernProps) {
-  const use4Cols = showNegative && showDecimal;
-  
-  const keys = use4Cols 
-    ? [
-        '1', '2', '3', '⌫',
-        '4', '5', '6', '±',
-        '7', '8', '9', '.',
-        '', '0', '', ''
-      ]
-    : [
-        '1', '2', '3',
-        '4', '5', '6',
-        '7', '8', '9',
-        showNegative ? '±' : (showDecimal ? '.' : ''), '0', '⌫'
-      ];
+export function KeypadModern({ onPress, onDelete, onSubmit, disabled, submitDisabled }: KeypadProps) {
+  const keys = [
+    '1', '2', '3', '⌫',
+    '4', '5', '6', '±',
+    '7', '8', '9', '.',
+    '', '0', '', ''
+  ];
 
   const filteredKeys = keys.filter(k => k !== '');
-  const gridCols = use4Cols ? 'grid-cols-4' : 'grid-cols-3';
+  const gridCols = 'grid-cols-4';
 
   return (
     <div className="w-full bg-secondary/30 pb-safe pt-2">
       <div className={clsx("grid gap-[1px] bg-zinc-200/50", gridCols)}>
         {filteredKeys.map((k, idx) => {
           const isAction = k === '⌫' || k === '±' || k === '.';
-          const isZero = k === '0' && use4Cols;
+          const isZero = k === '0';
           return (
             <motion.button
               key={`${k}-${idx}`}
