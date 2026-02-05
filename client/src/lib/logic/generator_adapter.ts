@@ -202,16 +202,16 @@ function generatePercentQuestion(profile: DifficultyProfile): { text: string; an
   
   if (allowChange && Math.random() < 0.4) {
     const increase = Math.random() < 0.5;
-    const result = increase ? base * (1 + pct / 100) : base * (1 - pct / 100);
+    const answer = increase ? base * (1 + pct / 100) : base * (1 - pct / 100);
     return {
       text: `${increase ? 'Increase' : 'Decrease'} ${base} by ${pct}%`,
-      answer: Math.round(result),
+      answer,
       operandA: base,
       operandB: pct
     };
   }
   
-  const answer = Math.round(base * pct / 100);
+  const answer = base * pct / 100;
   return {
     text: `${pct}% of ${base}`,
     answer,
@@ -369,6 +369,12 @@ function validateAgainstCapabilities(
 function deriveAnswerFormatFromCaps(caps: LevelCapabilities, op: string, answer: number): AnswerFormat {
   const allowNegative = caps.allowNegativeAnswers;
   
+  const rounded1dp = Math.round(answer * 10) / 10;
+  const rounded2dp = Math.round(answer * 100) / 100;
+  const isInteger = Math.abs(answer - Math.round(answer)) < 0.0001;
+  const isExact1dp = Math.abs(answer - rounded1dp) < 0.0001;
+  const isExact2dp = Math.abs(answer - rounded2dp) < 0.0001;
+  
   if (op === 'div' && caps.divisionMode !== 'integerOnly') {
     const dpRequired = caps.divisionMode === 'round2dp' ? 2 : 1;
     return {
@@ -378,7 +384,30 @@ function deriveAnswerFormatFromCaps(caps: LevelCapabilities, op: string, answer:
     };
   }
   
-  if (caps.allowDecimals && answer !== Math.floor(answer)) {
+  if (op === 'percent' && !isInteger) {
+    if (isExact1dp) {
+      return {
+        dpRequired: 1,
+        roundingMode: 'exact',
+        allowNegative
+      };
+    }
+    if (isExact2dp) {
+      return {
+        dpRequired: 2,
+        roundingMode: 'exact',
+        allowNegative
+      };
+    }
+    const dpRequired = Math.min(caps.decimalDpMax || 1, 2) as 1 | 2;
+    return {
+      dpRequired,
+      roundingMode: 'round',
+      allowNegative
+    };
+  }
+  
+  if (caps.allowDecimals && !isInteger) {
     return {
       dpRequired: caps.decimalDpMax,
       roundingMode: 'exact',
@@ -495,10 +524,14 @@ export const generateQuestionForLevel = (
   const baseOp = op === 'multi' ? 'mul' : op === 'percent' ? 'mul' : op;
   const answerFormat = deriveAnswerFormatFromCaps(caps, op, generated.answer);
   
+  const normalizedAnswer = answerFormat.dpRequired > 0 
+    ? normalizeToDecimalPlaces(generated.answer, answerFormat.dpRequired)
+    : Math.round(generated.answer);
+  
   return {
     id: Math.random().toString(36).substr(2, 9),
     text: generated.text,
-    answer: generated.answer,
+    answer: normalizedAnswer,
     operation: baseOp as 'add' | 'sub' | 'mul' | 'div',
     answerFormat,
     tier,
@@ -507,6 +540,11 @@ export const generateQuestionForLevel = (
     meta
   };
 };
+
+function normalizeToDecimalPlaces(num: number, dp: number): number {
+  const factor = Math.pow(10, dp);
+  return Math.round(num * factor) / factor;
+}
 
 const getTargetTimeForLevel = (level: number, op: string): number => {
   const baseTimes: Record<string, number> = {

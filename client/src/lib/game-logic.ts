@@ -78,10 +78,11 @@ export function getAnswerFormatLabel(format: AnswerFormat): string | null {
   if (format.dpRequired === 0) {
     return null;
   }
-  if (format.dpRequired === 1) {
-    return "Answer to 1 decimal place";
+  const dpText = format.dpRequired === 1 ? "1 decimal place" : "2 decimal places";
+  if (format.roundingMode === 'round') {
+    return `Round to ${dpText}`;
   }
-  return "Answer to 2 decimal places";
+  return `Answer to ${dpText}`;
 }
 
 // --- Generators ---
