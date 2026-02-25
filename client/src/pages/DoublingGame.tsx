@@ -17,6 +17,7 @@ import { AnimatedXP } from '@/components/game/AnimatedXP';
 import { SkillDrillPreGame } from '@/components/game/SkillDrillPreGame';
 import { generateDoublingQuestion, getTier } from '@/lib/skill-drill-difficulty';
 import { QuestionsMilestoneCelebration } from '@/components/game/QuestionsMilestoneCelebration';
+import { LevelUpCelebration } from '@/components/game/LevelUpCelebration';
 
 interface DoublingQuestion {
   id: string;
@@ -34,7 +35,7 @@ interface GameResult {
   isNewBest: boolean;
 }
 
-type GameStep = 'pregame' | 'countdown' | 'active' | 'results' | 'questions_milestone';
+type GameStep = 'pregame' | 'countdown' | 'active' | 'results' | 'questions_milestone' | 'levelup';
 
 function FullScreenFlash({ type }: { type: 'correct' | 'wrong' }) {
   return (
@@ -57,6 +58,7 @@ export default function DoublingGame() {
   
   const [step, setStep] = useState<GameStep>('pregame');
   const [questionsMilestone, setQuestionsMilestone] = useState<number | null>(null);
+  const [levelUpInfo, setLevelUpInfo] = useState<{ levelBefore: number; levelAfter: number; xpIntoLevelBefore: number; xpIntoLevelAfter: number; levelUpCount: number } | null>(null);
   const [countdown, setCountdown] = useState(3);
   const [selectedDuration, setSelectedDuration] = useState(60);
   const [timeLeft, setTimeLeft] = useState(60);
@@ -448,11 +450,36 @@ export default function DoublingGame() {
               level: bonusResult.levelAfter,
               xpIntoLevel: bonusResult.xpIntoLevelAfter,
             });
+            if (bonusResult.levelUpCount > 0) {
+              setLevelUpInfo({
+                levelBefore: lvl,
+                levelAfter: bonusResult.levelAfter,
+                xpIntoLevelBefore: xp,
+                xpIntoLevelAfter: bonusResult.xpIntoLevelAfter,
+                levelUpCount: bonusResult.levelUpCount,
+              });
+              setStep('levelup');
+              return;
+            }
           }
           navigate('/train');
         }}
         soundOn={settings.soundOn}
         hapticsOn={settings.hapticsOn}
+      />
+    );
+  }
+
+  if (step === 'levelup' && levelUpInfo) {
+    return (
+      <LevelUpCelebration
+        levelBefore={levelUpInfo.levelBefore}
+        levelAfter={levelUpInfo.levelAfter}
+        xpIntoLevelBefore={levelUpInfo.xpIntoLevelBefore}
+        xpIntoLevelAfter={levelUpInfo.xpIntoLevelAfter}
+        levelUpCount={levelUpInfo.levelUpCount}
+        onComplete={() => navigate('/train')}
+        soundOn={settings.soundOn}
       />
     );
   }

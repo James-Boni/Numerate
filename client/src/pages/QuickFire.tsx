@@ -15,6 +15,7 @@ import { MODE_MULTIPLIERS } from '@/config/progression';
 import { Card } from '@/components/ui/card';
 import { validateAnswer, DEFAULT_ANSWER_FORMAT, AnswerFormat, QuestionTier, selectQuestionTier, getAnswerFormatLabel, calculateXP, getTierXpMultiplier } from '@/lib/game-logic';
 import { QuestionsMilestoneCelebration } from '@/components/game/QuestionsMilestoneCelebration';
+import { LevelUpCelebration } from '@/components/game/LevelUpCelebration';
 import { applyXPAndLevelUp } from '@/lib/logic/xp-system';
 
 interface Question {
@@ -40,7 +41,7 @@ interface QuickFireResult {
   startingLevel: number;
 }
 
-type GameStep = 'intro' | 'countdown' | 'active' | 'results' | 'questions_milestone';
+type GameStep = 'intro' | 'countdown' | 'active' | 'results' | 'questions_milestone' | 'levelup';
 
 function CountUp({ value, duration = 1, delay = 0, onTick, suffix = '' }: { 
   value: number, 
@@ -146,6 +147,7 @@ export default function QuickFire() {
   const [isNewHighScore, setIsNewHighScore] = useState(false);
   const [showFlash, setShowFlash] = useState<'correct' | 'wrong' | null>(null);
   const [questionsMilestone, setQuestionsMilestone] = useState<number | null>(null);
+  const [levelUpInfo, setLevelUpInfo] = useState<{ levelBefore: number; levelAfter: number; xpIntoLevelBefore: number; xpIntoLevelAfter: number; levelUpCount: number } | null>(null);
   
   const [_, setLocation] = useLocation();
   const { 
@@ -569,11 +571,36 @@ export default function QuickFire() {
               level: bonusResult.levelAfter,
               xpIntoLevel: bonusResult.xpIntoLevelAfter,
             });
+            if (bonusResult.levelUpCount > 0) {
+              setLevelUpInfo({
+                levelBefore: currentLevel,
+                levelAfter: bonusResult.levelAfter,
+                xpIntoLevelBefore: xpIntoLevel,
+                xpIntoLevelAfter: bonusResult.xpIntoLevelAfter,
+                levelUpCount: bonusResult.levelUpCount,
+              });
+              setStep('levelup');
+              return;
+            }
           }
           setLocation('/train');
         }}
         soundOn={settings.soundOn}
         hapticsOn={settings.hapticsOn}
+      />
+    );
+  }
+
+  if (step === 'levelup' && levelUpInfo) {
+    return (
+      <LevelUpCelebration
+        levelBefore={levelUpInfo.levelBefore}
+        levelAfter={levelUpInfo.levelAfter}
+        xpIntoLevelBefore={levelUpInfo.xpIntoLevelBefore}
+        xpIntoLevelAfter={levelUpInfo.xpIntoLevelAfter}
+        levelUpCount={levelUpInfo.levelUpCount}
+        onComplete={() => setLocation('/train')}
+        soundOn={settings.soundOn}
       />
     );
   }
