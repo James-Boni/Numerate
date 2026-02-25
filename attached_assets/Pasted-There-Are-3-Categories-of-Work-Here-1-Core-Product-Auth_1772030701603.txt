@@ -1,0 +1,111 @@
+There Are 3 Categories of Work Here
+1️⃣ Core Product Authority (Value Creation)
+Decimal correctness
+Generator validation integrity
+Difficulty ramp integrity
+Reward flow polish
+Progress clarity
+Milestone structure
+2️⃣ Retention Mechanics
+Streak system
+Push notifications
+Onboarding polish
+Haptics
+3️⃣ Infrastructure (Monetisation & Compliance)
+Real IAP
+Sign in with Apple
+Bundle ID
+App Store Connect setup
+Privacy policy
+Assets
+Now here’s the key insight:
+You cannot justify £1/month if category 1 is not airtight.
+But you cannot ship if category 3 is missing.
+So What Is The Correct Order?
+Not emotional.
+Not philosophical.
+Strategic.
+Phase A: Lock Authority First
+Because charging money amplifies flaws.
+If someone pays £1 and:
+A decimal is incorrectly marked wrong
+XP miscounts
+Difficulty jumps erratically
+A milestone unlock feels random
+They will churn immediately.
+So before monetisation infrastructure, the product must feel inevitable.
+This is especially true for Numerate because your brand is “serious training”.
+Phase B: Infrastructure Once Product Is Stable
+Once you’re confident that:
+Trust is unbreakable
+Progress feels meaningful
+Reward flow feels premium
+Then integrate:
+RevenueCat / StoreKit
+SIWA
+App Store configuration
+That becomes mechanical execution.
+What You Should NOT Do
+Do not:
+Build IAP
+Build SIWA
+Go through App Store setup
+…while the core training system still needs structural refinement.
+Why?
+Because infrastructure work is mentally heavy but does not improve product quality.
+It feels productive.
+It isn’t value-creating.
+What Actually Matters Right Now?
+Answer this honestly:
+If you gave Numerate to 10 intelligent adults tomorrow…
+Would they:
+A) Say “this feels solid and serious”
+B) Or say “this is promising but slightly rough”
+If it’s B, you stay in Phase A.
+Your Current Stage (From Everything You’ve Told Me)
+You are still in refinement.
+Specifically:
+XP inconsistency was recently an issue.
+Difficulty ramp is still being tuned.
+Progress insights could be stronger.
+Milestone signalling is not fully surfaced.
+That means:
+You are not yet at monetisation layer.
+You are still shaping authority.
+Important Strategic Reality
+At £1/month, this app doesn’t need 100 features.
+It needs:
+Trust
+Visible improvement
+Emotional weight
+Clean polish
+That’s it.
+So Was Your Replit Response Focus Correct?
+Yes — because you were clarifying philosophy before execution.
+But.
+Now the real next step isn’t debating milestone UI.
+It’s this:
+“Is the arithmetic engine unbreakable?”
+If not, that is priority 1.
+Clean Next Step I Would Take
+Go back to Replit and say:
+Before we implement IAP or SIWA, I want to perform a full validation audit of:
+– Decimal handling
+– Generator capability enforcement
+– XP calculation consistency
+– Difficulty progression compliance with level capability model
+Please audit and identify any inconsistencies or edge-case risks.
+That is founder-level prioritisation.
+Final Strategic Answer
+No.
+You should not jump to infrastructure yet.
+Yes.
+You should focus on core product integrity first.
+Because when you finally wire up IAP, you want zero doubt.
+You want to feel:
+“This is ready to charge for.”
+And right now, you’re still polishing the blade.
+Let me ask you something serious:
+If Numerate launched in its current state and 1,000 people downloaded it next week…
+Would you feel proud?
+Or slightly anxious?
