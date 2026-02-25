@@ -160,6 +160,7 @@ export default function DoublingGame() {
   
   const handleKeyPress = (val: string) => {
     if (step !== 'active') return;
+    if (settings.soundOn) AudioManager.playTap();
     if (settings.hapticsOn) HapticsManager.keyTap();
     
     if (val === '.') {

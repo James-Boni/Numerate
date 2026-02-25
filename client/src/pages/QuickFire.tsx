@@ -397,9 +397,10 @@ export default function QuickFire() {
 
   const handleKeypadPress = useCallback((key: string) => {
     if (feedback) return;
+    if (settings.soundOn) AudioManager.playTap();
     if (settings.hapticsOn) HapticsManager.keyTap();
     setInput(prev => prev + key);
-  }, [feedback, settings.hapticsOn]);
+  }, [feedback, settings.soundOn, settings.hapticsOn]);
 
   const handleKeypadDelete = useCallback(() => {
     if (feedback) return;
