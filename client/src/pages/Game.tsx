@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ClipboardCheck, Zap, Target, TrendingUp, Clock, Star, ChevronUp } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
+import { HapticsManager } from '@/lib/haptics';
 import { motion, animate, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { xpRequiredToAdvance } from '@/lib/logic/xp-system';
@@ -99,6 +100,7 @@ function LevelUpCelebration({
           if (!isLast) {
             setTimeout(() => {
               if (soundOn) AudioManager.playLevelUpEnhanced(1);
+              HapticsManager.levelUp();
               setAnimationPhase('leveling');
               setShowGlow(true);
               setShowParticles(true);
@@ -116,6 +118,11 @@ function LevelUpCelebration({
                 } else {
                   AudioManager.playLevelUpEnhanced(levelUpCount);
                 }
+              }
+              if (isMilestoneLevel) {
+                HapticsManager.milestoneFanfare(milestoneTier);
+              } else {
+                HapticsManager.levelUp();
               }
               setAnimationPhase('complete');
             }, baseStepDuration * 0.4);
@@ -449,6 +456,7 @@ export default function Game() {
     if (newRecords.length > 0) {
       console.log('[PERSONAL_RECORDS] New records:', newRecords);
       setNewPersonalRecords(newRecords);
+      if (settings.hapticsOn) HapticsManager.personalRecord();
     }
     
     // Detect weakness patterns for coaching (filter out already-seen strategies)
@@ -481,10 +489,8 @@ export default function Game() {
       });
       
       if (settings.soundOn) {
-        // Use performance-based session complete sound
         AudioManager.playSessionComplete(results.accuracy);
         
-        // Accuracy reveal overlap
         setTimeout(() => {
           AudioManager.playThud();
           if (results.accuracy >= 0.95) {
@@ -492,10 +498,14 @@ export default function Game() {
           }
         }, 900);
 
-        // Speed reveal
         setTimeout(() => {
           AudioManager.playZap();
         }, 1300);
+      }
+      if (settings.hapticsOn) {
+        HapticsManager.sessionComplete();
+        setTimeout(() => HapticsManager.statReveal(), 900);
+        setTimeout(() => HapticsManager.speedReveal(), 1300);
       }
     }
   }, [step, results, settings.soundOn]);

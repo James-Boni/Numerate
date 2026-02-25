@@ -6,6 +6,7 @@ import { useStore, SessionStats } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { X, Clock, Trophy, Flame, Plus, AlertTriangle } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
+import { HapticsManager } from '@/lib/haptics';
 import { clsx } from 'clsx';
 import { generateQuestionForLevel, resetOperationScheduler } from '@/lib/logic/generator_adapter';
 import { KeypadModern } from '@/components/game/Keypad';
@@ -257,8 +258,9 @@ export default function QuickFire() {
     const isNewBest = updateQuickFireHighScore(finalScore);
     setIsNewHighScore(isNewBest);
     
-    if (isNewBest && settings.soundOn) {
-      setTimeout(() => AudioManager.playCheer(), 300);
+    if (isNewBest) {
+      if (settings.soundOn) setTimeout(() => AudioManager.playCheer(), 300);
+      if (settings.hapticsOn) HapticsManager.highScore();
     }
 
     const resultObj: QuickFireResult = {
@@ -320,6 +322,7 @@ export default function QuickFire() {
         totalCountRef.current += 1;
         setShowFlash('wrong');
         if (settings.soundOn) AudioManager.playWrong();
+        if (settings.hapticsOn) HapticsManager.wrongAnswer();
         endRun('timeout');
         return;
       }
@@ -339,6 +342,7 @@ export default function QuickFire() {
   const handleSubmit = useCallback(() => {
     if (!question || isSubmittingRef.current || !gameActiveRef.current) return;
     if (!input) return;
+    if (settings.hapticsOn) HapticsManager.submitTap();
     
     isSubmittingRef.current = true;
     
@@ -371,6 +375,7 @@ export default function QuickFire() {
       setShowFlash('correct');
       
       if (settings.soundOn) AudioManager.playCorrect();
+      if (settings.hapticsOn) HapticsManager.correctAnswer();
       
       setTimeout(() => {
         setShowFlash(null);
@@ -382,6 +387,7 @@ export default function QuickFire() {
       setFeedback('wrong');
       setShowFlash('wrong');
       if (settings.soundOn) AudioManager.playWrong();
+      if (settings.hapticsOn) HapticsManager.wrongAnswer();
       
       setTimeout(() => {
         endRun('wrong');
@@ -391,8 +397,9 @@ export default function QuickFire() {
 
   const handleKeypadPress = useCallback((key: string) => {
     if (feedback) return;
+    if (settings.hapticsOn) HapticsManager.keyTap();
     setInput(prev => prev + key);
-  }, [feedback]);
+  }, [feedback, settings.hapticsOn]);
 
   const handleKeypadDelete = useCallback(() => {
     if (feedback) return;
@@ -412,19 +419,23 @@ export default function QuickFire() {
     setCountdownNumber(3);
     
     if (settings.soundOn) AudioManager.playCountdownHorn();
+    if (settings.hapticsOn) HapticsManager.countdownTick();
     
     setTimeout(() => {
       setCountdownNumber(2);
       if (settings.soundOn) AudioManager.playCountdownHorn();
+      if (settings.hapticsOn) HapticsManager.countdownTick();
     }, 1000);
     
     setTimeout(() => {
       setCountdownNumber(1);
       if (settings.soundOn) AudioManager.playCountdownHorn();
+      if (settings.hapticsOn) HapticsManager.countdownTick();
     }, 2000);
     
     setTimeout(() => {
       if (settings.soundOn) AudioManager.playGoHorn();
+      if (settings.hapticsOn) HapticsManager.goSignal();
       
       hasEndedRef.current = false;
       gameActiveRef.current = true;

@@ -5,6 +5,7 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
 import { Confetti } from './Confetti';
 import { AudioManager } from '@/lib/audio';
+import { HapticsManager } from '@/lib/haptics';
 
 interface DailyStreakCelebrationProps {
   streakCount: number;
@@ -88,6 +89,7 @@ export function DailyStreakCelebration({
     if (soundOn) {
       AudioManager.playDailyStreakMilestone(streakCount);
     }
+    HapticsManager.dailyStreakMilestone();
     
     setTimeout(() => setPhase('reveal'), 300);
     setTimeout(() => {

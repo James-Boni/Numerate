@@ -9,6 +9,7 @@ import { generateQuestionForLevel, GeneratedQuestionMeta, resetOperationSchedule
 import { useStore, SessionStats, QuestionResult } from '@/lib/store';
 
 import { AudioManager } from '@/lib/audio';
+import { HapticsManager } from '@/lib/haptics';
 import { computeFluencyComponents, computeFluencyScore, computeSessionXP } from '@/lib/logic/progression';
 import { PROGRESSION_CONFIG as CFG } from '@/config/progression';
 import { calculateCombinedSessionXP, applyXPAndLevelUp, CombinedXPResult } from '@/lib/logic/xp-system';
@@ -329,6 +330,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   const handleSubmit = (e?: React.MouseEvent | React.TouchEvent) => {
     if (!question || feedback) return;
     if (!input) return;
+    if (settings.hapticsOn) HapticsManager.submitTap();
     
     const answerFormat = question.answerFormat ?? DEFAULT_ANSWER_FORMAT;
     const isCorrect = validateAnswer(input, question.answer, answerFormat);
@@ -405,8 +407,12 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       setFeedback('correct');
       setFlash('correct');
       
-      const vibrateIntensity = Math.min(5 + newStreak, 15);
-      if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(vibrateIntensity);
+      if (settings.hapticsOn) {
+        HapticsManager.correctAnswer();
+        if ([3, 5, 10, 15, 20].includes(newStreak)) {
+          HapticsManager.streakMilestone(newStreak);
+        }
+      }
       
       // Advance to next question - slightly longer for streak celebration
       const delay = [3, 5, 10, 15, 20].includes(newStreak) ? 300 : 100;
@@ -418,7 +424,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
       setStreak(0);
       setFeedback('wrong');
       setFlash('wrong');
-      if (settings.hapticsOn && navigator.vibrate) navigator.vibrate(20);
+      if (settings.hapticsOn) HapticsManager.wrongAnswer();
       
       // Hold wrong answer state (400ms) to allow sound to finish and user to see error
       setTimeout(nextQuestion, 400);
@@ -433,6 +439,7 @@ export function SessionScreen({ mode, durationSeconds, initialTier, onComplete, 
   const handleKeyPress = (k: string) => {
     if (feedback) return;
     if (settings.soundOn) AudioManager.playTap();
+    if (settings.hapticsOn) HapticsManager.keyTap();
     
     if (k === '±') {
       setInput(prev => {

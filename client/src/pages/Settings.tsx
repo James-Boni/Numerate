@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Volume2, Zap, LogOut, Trash2, ChevronRight, User, AlertTriangle, X, Code, Crown, RotateCcw, Apple, Bell, Clock } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
+import { HapticsManager } from '@/lib/haptics';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'wouter';
 import { useAccountStore, isPremiumActive, authService } from '@/lib/services';
@@ -163,7 +164,10 @@ export default function Settings() {
               </div>
               <Switch 
                 checked={settings.hapticsOn} 
-                onCheckedChange={(checked) => updateSettings({ hapticsOn: checked })} 
+                onCheckedChange={(checked) => {
+                  updateSettings({ hapticsOn: checked });
+                  HapticsManager.setEnabled(checked);
+                }} 
               />
             </div>
           </Card>

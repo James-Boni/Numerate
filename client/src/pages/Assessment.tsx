@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ClipboardCheck, Zap, Target, TrendingUp } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
+import { HapticsManager } from '@/lib/haptics';
 import { clsx } from 'clsx';
 import { computeStartingPlacement, getPlacementMessageByLevel, PlacementResult } from '@/lib/logic/placement';
 
@@ -135,6 +136,7 @@ export default function Assessment() {
         if (settings.soundOn) {
           AudioManager.playPlacementReveal();
         }
+        HapticsManager.placementReveal();
       }, 400);
       
       // After 1200ms, show stats

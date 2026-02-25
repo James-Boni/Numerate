@@ -6,6 +6,7 @@ import { useStore, SessionStats } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { X, Target } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
+import { HapticsManager } from '@/lib/haptics';
 import { clsx } from 'clsx';
 import { KeypadModern } from '@/components/game/Keypad';
 import { computeFluency, applyXPAndLevelUp } from '@/lib/logic/xp-system';
@@ -114,9 +115,11 @@ export default function RoundingGame() {
     if (step !== 'countdown') return;
     if (countdown > 0 && countdown <= 3) {
       if (settings.soundOn) AudioManager.playCountdownHorn();
+      if (settings.hapticsOn) HapticsManager.countdownTick();
     }
     if (countdown <= 0) {
       if (settings.soundOn) AudioManager.playGoHorn();
+      if (settings.hapticsOn) HapticsManager.goSignal();
       setStep('active');
       startTimeRef.current = Date.now();
       nextQuestion();
@@ -150,6 +153,7 @@ export default function RoundingGame() {
   
   const handleKeyPress = (val: string) => {
     if (step !== 'active') return;
+    if (settings.hapticsOn) HapticsManager.keyTap();
     
     if (val === '.') {
       if (!input.includes('.')) {
@@ -174,6 +178,7 @@ export default function RoundingGame() {
   
   const handleSubmit = () => {
     if (!question || input === '' || step !== 'active' || feedback) return;
+    if (settings.hapticsOn) HapticsManager.submitTap();
     
     const userAnswer = parseFloat(input);
     const isCorrect = Math.abs(userAnswer - question.answer) < 0.001;
@@ -206,6 +211,12 @@ export default function RoundingGame() {
           AudioManager.playStreakCelebration(newStreak);
         }
       }
+      if (settings.hapticsOn) {
+        HapticsManager.correctAnswer();
+        if ([3, 5, 10, 15, 20].includes(newStreak)) {
+          HapticsManager.streakMilestone(newStreak);
+        }
+      }
       
       const delay = [3, 5, 10, 15, 20].includes(newStreak) ? 300 : 100;
       setTimeout(() => {
@@ -218,6 +229,7 @@ export default function RoundingGame() {
       setFlash('wrong');
       setFeedback('wrong');
       if (settings.soundOn) AudioManager.playWrong();
+      if (settings.hapticsOn) HapticsManager.wrongAnswer();
       
       setTimeout(() => {
         setFlash(null);

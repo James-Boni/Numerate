@@ -40,6 +40,8 @@ Preferred communication style: Simple, everyday language.
 
 **Audio Feedback**: Utilizes Web Audio API for zero-latency, performance-scaled sounds, including XP ticks, pops, bursts, and level-up fanfares that scale with milestones (10, 25, 50, 75, 100). Session completion sounds vary based on accuracy.
 
+**Haptic Feedback**: Native iOS haptics via `@capacitor/haptics` plugin, managed by `HapticsManager` (`client/src/lib/haptics.ts`). Only fires on native iOS (no web fallback). Respects user's `hapticsOn` toggle in Settings. 14 interaction types: keyTap (Impact Light), submitTap (Impact Medium), correctAnswer (Notification Success), wrongAnswer (Notification Error), streakMilestone (Medium/Heavy based on streak), countdownTick (Medium), goSignal (Heavy), sessionComplete (Success), xpBurst (Heavy), statReveal (Medium), speedReveal (Light), personalRecord (Success), placementReveal (Success), dailyStreakMilestone (Success), highScore (Success). Level-up and milestone fanfare use custom multi-pulse sequences. Intentionally excluded from high-frequency events (XP ticks, timer ticks).
+
 **Milestone Level Celebrations**: Special, progressively grander celebrations for levels 10, 25, 50, 75, and 100, featuring unique titles, praise copy, enhanced visual effects (gold/amber, confetti, radial glows), and extended durations.
 
 **Notification Settings**: Device-local daily reminder toggles with time pickers, stored in local Zustand persist.
@@ -85,6 +87,7 @@ Provides personalized insights on strengths and focus areas before sessions, inc
 - **recharts**: Charting library.
 - **zod**: Schema validation.
 - **drizzle-zod**: Zod schema generation from Drizzle.
+- **@capacitor/haptics**: Native iOS haptic feedback.
 
 ### Backend User System
 - **Auth Endpoints**: `/api/auth/register`, `/api/auth/login`, `/api/auth/me`, `/api/auth/apple`, `/api/auth/link-apple`.

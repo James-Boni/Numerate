@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence, useSpring, useTransform } from 'framer-motion';
 import { AudioManager } from '@/lib/audio';
+import { HapticsManager } from '@/lib/haptics';
 
 interface AnimatedXPProps {
   value: number;
@@ -72,6 +73,7 @@ export function AnimatedXP({
       if (soundEnabled) {
         if (intensity >= 4) {
           AudioManager.playXPBurst();
+          HapticsManager.xpBurst();
         } else if (intensity >= 2) {
           AudioManager.playXPPop(intensity);
         } else {
@@ -217,9 +219,9 @@ export function XPRollup({
         clearInterval(timer);
         setPhase('burst');
         
-        // Final burst sound
         if (soundEnabled) {
           AudioManager.playXPBurst();
+          HapticsManager.xpBurst();
         }
         
         setTimeout(() => {
