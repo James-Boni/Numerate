@@ -22,16 +22,19 @@ export default function DevMenu() {
     level,
     sessions,
     quickFireHighScore,
+    lifetimeQuestionsAnswered,
     resetProgress,
     devSetLevel,
     devSetStartingLevel,
     devSetHasCompletedAssessment,
     devClearDailySessions,
-    devClearQuickFireStats
+    devClearQuickFireStats,
+    devSetLifetimeQuestions
   } = useStore();
 
   const [levelInput, setLevelInput] = useState(level.toString());
   const [startingLevelInput, setStartingLevelInput] = useState(startingLevel.toString());
+  const [questionsInput, setQuestionsInput] = useState(lifetimeQuestionsAnswered.toString());
   const [levelError, setLevelError] = useState('');
   const [startingLevelError, setStartingLevelError] = useState('');
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
@@ -216,6 +219,47 @@ export default function DevMenu() {
             </div>
             {levelError && <p className="text-rose-400 text-xs">{levelError}</p>}
             <p className="text-slate-500 text-xs">Current: {level}</p>
+          </div>
+
+          <div className="border-t border-slate-700 pt-4 space-y-2">
+            <label className="text-slate-300 text-sm block">Lifetime Questions Answered</label>
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                value={questionsInput}
+                onChange={(e) => setQuestionsInput(e.target.value)}
+                className="bg-slate-700 border-slate-600 text-white flex-1"
+                min={0}
+              />
+              <Button size="sm" onClick={() => {
+                const val = parseInt(questionsInput, 10);
+                if (!isNaN(val) && val >= 0) {
+                  devSetLifetimeQuestions(val);
+                  showToast(`Questions set to ${val}`);
+                }
+              }} className="bg-cyan-600 hover:bg-cyan-700">
+                Apply
+              </Button>
+            </div>
+            <p className="text-slate-500 text-xs">Current: {lifetimeQuestionsAnswered.toLocaleString()}</p>
+            <div className="flex gap-2 flex-wrap">
+              {[990, 1990, 4990, 9990].map(val => (
+                <Button
+                  key={val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600 text-xs"
+                  onClick={() => {
+                    devSetLifetimeQuestions(val);
+                    setQuestionsInput(val.toString());
+                    showToast(`Questions set to ${val} (${val + 10}+ triggers milestone)`);
+                  }}
+                >
+                  {val}
+                </Button>
+              ))}
+            </div>
+            <p className="text-slate-500 text-xs">Quick-set to just below milestones. Complete a session to trigger celebration.</p>
           </div>
         </Card>
 

@@ -16,6 +16,7 @@ import { StreakIndicator } from '@/components/game/StreakIndicator';
 import { AnimatedXP } from '@/components/game/AnimatedXP';
 import { SkillDrillPreGame } from '@/components/game/SkillDrillPreGame';
 import { generateDoublingQuestion, getTier } from '@/lib/skill-drill-difficulty';
+import { QuestionsMilestoneCelebration } from '@/components/game/QuestionsMilestoneCelebration';
 
 interface DoublingQuestion {
   id: string;
@@ -33,7 +34,7 @@ interface GameResult {
   isNewBest: boolean;
 }
 
-type GameStep = 'pregame' | 'countdown' | 'active' | 'results';
+type GameStep = 'pregame' | 'countdown' | 'active' | 'results' | 'questions_milestone';
 
 function FullScreenFlash({ type }: { type: 'correct' | 'wrong' }) {
   return (
@@ -55,6 +56,7 @@ export default function DoublingGame() {
   const { settings, level, saveSession, xpIntoLevel, updateSkillDrillBests, skillDrillBests } = useStore();
   
   const [step, setStep] = useState<GameStep>('pregame');
+  const [questionsMilestone, setQuestionsMilestone] = useState<number | null>(null);
   const [countdown, setCountdown] = useState(3);
   const [selectedDuration, setSelectedDuration] = useState(60);
   const [timeLeft, setTimeLeft] = useState(60);
@@ -281,7 +283,12 @@ export default function DoublingGame() {
       bestStreak: finalBestStreak
     };
     
+    const prevQuestions = useStore.getState().lifetimeQuestionsAnswered;
     saveSession(sessionStats);
+    const newQuestions = useStore.getState().lifetimeQuestionsAnswered;
+    if (Math.floor(newQuestions / 1000) > Math.floor(prevQuestions / 1000)) {
+      setQuestionsMilestone(Math.floor(newQuestions / 1000));
+    }
     updateSkillDrillBests('doubling', finalCorrect, finalBestStreak);
     
     setResult({
@@ -410,14 +417,43 @@ export default function DoublingGame() {
             </Button>
             <Button
               variant="ghost"
-              onClick={() => navigate('/train')}
+              onClick={() => {
+                if (questionsMilestone) {
+                  setStep('questions_milestone');
+                } else {
+                  navigate('/train');
+                }
+              }}
               className="w-full h-12 text-slate-500"
             >
-              Done
+              {questionsMilestone ? 'View Milestone!' : 'Done'}
             </Button>
           </div>
         </div>
       </MobileLayout>
+    );
+  }
+
+  if (step === 'questions_milestone' && questionsMilestone) {
+    return (
+      <QuestionsMilestoneCelebration
+        milestone={questionsMilestone}
+        onContinue={() => {
+          if (questionsMilestone) {
+            setQuestionsMilestone(null);
+            const { lifetimeXP, xpIntoLevel: xp, level: lvl } = useStore.getState();
+            const bonusResult = applyXPAndLevelUp(lvl, xp, 500);
+            useStore.setState({
+              lifetimeXP: lifetimeXP + 500,
+              level: bonusResult.levelAfter,
+              xpIntoLevel: bonusResult.xpIntoLevelAfter,
+            });
+          }
+          navigate('/train');
+        }}
+        soundOn={settings.soundOn}
+        hapticsOn={settings.hapticsOn}
+      />
     );
   }
   

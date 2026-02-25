@@ -44,6 +44,8 @@ Preferred communication style: Simple, everyday language.
 
 **Milestone Level Celebrations**: Special, progressively grander celebrations for levels 10, 25, 50, 75, and 100, featuring unique titles, praise copy, enhanced visual effects (gold/amber, confetti, radial glows), and extended durations.
 
+**Questions Milestone Celebrations**: Every 1,000 lifetime questions answered (across all game modes) triggers a full-screen celebration awarding +500 XP bonus. The `lifetimeQuestionsAnswered` counter in the Zustand store is incremented by `totalQuestions` in `saveSession` for every session type. Detection uses `Math.floor(newTotal / 1000) > Math.floor(prevTotal / 1000)`. Post-session flow order: results → streak_milestone → questions_milestone → strategy → levelup → /train. Skill Drills and Quick Fire show the celebration before navigating back to /train. Celebration copy scales per tier (1k, 2k, 3k, 5k, 10k+), with amber/gold gradients for big milestones. The 500 XP bonus is applied via `applyXPAndLevelUp` on the milestone continue handler. Dev menu provides quick-set buttons (990, 1990, 4990, 9990) to test. Key file: `client/src/components/game/QuestionsMilestoneCelebration.tsx`. Store field persisted locally and synced to `lifetime_questions` column in `user_progress` DB table.
+
 **Notification Settings**: Device-local daily reminder toggles with time pickers, stored in local Zustand persist.
 
 **Coaching System**: Detects weaknesses from session results and delivers animated strategy lessons (e.g., Place Value Split, Make Tens) after sessions, shown once per user.

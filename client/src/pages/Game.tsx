@@ -22,6 +22,7 @@ import { PersonalRecordCelebration, PersonalRecord } from '@/components/game/Per
 import { useAccountStore, isPremiumActive } from '@/lib/services/account-store';
 import { detectWeakness, WeaknessPattern } from '@/lib/logic/weakness-detector';
 import { DailyStreakCelebration, isMilestone } from '@/components/game/DailyStreakCelebration';
+import { QuestionsMilestoneCelebration } from '@/components/game/QuestionsMilestoneCelebration';
 
 const MILESTONE_DATA: Record<number, { title: string; subtitle: string; tier: number }> = {
   10: { title: "Double Digits!", subtitle: "You've built a real foundation. This is where it starts to click.", tier: 1 },
@@ -413,18 +414,20 @@ function CountUp({ value, duration = 1, delay = 0, onTick, suffix = '' }: {
 }
 
 export default function Game() {
-  const [step, setStep] = useState<'daily_intro' | 'active' | 'results' | 'streak_milestone' | 'strategy' | 'levelup' | 'paywall'>('daily_intro');
+  const [step, setStep] = useState<'daily_intro' | 'active' | 'results' | 'streak_milestone' | 'questions_milestone' | 'strategy' | 'levelup' | 'paywall'>('daily_intro');
   const [results, setResults] = useState<SessionStats | null>(null);
   const [detectedWeakness, setDetectedWeakness] = useState<WeaknessPattern | null>(null);
   const [newPersonalRecords, setNewPersonalRecords] = useState<PersonalRecord[]>([]);
   const [entitlementChecked, setEntitlementChecked] = useState(false);
   const [streakMilestoneReached, setStreakMilestoneReached] = useState<number | null>(null);
+  const [questionsMilestone, setQuestionsMilestone] = useState<number | null>(null);
   const [_, setLocation] = useLocation();
   const { currentTier, saveSession, settings, seenStrategies, markStrategySeen, checkAndUpdatePersonalBests, streakCount } = useStore();
   const { entitlement, refreshEntitlement } = useAccountStore();
   const revealRun = React.useRef(false);
   const levelUpShownRef = React.useRef(false);
   const streakMilestoneShownRef = React.useRef(false);
+  const questionsMilestoneShownRef = React.useRef(false);
 
   // Check entitlement on mount and determine if user should be blocked
   useEffect(() => {
@@ -448,7 +451,16 @@ export default function Game() {
 
   const handleComplete = (stats: SessionStats) => {
     console.log(`[SESSION_FLOW] Training complete: ${Date.now()}`, stats);
+    const prevQuestions = useStore.getState().lifetimeQuestionsAnswered;
     saveSession(stats);
+    const newQuestions = useStore.getState().lifetimeQuestionsAnswered;
+    
+    if (Math.floor(newQuestions / 1000) > Math.floor(prevQuestions / 1000)) {
+      const milestoneNum = Math.floor(newQuestions / 1000);
+      console.log('[QUESTIONS_MILESTONE] Reached:', milestoneNum * 1000);
+      setQuestionsMilestone(milestoneNum);
+    }
+    
     setResults(stats);
     
     // Check for personal records
@@ -553,15 +565,12 @@ export default function Game() {
     );
   }
 
-  // Strategy lesson step (shown after results if weakness detected)
   if (step === 'strategy' && detectedWeakness) {
     return (
       <StrategyLesson
         strategyId={detectedWeakness.strategyId}
         onComplete={() => {
-          // Mark strategy as seen so it won't show again
           markStrategySeen(detectedWeakness.strategyId);
-          // Clear weakness so it doesn't show again, then continue flow
           setDetectedWeakness(null);
           const hasLevelUp = results && (results.levelUpCount ?? 0) > 0;
           if (hasLevelUp && !levelUpShownRef.current) {
@@ -575,7 +584,22 @@ export default function Game() {
     );
   }
 
-  // Streak milestone celebration (shown after results, before strategy/levelup)
+  const goToNextAfterQuestionsMilestone = () => {
+    questionsMilestoneShownRef.current = true;
+    if (detectedWeakness) {
+      setStep('strategy');
+    } else {
+      const hasLevelUp = results && (results.levelUpCount ?? 0) > 0;
+      if (hasLevelUp && !levelUpShownRef.current) {
+        levelUpShownRef.current = true;
+        setStep('levelup');
+      } else {
+        setLocation('/train');
+      }
+    }
+  };
+
+  // Streak milestone celebration (shown after results, before questions milestone/strategy/levelup)
   if (step === 'streak_milestone' && streakMilestoneReached) {
     return (
       <DailyStreakCelebration
@@ -583,8 +607,9 @@ export default function Game() {
         onContinue={() => {
           streakMilestoneShownRef.current = true;
           setStreakMilestoneReached(null);
-          // Continue to next step in flow
-          if (detectedWeakness) {
+          if (questionsMilestone && !questionsMilestoneShownRef.current) {
+            setStep('questions_milestone');
+          } else if (detectedWeakness) {
             setStep('strategy');
           } else {
             const hasLevelUp = results && (results.levelUpCount ?? 0) > 0;
@@ -597,6 +622,37 @@ export default function Game() {
           }
         }}
         soundOn={settings.soundOn}
+      />
+    );
+  }
+
+  if (step === 'questions_milestone' && questionsMilestone) {
+    return (
+      <QuestionsMilestoneCelebration
+        milestone={questionsMilestone}
+        onContinue={() => {
+          if (questionsMilestone) {
+            setQuestionsMilestone(null);
+            const { lifetimeXP, xpIntoLevel, level } = useStore.getState();
+            const bonusResult = applyXPAndLevelUp(level, xpIntoLevel, 500);
+            useStore.setState({
+              lifetimeXP: lifetimeXP + 500,
+              level: bonusResult.levelAfter,
+              xpIntoLevel: bonusResult.xpIntoLevelAfter,
+            });
+            if (results && bonusResult.levelUpCount > 0) {
+              setResults({
+                ...results,
+                levelUpCount: (results.levelUpCount ?? 0) + bonusResult.levelUpCount,
+                levelAfter: bonusResult.levelAfter,
+                xpIntoLevelAfter: bonusResult.xpIntoLevelAfter,
+              });
+            }
+          }
+          goToNextAfterQuestionsMilestone();
+        }}
+        soundOn={settings.soundOn}
+        hapticsOn={settings.hapticsOn}
       />
     );
   }
@@ -870,9 +926,10 @@ export default function Game() {
             size="lg" 
             className="w-full h-14 text-lg font-semibold rounded-2xl shadow-lg shadow-primary/10 mt-4"
             onClick={() => {
-              // Flow: results → streak_milestone (if milestone) → strategy (if weakness) → levelup (if applicable) → reassurance/train
               if (streakMilestoneReached && !streakMilestoneShownRef.current) {
                 setStep('streak_milestone');
+              } else if (questionsMilestone && !questionsMilestoneShownRef.current) {
+                setStep('questions_milestone');
               } else if (detectedWeakness) {
                 setStep('strategy');
               } else if (hasLevelUp && !levelUpShownRef.current) {
@@ -884,6 +941,7 @@ export default function Game() {
             }}
           >
             {streakMilestoneReached && !streakMilestoneShownRef.current ? 'View Streak!' : 
+             questionsMilestone && !questionsMilestoneShownRef.current ? 'View Milestone!' :
              detectedWeakness ? 'See Tip' : 
              hasLevelUp && !levelUpShownRef.current ? 'View Level Up!' : 
              'Continue'}

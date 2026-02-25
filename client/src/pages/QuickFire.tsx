@@ -14,6 +14,8 @@ import { computeFluency, calculateCombinedSessionXP } from '@/lib/logic/xp-syste
 import { MODE_MULTIPLIERS } from '@/config/progression';
 import { Card } from '@/components/ui/card';
 import { validateAnswer, DEFAULT_ANSWER_FORMAT, AnswerFormat, QuestionTier, selectQuestionTier, getAnswerFormatLabel, calculateXP, getTierXpMultiplier } from '@/lib/game-logic';
+import { QuestionsMilestoneCelebration } from '@/components/game/QuestionsMilestoneCelebration';
+import { applyXPAndLevelUp } from '@/lib/logic/xp-system';
 
 interface Question {
   id: string;
@@ -38,7 +40,7 @@ interface QuickFireResult {
   startingLevel: number;
 }
 
-type GameStep = 'intro' | 'countdown' | 'active' | 'results';
+type GameStep = 'intro' | 'countdown' | 'active' | 'results' | 'questions_milestone';
 
 function CountUp({ value, duration = 1, delay = 0, onTick, suffix = '' }: { 
   value: number, 
@@ -143,6 +145,7 @@ export default function QuickFire() {
   const [results, setResults] = useState<QuickFireResult | null>(null);
   const [isNewHighScore, setIsNewHighScore] = useState(false);
   const [showFlash, setShowFlash] = useState<'correct' | 'wrong' | null>(null);
+  const [questionsMilestone, setQuestionsMilestone] = useState<number | null>(null);
   
   const [_, setLocation] = useLocation();
   const { 
@@ -300,7 +303,14 @@ export default function QuickFire() {
       responseTimes: [...responseTimesRef.current],
     };
 
+    const prevQuestions = useStore.getState().lifetimeQuestionsAnswered;
     saveSession(sessionStats);
+    const newQuestions = useStore.getState().lifetimeQuestionsAnswered;
+    
+    if (Math.floor(newQuestions / 1000) > Math.floor(prevQuestions / 1000)) {
+      setQuestionsMilestone(Math.floor(newQuestions / 1000));
+    }
+    
     setResults(resultObj);
     setStep('results');
   }, [settings.soundOn, updateQuickFireHighScore, saveSession, stopAllTimers]);
@@ -545,6 +555,29 @@ export default function QuickFire() {
     );
   }
 
+  if (step === 'questions_milestone' && questionsMilestone) {
+    return (
+      <QuestionsMilestoneCelebration
+        milestone={questionsMilestone}
+        onContinue={() => {
+          if (questionsMilestone) {
+            setQuestionsMilestone(null);
+            const { lifetimeXP, xpIntoLevel, level: currentLevel } = useStore.getState();
+            const bonusResult = applyXPAndLevelUp(currentLevel, xpIntoLevel, 500);
+            useStore.setState({
+              lifetimeXP: lifetimeXP + 500,
+              level: bonusResult.levelAfter,
+              xpIntoLevel: bonusResult.xpIntoLevelAfter,
+            });
+          }
+          setLocation('/train');
+        }}
+        soundOn={settings.soundOn}
+        hapticsOn={settings.hapticsOn}
+      />
+    );
+  }
+
   if (step === 'results' && results) {
     return (
       <MobileLayout className="bg-white">
@@ -676,10 +709,16 @@ export default function QuickFire() {
             <Button 
               size="lg" 
               className="w-full h-14 text-lg font-semibold rounded-2xl shadow-lg shadow-primary/10"
-              onClick={() => setLocation('/train')}
+              onClick={() => {
+                if (questionsMilestone) {
+                  setStep('questions_milestone');
+                } else {
+                  setLocation('/train');
+                }
+              }}
               data-testid="button-quickfire-continue"
             >
-              Continue
+              {questionsMilestone ? 'View Milestone!' : 'Continue'}
             </Button>
           </motion.div>
         </div>

@@ -42,6 +42,8 @@ export const userProgress = pgTable("user_progress", {
     ps?: number;
   }>>().notNull().default([]),
   
+  lifetimeQuestions: integer("lifetime_questions").notNull().default(0),
+  
   // Paywall
   hasUsedFreeDaily: boolean("has_used_free_daily").notNull().default(false),
   

@@ -87,6 +87,9 @@ export interface UserState {
   streakCount: number;
   lastStreakDate: string | null; // ISO string
   
+  // Lifetime Questions
+  lifetimeQuestionsAnswered: number;
+  
   // Quick Fire
   quickFireIntroSeen: boolean;
   quickFireHighScore: number;
@@ -165,6 +168,7 @@ export interface UserState {
   devSetHasCompletedAssessment: (value: boolean) => void;
   devClearDailySessions: () => void;
   devClearQuickFireStats: () => void;
+  devSetLifetimeQuestions: (count: number) => void;
 }
 
 // --- Store ---
@@ -186,6 +190,8 @@ export const useStore = create<UserState>()(
       lifetimeXP: 0,
       streakCount: 0,
       lastStreakDate: null,
+      
+      lifetimeQuestionsAnswered: 0,
       
       quickFireIntroSeen: false,
       quickFireHighScore: 0,
@@ -327,11 +333,13 @@ export const useStore = create<UserState>()(
         );
         
         const newLifetimeXP = state.lifetimeXP + session.xpEarned;
+        const newLifetimeQuestions = state.lifetimeQuestionsAnswered + session.totalQuestions;
         const newBand = getBandFromLevel(levelResult.levelAfter);
 
         set({
           sessions: [session, ...state.sessions],
           lifetimeXP: newLifetimeXP,
+          lifetimeQuestionsAnswered: newLifetimeQuestions,
           level: levelResult.levelAfter,
           xpIntoLevel: levelResult.xpIntoLevelAfter,
           streakCount: newStreak,
@@ -404,6 +412,7 @@ export const useStore = create<UserState>()(
           level: targetLevel,
           xpIntoLevel: 0,
           lifetimeXP: 0,
+          lifetimeQuestionsAnswered: 0,
           sessions: [],
           streakCount: 0,
           lastStreakDate: null,
@@ -581,6 +590,7 @@ export const useStore = create<UserState>()(
             hasCompletedAssessment: state.hasCompletedAssessment,
             level: state.level,
             lifetimeXP: state.lifetimeXP,
+            lifetimeQuestions: state.lifetimeQuestionsAnswered,
             streakCount: state.streakCount,
             lastStreakDate: state.lastStreakDate ? new Date(state.lastStreakDate) : null,
             band: state.progression.band,
@@ -638,6 +648,7 @@ export const useStore = create<UserState>()(
             hasCompletedAssessment: progress.hasCompletedAssessment,
             level: progress.level,
             lifetimeXP: progress.lifetimeXP,
+            lifetimeQuestionsAnswered: progress.lifetimeQuestions ?? 0,
             streakCount: progress.streakCount,
             lastStreakDate: progress.lastStreakDate?.toString() || null,
             hasUsedFreeDaily: progress.hasUsedFreeDaily ?? false,
@@ -748,6 +759,11 @@ export const useStore = create<UserState>()(
           quickFireIntroSeen: false,
           sessions: state.sessions.filter(s => s.sessionType !== 'quick_fire')
         }));
+      },
+      
+      devSetLifetimeQuestions: (count: number) => {
+        console.log(`DEV_MENU: Setting lifetimeQuestionsAnswered to ${count}`);
+        set({ lifetimeQuestionsAnswered: count });
       }
     }),
     {
@@ -759,6 +775,13 @@ export const useStore = create<UserState>()(
             state.progression.level = state.level;
             state.progression.band = getBandFromLevel(state.level);
             console.log('[MIGRATION] Synced progression level to:', state.level);
+          }
+          
+          // Migration: Backfill lifetimeQuestionsAnswered from session history
+          if (state.lifetimeQuestionsAnswered === undefined || state.lifetimeQuestionsAnswered === null) {
+            const total = state.sessions.reduce((sum, s) => sum + (s.totalQuestions || 0), 0);
+            state.lifetimeQuestionsAnswered = total;
+            console.log('[MIGRATION] Backfilled lifetimeQuestionsAnswered:', total);
           }
           
           // Migration: Ensure skillDrillBests exists with defaults
