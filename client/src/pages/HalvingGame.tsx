@@ -8,7 +8,7 @@ import { X, Scissors } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { clsx } from 'clsx';
 import { KeypadModern } from '@/components/game/Keypad';
-import { computeFluency } from '@/lib/logic/xp-system';
+import { computeFluency, applyXPAndLevelUp } from '@/lib/logic/xp-system';
 import { Card } from '@/components/ui/card';
 import { AnswerFeedback } from '@/components/game/AnswerFeedback';
 import { StreakIndicator } from '@/components/game/StreakIndicator';
@@ -241,6 +241,8 @@ export default function HalvingGame() {
     
     const fluencyMetrics = computeFluency(finalTotal, finalCorrect, selectedDuration, times);
     
+    const levelResult = applyXPAndLevelUp(level, xpIntoLevel, xpEarned);
+    
     const sessionStats: SessionStats = {
       id: Math.random().toString(36).substr(2, 9),
       date: new Date().toISOString(),
@@ -254,10 +256,11 @@ export default function HalvingGame() {
       medianMs,
       xpEarned,
       fluencyScore: fluencyMetrics.fluencyScore,
-      levelBefore: level,
-      levelAfter: level,
-      xpIntoLevelBefore: xpIntoLevel,
-      xpIntoLevelAfter: xpIntoLevel + xpEarned,
+      levelBefore: levelResult.levelBefore,
+      levelAfter: levelResult.levelAfter,
+      levelUpCount: levelResult.levelUpCount,
+      xpIntoLevelBefore: levelResult.xpIntoLevelBefore,
+      xpIntoLevelAfter: levelResult.xpIntoLevelAfter,
       bestStreak: finalBestStreak
     };
     

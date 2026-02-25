@@ -490,6 +490,13 @@ export const generateQuestionForLevel = (
       );
       
       if (complexity >= profile.minComplexityScore || attempts >= MAX_ATTEMPTS) {
+        if (attempts >= MAX_ATTEMPTS) {
+          console.warn(
+            `[QuestionGenerator] MAX_ATTEMPTS (${MAX_ATTEMPTS}) reached at level ${effectiveLevel}. ` +
+            `Op: ${op}, complexity: ${complexity}, required: ${profile.minComplexityScore}. ` +
+            `Using best available question.`
+          );
+        }
         break;
       }
     }

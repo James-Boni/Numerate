@@ -152,7 +152,7 @@ export interface UserState {
   markStrategySeen: (strategyId: string) => void;
   
   // Personal Records Actions
-  checkAndUpdatePersonalBests: (session: SessionStats) => string[];
+  checkAndUpdatePersonalBests: (session: SessionStats) => { type: string; previousValue: number | null; newValue: number }[];
   updateSkillDrillBests: (gameType: 'rounding' | 'doubling' | 'halving', score: number, streak: number) => boolean;
   
   // Sync Actions
@@ -487,58 +487,52 @@ export const useStore = create<UserState>()(
         }
       },
       
-      checkAndUpdatePersonalBests: (session: SessionStats): string[] => {
+      checkAndUpdatePersonalBests: (session: SessionStats): { type: string; previousValue: number | null; newValue: number }[] => {
         const state = get();
-        const newRecords: string[] = [];
+        const newRecords: { type: string; previousValue: number | null; newValue: number }[] = [];
         const today = new Date().toISOString().split('T')[0];
         const currentBests = { ...state.personalBests };
         
-        // Only count valid daily sessions
         if (session.sessionType !== 'daily' || session.valid === false) {
           return [];
         }
         
-        // Check best streak
         if (session.bestStreak > currentBests.bestStreak) {
+          newRecords.push({ type: 'streak', previousValue: currentBests.bestStreak || null, newValue: session.bestStreak });
           currentBests.bestStreak = session.bestStreak;
           currentBests.bestStreakDate = today;
-          newRecords.push('streak');
         }
         
-        // Check fastest median response time (lower is better)
         if (session.medianMs && session.medianMs > 0) {
           if (currentBests.fastestMedianMs === null || session.medianMs < currentBests.fastestMedianMs) {
+            newRecords.push({ type: 'speed', previousValue: currentBests.fastestMedianMs, newValue: session.medianMs });
             currentBests.fastestMedianMs = session.medianMs;
             currentBests.fastestMedianDate = today;
-            newRecords.push('speed');
           }
         }
         
-        // Check highest accuracy (need min 10 questions for validity)
         if (session.totalQuestions >= 10 && session.accuracy > 0) {
           if (currentBests.highestAccuracy === null || session.accuracy > currentBests.highestAccuracy) {
+            newRecords.push({ type: 'accuracy', previousValue: currentBests.highestAccuracy, newValue: session.accuracy });
             currentBests.highestAccuracy = session.accuracy;
             currentBests.highestAccuracyDate = today;
-            newRecords.push('accuracy');
           }
         }
         
-        // Check highest throughput (questions per second - use throughputQps or fall back to qps field from backend)
         const throughput = session.throughputQps ?? (session as any).qps;
         if (throughput && throughput > 0) {
           if (currentBests.highestThroughput === null || throughput > currentBests.highestThroughput) {
+            newRecords.push({ type: 'throughput', previousValue: currentBests.highestThroughput, newValue: throughput });
             currentBests.highestThroughput = throughput;
             currentBests.highestThroughputDate = today;
-            newRecords.push('throughput');
           }
         }
         
-        // Check highest fluency score
         if (session.fluencyScore && session.fluencyScore > 0) {
           if (currentBests.highestFluencyScore === null || session.fluencyScore > currentBests.highestFluencyScore) {
+            newRecords.push({ type: 'fluency', previousValue: currentBests.highestFluencyScore, newValue: session.fluencyScore });
             currentBests.highestFluencyScore = session.fluencyScore;
             currentBests.highestFluencyDate = today;
-            newRecords.push('fluency');
           }
         }
         

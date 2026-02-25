@@ -2,7 +2,7 @@
 
 ## Overview
 
-Numerate is a mobile-first math training application designed to help adults improve their arithmetic fluency through adaptive daily practice sessions. The app features a 3-minute initial assessment to place users at an appropriate starting level, followed by timed training sessions with mixed operations (addition, subtraction, multiplication, division). The system uses a sophisticated progression engine that adapts difficulty based on user performance while maintaining emotionally safe feedback to encourage continued practice.
+Numerate is a mobile-first math training application designed to enhance adult arithmetic fluency through adaptive daily practice. It features an initial 3-minute assessment for level placement, followed by timed sessions with mixed arithmetic operations. The app employs a sophisticated, adaptive progression engine that adjusts difficulty based on performance while providing emotionally supportive feedback. The business vision is to provide an engaging and effective tool for adults to master fundamental math skills, fostering confidence and improving cognitive abilities.
 
 ## User Preferences
 
@@ -10,268 +10,76 @@ Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
-### Frontend Architecture
-- **Framework**: React with TypeScript, built using Vite
-- **Routing**: Wouter for lightweight client-side routing
-- **State Management**: Zustand with persist middleware for local storage persistence
-- **UI Components**: shadcn/ui component library with Radix UI primitives
-- **Styling**: Tailwind CSS with custom theme variables matching the app's logo aesthetic
-- **Animation**: Framer Motion for micro-interactions and feedback animations
-- **Data Fetching**: TanStack Query for server state management
+### Frontend
+- **Framework**: React with TypeScript (Vite)
+- **Routing**: Wouter
+- **State Management**: Zustand (with persist middleware for local storage)
+- **UI Components**: shadcn/ui with Radix UI
+- **Styling**: Tailwind CSS (custom theme)
+- **Animation**: Framer Motion
+- **Data Fetching**: TanStack Query
 
-### Backend Architecture
-- **Framework**: Express.js (v5) running on Node.js
-- **API Design**: RESTful endpoints under `/api/*` prefix
-- **Database ORM**: Drizzle ORM with PostgreSQL dialect
-- **Build System**: esbuild for server bundling, Vite for client
+### Backend
+- **Framework**: Express.js (Node.js)
+- **API Design**: RESTful (`/api/*`)
+- **Database ORM**: Drizzle ORM (PostgreSQL dialect)
+- **Build System**: esbuild
 
 ### Data Storage
-- **Database**: PostgreSQL (required via DATABASE_URL environment variable)
-- **Schema**: Three main tables - `users`, `user_progress`, `sessions`
-- **Client Persistence**: Zustand persist middleware stores progression state locally
-- **Sync Strategy**: Client maintains local state with periodic backend sync
+- **Database**: PostgreSQL
+- **Schema**: `users`, `user_progress`, `sessions` tables
+- **Client Persistence**: Zustand persist middleware for local state with periodic backend synchronization.
 
 ### Key Design Patterns
 
-**Progression Engine (Two-Layer System)**:
-1. Curriculum Gates (Level) - Controls what question types are available based on user level
-2. Adaptive Tuning (Skill Ratings) - Adjusts difficulty within allowed templates based on performance
+**Progression Engine**: A two-layer system managing curriculum gates (levels) and adaptive tuning (skill ratings) for difficulty adjustment. Question generation is level-based, controlling operation mix, operand ranges, and preventing repetition.
 
-**Question Generation (Level-Based System)**:
-- Level directly controls operation mix via `getOperationWeights(level)`:
-  - L1-5: 80% add, 20% sub
-  - L6-12: 55% add, 45% sub
-  - L13-20: 40% add, 35% sub, 25% mul
-  - L21-30: 30% add, 30% sub, 25% mul, 15% div
-  - L31+: 25% add, 25% sub, 30% mul, 20% div
-- Level controls operand ranges via `getDifficultyParams(level)`:
-  - maxAddSub = 10 + level * 4 (L10 = 50, L30 = 130)
-  - Multiplication unlocks at level 13
-  - Division unlocks at level 21 (integer results only)
-- Repetition guards to avoid asking the same question patterns repeatedly
-- Key files: `difficulty.ts` (weights/params), `generator_adapter.ts` (question generation)
+**Answer Validation**: Employs "Trust Rules" to ensure accurate and context-appropriate decimal handling and precision detection, avoiding unnecessary decimal input.
 
-**XP and Scoring**:
-- Base XP per question plus performance bonuses
-- Fluency score computed from accuracy, speed, consistency, and throughput
-- Level thresholds increase progressively (harder to level up over time)
+**XP and Scoring**: Features a multi-faceted XP system combining base XP, speed bonuses, streak multipliers, tier multipliers (stretch, core, review), mode multipliers, and excellence/elite bonuses. Fluency score is derived from accuracy, speed, consistency, and throughput. XP contributions from all game modes trigger level-ups with transparent bonus breakdowns.
 
-**Audio Feedback**:
-- Web Audio API synthesized sounds for zero-latency playback
-- Performance-scaled sounds (XP ticks, pops, bursts for different gain sizes)
-- Level-up fanfares scale with levels gained
-- Session completion sounds vary by accuracy (90%+ triumphant, 70%+ good, <70% encouraging)
-- Respects user sound toggle preferences
+**Audio Feedback**: Utilizes Web Audio API for zero-latency, performance-scaled sounds, including XP ticks, pops, bursts, and level-up fanfares that scale with milestones (10, 25, 50, 75, 100). Session completion sounds vary based on accuracy.
 
-**Notification Settings (Device-Local)**:
-- Daily reminder toggle with browser permission request
-- Time picker for preferred reminder time (default 09:00)
-- Settings stored in local Zustand persist (not synced to backend)
-- Device-local by design: browser notification permissions are browser-specific
+**Milestone Level Celebrations**: Special, progressively grander celebrations for levels 10, 25, 50, 75, and 100, featuring unique titles, praise copy, enhanced visual effects (gold/amber, confetti, radial glows), and extended durations.
 
-**Coaching System (Strategy Lessons)**:
-- Weakness detection analyzes session question results for patterns
-- 6 animated strategy lessons: Place Value Split, Make Tens, Count Up, Compensation, Distributive Split, Nines Trick
-- Lessons appear after session results (before level up) when weakness detected
-- Each strategy shown only once per user (tracked in seenStrategies)
-- Key files: `weakness-detector.ts`, `strategy-content.ts`, `StrategyLesson.tsx`
+**Notification Settings**: Device-local daily reminder toggles with time pickers, stored in local Zustand persist.
+
+**Coaching System**: Detects weaknesses from session results and delivers animated strategy lessons (e.g., Place Value Split, Make Tens) after sessions, shown once per user.
 
 ### Application Flow
-1. Welcome → Assessment (3-minute placement test) → Starting level assignment
-2. Daily Training → Daily Challenge Intro → Timed session (3 minutes) → Session summary → Strategy Lesson (if weakness detected) → Level Up celebration → Reassurance/Paywall (first session)
-3. Skill Drills → Rounding, Doubling, Halving practice modes (all unlocked)
-4. Progress tracking → Time-bound metrics, level journey, performance insights
+The application guides users from a welcome screen through an assessment to daily training sessions, which include timed practice, session summaries, potential strategy lessons, and level-up celebrations. Skill Drills (Rounding, Doubling, Halving) are also available.
 
 ### Skill Drill Game Modes
-**Rounding Practice** (`/rounding`):
-- Available immediately (no level lock)
-- 3-minute timed sessions with tier-based difficulty scaling
-- Tier advances every 3 correct answers (endless scaling)
-- Rounding targets: 10, 100, 1000, 10000, 0.1, 0.01 (progressively unlocked by tier)
-- Numbers scale to 5+ digits at higher tiers
-- 15 XP per correct answer
-- Pre-game screen shows personal bests before starting
-- Key files: `RoundingGame.tsx`, `skill-drill-difficulty.ts`
+Rounding, Doubling, and Halving practice modes offer 3-minute timed sessions with tier-based difficulty scaling. They contribute to total XP and level-ups but do not affect global progress metrics.
 
-**Doubling Practice** (`/doubling`):
-- Available immediately (no level lock)
-- 3-minute timed sessions with tier-based difficulty scaling
-- Tier advances every 3 correct answers (endless scaling)
-- Tier 0-1: whole numbers 2-50
-- Tier 2-3: 20-150, some .5 decimals
-- Tier 4+: larger numbers, .25/.75 decimals, unfriendly numbers
-- 18 XP per correct answer
-- Pre-game screen shows personal bests before starting
-- Key files: `DoublingGame.tsx`, `skill-drill-difficulty.ts`
+### Progress Page System
+- **Core Principle**: Focuses on "EVIDENCE OF IMPROVEMENT" from "daily" sessions only.
+- **Metrics**: Displays time-bound (7D, 30D, All time) accuracy, speed (median with IQR), and throughput.
+- **UI Sections**: Includes time range selection, adaptive insights, weekly insights (7D), journey comparison (All time), level journey, performance cards, skill breakdown dashboard, difficulty context, and personal bests.
 
-**Halving Practice** (`/halving`):
-- Available immediately (no level lock)
-- 3-minute timed sessions with tier-based difficulty scaling
-- Tier advances every 3 correct answers (endless scaling)
-- Tier 0-1: even numbers 10-100 (clean halves)
-- Tier 2-3: includes odd numbers (creates .5 results)
-- Tier 6+: decimals creating .25/.75 results
-- 20 XP per correct answer
-- Pre-game screen shows personal bests before starting
-- Key files: `HalvingGame.tsx`, `skill-drill-difficulty.ts`
+### Personal Records System
+Tracks best streak, fastest median response, highest accuracy, highest throughput, and highest fluency score, with backend persistence and in-session celebrations showing improvement against previous records.
 
-**Skill Drill Session Types**: rounding_practice, doubling_practice, halving_practice
-- These do NOT count toward Progress page metrics (daily sessions only)
-- Award minimal XP for practice motivation (3-5 XP per correct answer)
-- Personal bests stored locally via Zustand persist (device-local, not synced to backend)
-- Session duration options: 1, 2, or 3 minutes (user-selected on pre-game screen)
-- Tier system advances every 3 correct answers with tier indicator shown during gameplay
-- Results show highest tier reached, personal best celebrations, encouraging messages
-- Quick restart button allows replaying with same duration
-
-### Progress Page System (Core System - Locked)
-**Foundational Principles**:
-- Progress shows EVIDENCE OF IMPROVEMENT, not raw stats
-- Daily sessions are the ONLY source of global progress metrics
-- Quick Fire and Assessment NEVER pollute progress metrics
-- All views are TIME-BOUND (7D default, 30D, All time)
-
-**Session Filtering**:
-- Include ONLY: sessionType === "daily"
-- Exclude ALWAYS: quick_fire, assessment
-
-**Daily Aggregation**:
-- Accuracy: weighted (totalCorrect / totalAttempted per day)
-- Speed: median response time with IQR band (25th-75th percentile)
-- Throughput: questions per minute (active time only)
-
-**UI Sections**:
-1. Time Range Selector (7D default, 30D, All time)
-2. Adaptive Insight Line (one explanatory sentence)
-3. Weekly Insights Card (7D view only) - shows week's highlights, avg accuracy/speed, best streak, XP earned, week-over-week comparison
-4. Journey Comparison Card (All time view only) - Day 1 vs Today comparison with improvement badges
-5. Level Journey Card (start vs current level)
-6. Performance Cards: Accuracy, Speed (with IQR), Throughput
-7. Skill Breakdown Dashboard - star ratings per operation type (add/sub/mul/div) based on accuracy, speed, practice volume
-8. Difficulty Context Copy (static reassurance about dips)
-9. Personal Bests (quiet, no pressure)
-
-**Personal Records System**:
-- Tracked metrics: best streak, fastest median response, highest accuracy, highest throughput, highest fluency score
-- Backend persistence via personalBests JSONB column in user_progress table
-- Celebrated in session results with PersonalRecordCelebration component when records are beaten
-- Key files: `PersonalRecordCelebration.tsx`, store's `checkAndUpdatePersonalBests()`
-
-**Daily Focus System (Train Page)**:
-- Personalized insights shown before session start
-- Identifies strengths (high accuracy, fast responses) and focus areas (weak operations)
-- Shows ETA to next level based on average XP earned
-- Key file: `DailyFocus.tsx`
-
-**Exclusions**:
-- No Quick Fire data, no Assessment data
-- No XP charts, no raw session lists
-- No streak pressure
+### Daily Focus System
+Provides personalized insights on strengths and focus areas before sessions, including estimated time to the next level.
 
 ## External Dependencies
 
 ### Database
-- **PostgreSQL**: Primary data store, connection via `DATABASE_URL` environment variable
-- **Drizzle Kit**: Database migration tool (`drizzle-kit push` for schema sync)
+- **PostgreSQL**: Primary data store.
+- **Drizzle Kit**: Database migration tool.
 
-### Third-Party Libraries (Key)
-- **@tanstack/react-query**: Server state management and caching
-- **framer-motion**: Animation library for UI transitions
-- **recharts**: Chart library for progress visualization
-- **zod**: Schema validation for API data
-- **drizzle-zod**: Zod schema generation from Drizzle tables
-
-### Development Tools
-- **Vite**: Development server with HMR, production bundling
-- **Replit Plugins**: Cartographer, dev banner, runtime error overlay (dev only)
-- **Vitest**: Testing framework (configured but tests not extensively implemented)
-
-### Session Storage
-- **connect-pg-simple**: PostgreSQL session store (available but not currently used for auth)
+### Third-Party Libraries
+- **@tanstack/react-query**: Server state management.
+- **framer-motion**: UI animation.
+- **recharts**: Charting library.
+- **zod**: Schema validation.
+- **drizzle-zod**: Zod schema generation from Drizzle.
 
 ### Backend User System
-**Database Schema** (users table):
-- `id`: Internal UUID (primary key)
-- `auth_token`: Unique token for Bearer authentication
-- `apple_subject_id`: For future Sign in with Apple linking
-- `email`: Optional, from Apple or user input
-- `entitlement_tier/status/source`: Premium subscription tracking
-- `entitlement_expires_at`, `original_transaction_id`: IAP receipt data
+- **Auth Endpoints**: `/api/auth/register`, `/api/auth/login`, `/api/auth/me`, `/api/auth/apple`, `/api/auth/link-apple`.
+- **Sync Endpoints**: `/api/sync/progress`, `/api/sync/session`.
 
-**Auth Endpoints** (`server/routes.ts`):
-- `POST /api/auth/register` - Creates guest user with auth token
-- `POST /api/auth/login` - Login with existing auth token
-- `GET /api/auth/me` - Get current user (requires Bearer token)
-- `POST /api/auth/apple` - Placeholder for future SIWA
-- `POST /api/auth/link-apple` - Placeholder for linking Apple to guest
-
-**Sync Endpoints** (token-authenticated):
-- `POST /api/sync/progress` - Upload progress (partial updates supported)
-- `GET /api/sync/progress` - Fetch user's progress and sessions
-- `POST /api/sync/session` - Save completed session
-
-### iOS Readiness Framework (Scaffolding)
-**Location**: `client/src/lib/services/`
-
-Scaffolding for future iOS integration (SIWA + IAP):
-
-**Core Services**:
-- `types.ts`: Canonical UserAccount and Entitlement models
-- `auth-service.ts`: Connects to backend /api/auth/register, persists auth token
-- `billing-service.ts`: BillingService interface with MockBillingService (dev entitlement controls)
-- `storage-service.ts`: Secure storage abstraction (localStorage now, SecureStore for Expo later)
-- `sync-service.ts`: Offline-first sync with retry queue for failed requests
-- `api-client.ts`: Backend API contract with LocalApiClient mock
-- `account-store.ts`: Zustand store for account/entitlement state
-- `ios-config.ts`: iOS/Expo configuration placeholders
-
-**Security Rules**:
-- Never store passwords, payment card data, or Apple identity tokens
-- Production builds cannot toggle premium via dev methods
-- Entitlement displayed only from BillingService.getEntitlement()
-
-**UI Surfaces**:
-- Settings: Account section (Guest/Apple status), Premium section (Restore Purchases)
-- DevMenu: Entitlement controls (toggle premium, set status, simulate expiry)
-
-**Key Patterns**:
-- Anonymous-first, link Apple later
-- Internal UUID as primary key (not Apple subject identifier)
-- Entitlement status derived from entitlement fields only
-- Offline-first with sync queue for failed network requests
-
-## Capacitor iOS Integration
-
-The project is configured with Capacitor to wrap the React web app as a native iOS application.
-
-### Configuration
-- **App ID**: com.example.numerate (change to your own before publishing)
-- **App Name**: Numerate
-- **Web Directory**: dist/public (Vite build output)
-- **Config File**: capacitor.config.ts (root directory)
-
-### iOS Project Structure
-- `ios/App/App.xcworkspace` - Xcode workspace (use this to open project)
-- `ios/App/App/` - Native iOS app code and web assets
-- `ios/App/Podfile` - CocoaPods dependencies
-
-### Build Commands (Run on Mac with Xcode)
-1. Install dependencies: `npm install`
-2. Build web assets: `npx vite build`
-3. Sync to iOS: `npx cap sync ios`
-4. Open in Xcode: `npx cap open ios`
-
-### Routing
-- Uses Wouter for client-side routing
-- Capacitor automatically handles SPA routing by serving local assets
-- All routes work offline once bundled
-
-### iOS-Specific Configuration
-- Safe area handling: contentInset set to "automatic"
-- Status bar: Uses teal (#0d9488) background color
-- Zoom prevention: Handled via viewport meta tag in index.html
-
-### Future iOS Integrations (Scaffolding Ready)
-- Sign in with Apple (SIWA): See `client/src/lib/services/auth-service.ts`
-- In-App Purchases (IAP): See `client/src/lib/services/billing-service.ts`
-- Secure storage: Uses localStorage, ready for SecureStore with Expo/Capacitor plugins
+### iOS Readiness Framework
+- **Core Services**: `auth-service.ts`, `billing-service.ts`, `sync-service.ts`, `account-store.ts`.
+- **Key Patterns**: Anonymous-first authentication, offline-first with sync queue.

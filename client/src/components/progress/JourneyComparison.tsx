@@ -12,12 +12,12 @@ interface JourneyStats {
   firstSession: {
     date: string;
     accuracy: number;
-    avgSpeedMs: number;
+    medianSpeedMs: number;
     level: number;
   };
   recentAvg: {
     accuracy: number;
-    avgSpeedMs: number;
+    medianSpeedMs: number;
     level: number;
   };
   improvements: {
@@ -28,6 +28,30 @@ interface JourneyStats {
   daysActive: number;
 }
 
+function collectResponseTimes(sessions: SessionStats[]): number[] {
+  const allTimes: number[] = [];
+  sessions.forEach(s => {
+    if (s.responseTimes && s.responseTimes.length > 0) {
+      allTimes.push(...s.responseTimes);
+    } else if (s.avgResponseTimeMs) {
+      for (let i = 0; i < s.totalQuestions; i++) {
+        allTimes.push(s.avgResponseTimeMs);
+      }
+    }
+  });
+  return allTimes;
+}
+
+function computeMedian(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  return sorted[mid];
+}
+
 function analyzeJourney(sessions: SessionStats[], startingLevel: number, currentLevel: number): JourneyStats | null {
   const dailySessions = sessions
     .filter(s => s.sessionType === 'daily' && s.valid !== false)
@@ -36,29 +60,32 @@ function analyzeJourney(sessions: SessionStats[], startingLevel: number, current
   if (dailySessions.length < 2) return null;
   
   const firstSession = dailySessions[0];
+  const firstSessionTimes = collectResponseTimes([firstSession]);
+  const firstMedianSpeed = computeMedian(firstSessionTimes);
   
   const recentSessions = dailySessions.slice(-5);
   const recentAccuracy = recentSessions.reduce((sum, s) => sum + s.accuracy, 0) / recentSessions.length;
-  const recentSpeed = recentSessions.reduce((sum, s) => sum + s.avgResponseTimeMs, 0) / recentSessions.length;
+  const recentTimes = collectResponseTimes(recentSessions);
+  const recentMedianSpeed = computeMedian(recentTimes);
   
   const firstDate = new Date(firstSession.date);
-  const today = new Date();
-  const daysActive = Math.ceil((today.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24));
+  const uniqueDates = new Set(dailySessions.map(s => new Date(s.date).toISOString().split('T')[0]));
+  const daysActive = uniqueDates.size;
   
   const accuracyImprovement = ((recentAccuracy - firstSession.accuracy) / Math.max(firstSession.accuracy, 0.01)) * 100;
-  const speedImprovement = ((firstSession.avgResponseTimeMs - recentSpeed) / firstSession.avgResponseTimeMs) * 100;
+  const speedImprovement = firstMedianSpeed > 0 ? ((firstMedianSpeed - recentMedianSpeed) / firstMedianSpeed) * 100 : 0;
   const levelsGained = currentLevel - startingLevel;
   
   return {
     firstSession: {
       date: firstDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
       accuracy: firstSession.accuracy,
-      avgSpeedMs: firstSession.avgResponseTimeMs,
+      medianSpeedMs: firstMedianSpeed,
       level: firstSession.levelBefore ?? startingLevel,
     },
     recentAvg: {
       accuracy: recentAccuracy,
-      avgSpeedMs: recentSpeed,
+      medianSpeedMs: recentMedianSpeed,
       level: currentLevel,
     },
     improvements: {
@@ -128,7 +155,7 @@ export function JourneyComparison({ sessions, startingLevel, currentLevel }: Jou
           <Sparkles className="w-5 h-5 text-violet-500" />
           <h3 className="font-semibold text-slate-800">Your Journey</h3>
         </div>
-        <span className="text-xs text-slate-500">{stats.daysActive} days</span>
+        <span className="text-xs text-slate-500" data-testid="text-days-active">{stats.daysActive} {stats.daysActive === 1 ? 'day' : 'days'} of practice</span>
       </div>
       
       <div className="grid grid-cols-2 gap-4">
@@ -152,7 +179,7 @@ export function JourneyComparison({ sessions, startingLevel, currentLevel }: Jou
             </div>
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-violet-400" />
-              <span className="text-sm text-slate-700">{(stats.firstSession.avgSpeedMs / 1000).toFixed(1)}s</span>
+              <span className="text-sm text-slate-700">{(stats.firstSession.medianSpeedMs / 1000).toFixed(1)}s</span>
             </div>
           </div>
           <div className="text-xs text-slate-400">{stats.firstSession.date}</div>
@@ -178,7 +205,7 @@ export function JourneyComparison({ sessions, startingLevel, currentLevel }: Jou
             </div>
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-violet-500" />
-              <span className="text-sm font-medium text-slate-800">{(stats.recentAvg.avgSpeedMs / 1000).toFixed(1)}s</span>
+              <span className="text-sm font-medium text-slate-800">{(stats.recentAvg.medianSpeedMs / 1000).toFixed(1)}s</span>
             </div>
           </div>
           <div className="text-xs text-violet-500 font-medium">Recent avg</div>

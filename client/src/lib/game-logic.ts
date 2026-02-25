@@ -48,11 +48,24 @@ export function validateAnswer(userInput: string, correctAnswer: number, format:
     return userValue === Math.round(correctAnswer);
   }
   
-  if (!userInput.includes('.')) {
+  const normalizedInput = userInput.endsWith('.') ? userInput + '0' : userInput;
+
+  const correctRoundedToDP = Math.round(correctAnswer * Math.pow(10, format.dpRequired)) / Math.pow(10, format.dpRequired);
+  const correctIsWholeNumber = Math.abs(correctRoundedToDP - Math.round(correctRoundedToDP)) < 0.0001;
+
+  if (correctIsWholeNumber) {
+    if (format.roundingMode === 'round') {
+      return userValue === Math.round(correctRoundedToDP);
+    } else {
+      return Math.abs(userValue - correctAnswer) < 0.0001;
+    }
+  }
+
+  if (!normalizedInput.includes('.')) {
     return false;
   }
   
-  const decimalPart = userInput.split('.')[1] || '';
+  const decimalPart = normalizedInput.split('.')[1] || '';
   if (decimalPart.length < format.dpRequired) {
     return false;
   }

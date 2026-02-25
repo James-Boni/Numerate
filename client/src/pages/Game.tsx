@@ -17,10 +17,29 @@ import { Confetti } from '@/components/game/Confetti';
 import { PaywallScreen } from '@/components/game/PaywallScreen';
 import { DailyChallengeIntro } from '@/components/game/DailyChallengeIntro';
 import { StrategyLesson } from '@/components/game/StrategyLesson';
-import { PersonalRecordCelebration } from '@/components/game/PersonalRecordCelebration';
+import { PersonalRecordCelebration, PersonalRecord } from '@/components/game/PersonalRecordCelebration';
 import { useAccountStore, isPremiumActive } from '@/lib/services/account-store';
 import { detectWeakness, WeaknessPattern } from '@/lib/logic/weakness-detector';
 import { DailyStreakCelebration, isMilestone } from '@/components/game/DailyStreakCelebration';
+
+const MILESTONE_DATA: Record<number, { title: string; subtitle: string; tier: number }> = {
+  10: { title: "Double Digits!", subtitle: "You've built a real foundation. This is where it starts to click.", tier: 1 },
+  25: { title: "Quarter Century!", subtitle: "Most people never get this far. Your dedication is paying off.", tier: 2 },
+  50: { title: "Half Century!", subtitle: "You're in the top tier. Your number skills are genuinely impressive now.", tier: 3 },
+  75: { title: "Diamond Level!", subtitle: "Extraordinary commitment. You should feel proud of how far you've come.", tier: 4 },
+  100: { title: "Century!", subtitle: "One hundred levels. You've mastered what most adults avoid. Incredible.", tier: 5 },
+};
+
+function getMilestoneForRange(levelBefore: number, levelAfter: number) {
+  const milestones = [10, 25, 50, 75, 100];
+  for (let i = milestones.length - 1; i >= 0; i--) {
+    const m = milestones[i];
+    if (levelBefore < m && levelAfter >= m) {
+      return MILESTONE_DATA[m];
+    }
+  }
+  return null;
+}
 
 function LevelUpCelebration({ 
   levelBefore, 
@@ -45,6 +64,14 @@ function LevelUpCelebration({
   const [showGlow, setShowGlow] = useState(false);
   const [showParticles, setShowParticles] = useState(false);
   const animatedRef = useRef(false);
+
+  const milestone = getMilestoneForRange(levelBefore, levelAfter);
+  const isMilestoneLevel = !!milestone;
+  const milestoneTier = milestone?.tier ?? 0;
+  const confettiCount = isMilestoneLevel ? 60 + milestoneTier * 30 : (levelUpCount > 1 ? 80 : 50);
+  const particleCount = isMilestoneLevel ? 16 + milestoneTier * 4 : 16;
+  const particleSpread = isMilestoneLevel ? 150 + milestoneTier * 20 : 150;
+  const celebrationDelay = isMilestoneLevel ? 1.2 + milestoneTier * 0.15 : 0.8;
 
   useEffect(() => {
     if (animatedRef.current) return;
@@ -83,7 +110,13 @@ function LevelUpCelebration({
             }, baseStepDuration * 0.6);
           } else {
             setTimeout(() => {
-              if (soundOn) AudioManager.playLevelUpEnhanced(levelUpCount);
+              if (soundOn) {
+                if (isMilestoneLevel) {
+                  AudioManager.playMilestoneFanfare(milestoneTier);
+                } else {
+                  AudioManager.playLevelUpEnhanced(levelUpCount);
+                }
+              }
               setAnimationPhase('complete');
             }, baseStepDuration * 0.4);
           }
@@ -116,41 +149,58 @@ function LevelUpCelebration({
     }
   }, [animationPhase]);
 
+  const bgGradient = isMilestoneLevel
+    ? 'bg-gradient-to-b from-amber-50 via-yellow-50/80 to-white'
+    : 'bg-gradient-to-b from-primary/5 to-white';
+
+  const glowColor = isMilestoneLevel ? 'bg-amber-400/30' : 'bg-primary/20';
+  const glowIntensity = isMilestoneLevel ? [0, 1, 0.8] : [0, 1, 0.6];
+
   return (
-    <MobileLayout className="bg-gradient-to-b from-primary/5 to-white overflow-hidden">
-      <Confetti active={showConfetti} originX={50} originY={40} count={levelUpCount > 1 ? 80 : 50} />
+    <MobileLayout className={`${bgGradient} overflow-hidden`}>
+      <Confetti active={showConfetti} originX={50} originY={40} count={confettiCount} />
       
-      {/* Screen flash on level up - stronger contrast */}
       <AnimatePresence>
         {showGlow && (
           <motion.div
-            className="absolute inset-0 bg-primary/20 pointer-events-none z-10"
+            className={`absolute inset-0 ${glowColor} pointer-events-none z-10`}
             initial={{ opacity: 0 }}
-            animate={{ opacity: [0, 1, 0.6] }}
+            animate={{ opacity: glowIntensity }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.5, times: [0, 0.3, 1] }}
+            transition={{ duration: isMilestoneLevel ? 0.8 : 0.5, times: [0, 0.3, 1] }}
           />
         )}
       </AnimatePresence>
+
+      {isMilestoneLevel && animationPhase === 'complete' && (
+        <motion.div
+          className="absolute inset-0 pointer-events-none z-10"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 0.6, 0] }}
+          transition={{ duration: 2, repeat: Infinity, repeatDelay: 0.5 }}
+        >
+          <div className="absolute inset-0 bg-gradient-radial from-amber-300/40 via-transparent to-transparent" 
+               style={{ background: 'radial-gradient(circle at 50% 40%, rgba(251, 191, 36, 0.3), transparent 70%)' }} />
+        </motion.div>
+      )}
       
-      {/* Radial particles */}
       <AnimatePresence>
         {showParticles && (
           <>
-            {Array.from({ length: 16 }).map((_, i) => (
+            {Array.from({ length: particleCount }).map((_, i) => (
               <motion.div
                 key={i}
-                className="absolute w-3 h-3 rounded-full bg-primary"
+                className={`absolute w-3 h-3 rounded-full ${isMilestoneLevel ? (i % 2 === 0 ? 'bg-amber-400' : 'bg-yellow-300') : 'bg-primary'}`}
                 style={{ left: '50%', top: '40%' }}
                 initial={{ opacity: 1, scale: 0, x: 0, y: 0 }}
                 animate={{ 
                   opacity: 0, 
-                  scale: 1.5,
-                  x: Math.cos((i / 16) * Math.PI * 2) * 150,
-                  y: Math.sin((i / 16) * Math.PI * 2) * 150
+                  scale: isMilestoneLevel ? 2 : 1.5,
+                  x: Math.cos((i / particleCount) * Math.PI * 2) * particleSpread,
+                  y: Math.sin((i / particleCount) * Math.PI * 2) * particleSpread
                 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.6, ease: 'easeOut' }}
+                transition={{ duration: isMilestoneLevel ? 0.9 : 0.6, ease: 'easeOut' }}
               />
             ))}
           </>
@@ -171,88 +221,114 @@ function LevelUpCelebration({
             } : { scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
             transition={{ duration: 0.5, repeat: animationPhase === 'leveling' ? Infinity : 0 }}
           >
-            <ChevronUp size={48} className="text-primary mx-auto" />
+            <ChevronUp size={isMilestoneLevel ? 56 : 48} className={isMilestoneLevel ? 'text-amber-500 mx-auto' : 'text-primary mx-auto'} />
           </motion.div>
           <motion.h1 
-            className="text-3xl font-bold text-slate-900"
+            className={`font-bold ${isMilestoneLevel ? 'text-4xl' : 'text-3xl'} ${isMilestoneLevel ? 'text-amber-700' : 'text-slate-900'}`}
             animate={animationPhase === 'complete' ? { scale: [1, 1.1, 1] } : {}}
             transition={{ duration: 0.3 }}
           >
-            Level Up!
+            {isMilestoneLevel && animationPhase === 'complete' ? milestone!.title : 'Level Up!'}
           </motion.h1>
         </motion.div>
 
         <motion.div 
-          className="w-full max-w-xs bg-white rounded-3xl p-8 shadow-lg shadow-primary/10 text-center relative overflow-hidden"
-          initial={{ scale: 0.9, opacity: 0 }}
+          className={`w-full max-w-xs rounded-3xl p-8 shadow-lg text-center relative overflow-hidden ${
+            isMilestoneLevel 
+              ? 'bg-gradient-to-b from-amber-50 to-white shadow-amber-200/30 ring-2 ring-amber-200/50' 
+              : 'bg-white shadow-primary/10'
+          }`}
+          initial={{ scale: isMilestoneLevel ? 0.8 : 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.2, type: isMilestoneLevel ? 'spring' : 'tween', stiffness: 200, damping: 15 }}
         >
-          {/* Shimmer effect on complete */}
           {animationPhase === 'complete' && (
             <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+              className={`absolute inset-0 bg-gradient-to-r from-transparent ${isMilestoneLevel ? 'via-amber-100/60' : 'via-white/40'} to-transparent`}
               initial={{ x: '-100%' }}
               animate={{ x: '200%' }}
-              transition={{ duration: 1, repeat: 2, repeatDelay: 0.5 }}
+              transition={{ duration: 1, repeat: isMilestoneLevel ? 4 : 2, repeatDelay: 0.5 }}
             />
           )}
           
           <motion.div 
-            className="text-8xl font-black text-primary mb-4 relative"
+            className={`font-black mb-4 relative ${
+              isMilestoneLevel 
+                ? 'text-8xl bg-gradient-to-b from-amber-500 via-yellow-500 to-amber-600 bg-clip-text text-transparent' 
+                : 'text-8xl text-primary'
+            }`}
             key={displayLevel}
-            initial={{ scale: 0.5, opacity: 0, rotate: -10 }}
+            initial={{ scale: isMilestoneLevel ? 0.3 : 0.5, opacity: 0, rotate: isMilestoneLevel ? -20 : -10 }}
             animate={{ 
-              scale: animationPhase === 'complete' ? [1, 1.25, 1.1] : 1, 
+              scale: animationPhase === 'complete' 
+                ? (isMilestoneLevel ? [1, 1.35, 1.15] : [1, 1.25, 1.1]) 
+                : 1, 
               opacity: 1, 
               rotate: 0 
             }}
             transition={{ 
               type: 'spring', 
-              stiffness: 250, 
-              damping: 12,
-              scale: { delay: 0.1, duration: 0.6 }
+              stiffness: isMilestoneLevel ? 200 : 250, 
+              damping: isMilestoneLevel ? 10 : 12,
+              scale: { delay: 0.1, duration: isMilestoneLevel ? 0.9 : 0.6 }
             }}
           >
             {displayLevel}
             
-            {/* Glow behind number */}
             <motion.div
-              className="absolute inset-0 blur-xl bg-primary/30 -z-10"
+              className={`absolute inset-0 blur-xl -z-10 ${isMilestoneLevel ? 'bg-amber-400/40' : 'bg-primary/30'}`}
               animate={{ 
-                opacity: animationPhase === 'complete' ? [0.3, 0.6, 0.3] : 0,
-                scale: animationPhase === 'complete' ? [1, 1.2, 1] : 1
+                opacity: animationPhase === 'complete' ? (isMilestoneLevel ? [0.4, 0.8, 0.4] : [0.3, 0.6, 0.3]) : 0,
+                scale: animationPhase === 'complete' ? (isMilestoneLevel ? [1, 1.4, 1] : [1, 1.2, 1]) : 1
               }}
               transition={{ duration: 1.5, repeat: Infinity }}
             />
           </motion.div>
 
           <div className="space-y-2">
-            <div className="relative h-4 bg-slate-100 rounded-full overflow-hidden">
+            <div className={`relative h-4 rounded-full overflow-hidden ${isMilestoneLevel ? 'bg-amber-100' : 'bg-slate-100'}`}>
               <motion.div 
-                className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-primary/80 rounded-full"
+                className={`absolute inset-y-0 left-0 rounded-full ${
+                  isMilestoneLevel 
+                    ? 'bg-gradient-to-r from-amber-400 to-yellow-400' 
+                    : 'bg-gradient-to-r from-primary to-primary/80'
+                }`}
                 initial={{ width: 0 }}
                 animate={{ width: `${barProgress}%` }}
                 transition={{ duration: 0.3, ease: 'easeOut' }}
               />
               {animationPhase === 'leveling' && (
                 <motion.div
-                  className="absolute inset-0 bg-primary/50"
+                  className={`absolute inset-0 ${isMilestoneLevel ? 'bg-amber-400/50' : 'bg-primary/50'}`}
                   animate={{ opacity: [0, 1, 0] }}
                   transition={{ duration: 0.2 }}
                 />
               )}
             </div>
             <motion.p 
-              className="text-sm text-slate-500"
-              animate={animationPhase === 'complete' ? { color: '#0d9488' } : {}}
+              className={`text-sm ${isMilestoneLevel ? 'text-amber-600' : 'text-slate-500'}`}
+              animate={animationPhase === 'complete' ? { color: isMilestoneLevel ? '#b45309' : '#0d9488' } : {}}
             >
               {animationPhase === 'complete' ? `Level ${levelAfter} unlocked!` : 'Leveling up...'}
             </motion.p>
           </div>
         </motion.div>
 
-        {levelUpCount > 1 && (
+        {isMilestoneLevel && animationPhase === 'complete' && (
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ delay: 0.4, type: 'spring', stiffness: 150, damping: 12 }}
+            className="max-w-xs text-center px-4"
+            data-testid="milestone-message"
+          >
+            <p className="text-base text-amber-800/80 leading-relaxed italic">
+              {milestone!.subtitle}
+            </p>
+          </motion.div>
+        )}
+
+        {!isMilestoneLevel && levelUpCount > 1 && (
           <motion.div
             initial={{ opacity: 0, scale: 0.8, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -272,12 +348,17 @@ function LevelUpCelebration({
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: animationPhase === 'complete' ? 1 : 0, y: animationPhase === 'complete' ? 0 : 20 }}
-          transition={{ delay: 0.8 }}
+          transition={{ delay: celebrationDelay }}
         >
           <Button 
             size="lg" 
-            className="w-full h-14 px-12 text-lg font-semibold rounded-2xl shadow-lg shadow-primary/20"
+            className={`w-full h-14 px-12 text-lg font-semibold rounded-2xl shadow-lg ${
+              isMilestoneLevel 
+                ? 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-amber-300/30' 
+                : 'shadow-primary/20'
+            }`}
             onClick={onComplete}
+            data-testid="button-continue-levelup"
           >
             Continue
           </Button>
@@ -328,7 +409,7 @@ export default function Game() {
   const [step, setStep] = useState<'daily_intro' | 'active' | 'results' | 'streak_milestone' | 'strategy' | 'levelup' | 'paywall'>('daily_intro');
   const [results, setResults] = useState<SessionStats | null>(null);
   const [detectedWeakness, setDetectedWeakness] = useState<WeaknessPattern | null>(null);
-  const [newPersonalRecords, setNewPersonalRecords] = useState<string[]>([]);
+  const [newPersonalRecords, setNewPersonalRecords] = useState<PersonalRecord[]>([]);
   const [entitlementChecked, setEntitlementChecked] = useState(false);
   const [streakMilestoneReached, setStreakMilestoneReached] = useState<number | null>(null);
   const [_, setLocation] = useLocation();
@@ -647,6 +728,67 @@ export default function Game() {
               />
             )}
           </motion.div>
+
+          {results && (() => {
+            const baseXP = results.baseSessionXP ?? results.xpEarned ?? 0;
+            const totalXP = results.xpEarned ?? 0;
+            const bonusXP = totalXP - baseXP;
+            const hasExcellence = (results.excellenceMultiplierApplied ?? 0) > 0;
+            const hasElite = (results.eliteMultiplierApplied ?? 0) > 0;
+            const excellenceAmount = hasExcellence ? (accuracy >= 0.95 ? 100 : 50) : 0;
+            const eliteAmount = hasElite ? 150 : 0;
+
+            if (bonusXP <= 0) return null;
+
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.2 }}
+                className="relative z-10 space-y-1.5 pt-2"
+                data-testid="xp-breakdown"
+              >
+                <div className="flex items-center justify-between text-sm text-slate-500">
+                  <span>Base XP</span>
+                  <span className="font-semibold tabular-nums">{baseXP}</span>
+                </div>
+                {hasExcellence && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 1.4 }}
+                    className="flex items-center justify-between text-sm"
+                    data-testid="xp-excellence-bonus"
+                  >
+                    <span className="flex items-center gap-1.5 text-amber-600 font-medium">
+                      <Star size={14} className="fill-amber-500 text-amber-500" />
+                      Excellence Bonus
+                    </span>
+                    <span className="font-bold text-amber-600 tabular-nums">+{excellenceAmount}</span>
+                  </motion.div>
+                )}
+                {hasElite && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 1.6 }}
+                    className="flex items-center justify-between text-sm"
+                    data-testid="xp-elite-bonus"
+                  >
+                    <span className="flex items-center gap-1.5 text-purple-600 font-medium">
+                      <Zap size={14} className="fill-purple-500 text-purple-500" />
+                      Elite Bonus
+                    </span>
+                    <span className="font-bold text-purple-600 tabular-nums">+{eliteAmount}</span>
+                  </motion.div>
+                )}
+                <div className="border-t border-slate-200 pt-1.5 flex items-center justify-between text-sm font-bold text-primary">
+                  <span>Total</span>
+                  <span className="tabular-nums">{totalXP}</span>
+                </div>
+              </motion.div>
+            );
+          })()}
         </motion.div>
 
         {newPersonalRecords.length > 0 && (

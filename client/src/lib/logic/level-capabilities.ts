@@ -39,7 +39,7 @@ export interface LevelCapabilities {
 export function getLevelCapabilities(level: number): LevelCapabilities {
   const clampedLevel = Math.max(1, Math.min(100, level));
   
-  if (clampedLevel <= 4) return getFoundationCapabilities(clampedLevel);
+  if (clampedLevel <= 5) return getFoundationCapabilities(clampedLevel);
   if (clampedLevel <= 8) return getEarlyNegativesCapabilities(clampedLevel);
   if (clampedLevel <= 15) return getPercentFractionsCapabilities(clampedLevel);
   if (clampedLevel <= 25) return getMagnitudeRampCapabilities(clampedLevel);
@@ -49,11 +49,11 @@ export function getLevelCapabilities(level: number): LevelCapabilities {
 }
 
 function getFoundationCapabilities(level: number): LevelCapabilities {
-  const t = (level - 1) / 3;
+  const t = (level - 1) / 4;
   
   return {
     level,
-    band: 'L1-4: Foundation',
+    band: 'L1-5: Foundation',
     
     allowNegativeAnswers: false,
     allowDecimals: false,
@@ -66,20 +66,20 @@ function getFoundationCapabilities(level: number): LevelCapabilities {
     fractionsEnabled: false,
     fractionDenominators: [],
     
-    operations: { add: true, sub: true, mul: true, div: true },
+    operations: { add: true, sub: true, mul: false, div: false },
     
     operandRanges: {
       addSub: { min: 1, max: 10 + level * 2 },
-      mulA: { min: 1, max: 5 },
-      mulB: { min: 1, max: 5 },
-      divDivisor: { min: 2, max: 5 },
-      divDividend: { min: 4, max: 25 }
+      mulA: { min: 0, max: 0 },
+      mulB: { min: 0, max: 0 },
+      divDivisor: { min: 0, max: 0 },
+      divDividend: { min: 0, max: 0 }
     },
     
     requireCarryBorrow: false,
     
-    conceptsUnlocked: ['basic_add', 'basic_sub', 'basic_mul', 'basic_div'],
-    description: `L${level}: Foundation - All ops with small numbers (1-${10 + level * 2}), integer answers only`
+    conceptsUnlocked: ['basic_add', 'basic_sub'],
+    description: `L${level}: Foundation - Add/sub only (1-${10 + level * 2}), integer answers only`
   };
 }
 
@@ -88,7 +88,7 @@ function getEarlyNegativesCapabilities(level: number): LevelCapabilities {
   
   return {
     level,
-    band: 'L5-8: Early Negatives',
+    band: 'L6-8: Early Negatives',
     
     allowNegativeAnswers: true,
     negativeMagnitudeLimit: 20 + (level - 5) * 10,
@@ -103,25 +103,26 @@ function getEarlyNegativesCapabilities(level: number): LevelCapabilities {
     fractionsEnabled: false,
     fractionDenominators: [],
     
-    operations: { add: true, sub: true, mul: true, div: true },
+    operations: { add: true, sub: true, mul: false, div: false },
     
     operandRanges: {
       addSub: { min: 10, max: 50 + level * 5 },
-      mulA: { min: 2, max: 9 },
-      mulB: { min: 2, max: 9 },
-      divDivisor: { min: 2, max: 9 },
-      divDividend: { min: 10, max: 81 }
+      mulA: { min: 0, max: 0 },
+      mulB: { min: 0, max: 0 },
+      divDivisor: { min: 0, max: 0 },
+      divDividend: { min: 0, max: 0 }
     },
     
     requireCarryBorrow: level >= 7,
     
     conceptsUnlocked: ['negative_answers'],
-    description: `L${level}: Bigger integers (10-${50 + level * 5}), negatives allowed (limit -${20 + (level - 5) * 10})`
+    description: `L${level}: Add/sub only (10-${50 + level * 5}), negatives allowed (limit -${20 + (level - 5) * 10})`
   };
 }
 
 function getPercentFractionsCapabilities(level: number): LevelCapabilities {
   const t = (level - 9) / 6;
+  const mulEnabled = level >= 13;
   
   const percentValues = level <= 11 
     ? [10, 25, 50] 
@@ -152,26 +153,27 @@ function getPercentFractionsCapabilities(level: number): LevelCapabilities {
     fractionsEnabled: true,
     fractionDenominators: fractionDenoms,
     
-    operations: { add: true, sub: true, mul: true, div: true },
+    operations: { add: true, sub: true, mul: mulEnabled, div: false },
     
     operandRanges: {
       addSub: { min: 20, max: 100 + level * 10 },
-      mulA: { min: 2, max: 12 },
-      mulB: { min: 2, max: 12 },
-      divDivisor: { min: 2, max: 12 },
-      divDividend: { min: 20, max: 144 }
+      mulA: { min: mulEnabled ? 2 : 0, max: mulEnabled ? 12 : 0 },
+      mulB: { min: mulEnabled ? 2 : 0, max: mulEnabled ? 12 : 0 },
+      divDivisor: { min: 0, max: 0 },
+      divDividend: { min: 0, max: 0 }
     },
     
     requireCarryBorrow: true,
     
-    conceptsUnlocked: ['percent_basic', 'fractions_basic'],
-    description: `L${level}: Percent (${percentValues.join(',')}%) and fractions (1/${fractionDenoms.join(',1/')}) introduced, still integer answers`
+    conceptsUnlocked: mulEnabled ? ['percent_basic', 'fractions_basic', 'basic_mul'] : ['percent_basic', 'fractions_basic'],
+    description: `L${level}: Percent (${percentValues.join(',')}%) and fractions (1/${fractionDenoms.join(',1/')}) introduced${mulEnabled ? ', mul unlocked' : ''}, still integer answers`
   };
 }
 
 function getMagnitudeRampCapabilities(level: number): LevelCapabilities {
   const t = (level - 16) / 9;
   const maxAddSub = 200 + (level - 16) * 50;
+  const divEnabled = level >= 21;
   
   return {
     level,
@@ -190,20 +192,20 @@ function getMagnitudeRampCapabilities(level: number): LevelCapabilities {
     fractionsEnabled: true,
     fractionDenominators: [2, 3, 4, 5, 8, 10],
     
-    operations: { add: true, sub: true, mul: true, div: true },
+    operations: { add: true, sub: true, mul: true, div: divEnabled },
     
     operandRanges: {
       addSub: { min: 50, max: maxAddSub },
       mulA: { min: 5, max: 20 + level - 16 },
       mulB: { min: 5, max: 15 + Math.floor((level - 16) / 2) },
-      divDivisor: { min: 3, max: 15 },
-      divDividend: { min: 50, max: 500 + (level - 16) * 50 }
+      divDivisor: { min: divEnabled ? 3 : 0, max: divEnabled ? 15 : 0 },
+      divDividend: { min: divEnabled ? 50 : 0, max: divEnabled ? 500 + (level - 16) * 50 : 0 }
     },
     
     requireCarryBorrow: true,
     
-    conceptsUnlocked: ['large_numbers', '2digit_mul'],
-    description: `L${level}: Large numbers (up to ${maxAddSub}), 2-digit multiplication, still integer answers`
+    conceptsUnlocked: divEnabled ? ['large_numbers', '2digit_mul', 'basic_div'] : ['large_numbers', '2digit_mul'],
+    description: `L${level}: Large numbers (up to ${maxAddSub}), 2-digit multiplication${divEnabled ? ', div introduced' : ''}, still integer answers`
   };
 }
 

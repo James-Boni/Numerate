@@ -12,7 +12,7 @@ interface WeeklyStats {
   totalSessions: number;
   totalQuestions: number;
   avgAccuracy: number;
-  avgSpeedMs: number;
+  medianSpeedMs: number;
   bestStreak: number;
   totalXP: number;
   levelsGained: number;
@@ -20,6 +20,30 @@ interface WeeklyStats {
   speedTrend: 'up' | 'down' | 'stable';
   accuracyChange: number;
   speedChange: number;
+}
+
+function collectResponseTimes(sessions: SessionStats[]): number[] {
+  const allTimes: number[] = [];
+  sessions.forEach(s => {
+    if (s.responseTimes && s.responseTimes.length > 0) {
+      allTimes.push(...s.responseTimes);
+    } else if (s.avgResponseTimeMs) {
+      for (let i = 0; i < s.totalQuestions; i++) {
+        allTimes.push(s.avgResponseTimeMs);
+      }
+    }
+  });
+  return allTimes;
+}
+
+function computeMedian(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  return sorted[mid];
 }
 
 function analyzeWeeklyData(sessions: SessionStats[]): WeeklyStats | null {
@@ -46,7 +70,8 @@ function analyzeWeeklyData(sessions: SessionStats[]): WeeklyStats | null {
   const totalCorrect = thisWeek.reduce((sum, s) => sum + s.correctQuestions, 0);
   const avgAccuracy = totalQuestions > 0 ? totalCorrect / totalQuestions : 0;
   
-  const avgSpeedMs = thisWeek.reduce((sum, s) => sum + s.avgResponseTimeMs, 0) / thisWeek.length;
+  const thisWeekTimes = collectResponseTimes(thisWeek);
+  const medianSpeedMs = computeMedian(thisWeekTimes);
   
   const bestStreak = Math.max(...thisWeek.map(s => s.bestStreak), 0);
   const totalXP = thisWeek.reduce((sum, s) => sum + s.xpEarned, 0);
@@ -64,10 +89,11 @@ function analyzeWeeklyData(sessions: SessionStats[]): WeeklyStats | null {
     const lastTotalQ = lastWeek.reduce((sum, s) => sum + s.totalQuestions, 0);
     const lastTotalC = lastWeek.reduce((sum, s) => sum + s.correctQuestions, 0);
     const lastAccuracy = lastTotalQ > 0 ? lastTotalC / lastTotalQ : 0;
-    const lastAvgSpeed = lastWeek.reduce((sum, s) => sum + s.avgResponseTimeMs, 0) / lastWeek.length;
+    const lastWeekTimes = collectResponseTimes(lastWeek);
+    const lastMedianSpeed = computeMedian(lastWeekTimes);
     
     accuracyChange = (avgAccuracy - lastAccuracy) * 100;
-    speedChange = ((lastAvgSpeed - avgSpeedMs) / lastAvgSpeed) * 100;
+    speedChange = lastMedianSpeed > 0 ? ((lastMedianSpeed - medianSpeedMs) / lastMedianSpeed) * 100 : 0;
     
     if (accuracyChange > 2) accuracyTrend = 'up';
     else if (accuracyChange < -2) accuracyTrend = 'down';
@@ -80,7 +106,7 @@ function analyzeWeeklyData(sessions: SessionStats[]): WeeklyStats | null {
     totalSessions: thisWeek.length,
     totalQuestions,
     avgAccuracy,
-    avgSpeedMs,
+    medianSpeedMs,
     bestStreak,
     totalXP,
     levelsGained,
@@ -190,9 +216,9 @@ export function WeeklyInsights({ sessions, currentLevel, startingLevel }: Weekly
             <TrendIcon trend={stats.speedTrend} />
           </div>
           <div className="text-2xl font-bold text-slate-900">
-            {(stats.avgSpeedMs / 1000).toFixed(1)}s
+            {(stats.medianSpeedMs / 1000).toFixed(1)}s
           </div>
-          <div className="text-xs text-slate-500">Avg Speed</div>
+          <div className="text-xs text-slate-500">Median Speed</div>
         </motion.div>
         
         <motion.div

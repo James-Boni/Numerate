@@ -9,9 +9,10 @@ import { AudioManager } from '@/lib/audio';
 import { clsx } from 'clsx';
 import { generateQuestionForLevel, resetOperationScheduler } from '@/lib/logic/generator_adapter';
 import { KeypadModern } from '@/components/game/Keypad';
-import { computeFluency } from '@/lib/logic/xp-system';
+import { computeFluency, calculateCombinedSessionXP } from '@/lib/logic/xp-system';
+import { MODE_MULTIPLIERS } from '@/config/progression';
 import { Card } from '@/components/ui/card';
-import { validateAnswer, DEFAULT_ANSWER_FORMAT, AnswerFormat, QuestionTier, selectQuestionTier, getAnswerFormatLabel } from '@/lib/game-logic';
+import { validateAnswer, DEFAULT_ANSWER_FORMAT, AnswerFormat, QuestionTier, selectQuestionTier, getAnswerFormatLabel, calculateXP, getTierXpMultiplier } from '@/lib/game-logic';
 
 interface Question {
   id: string;
@@ -209,19 +210,17 @@ export default function QuickFire() {
     const remainingTimeAtEnd = Math.max(0, remainingTimeRef.current);
     
     const accuracy = attemptedN > 0 ? correctC / attemptedN : 0;
-    const fluencyMetrics = computeFluency(
+    const { fluencyMetrics, xpResult } = calculateCombinedSessionXP(
+      'quick_fire',
+      finalInGameXP,
       attemptedN,
       correctC,
       durationSeconds,
       responseTimesRef.current
     );
     
-    const computedBonusXP = Math.floor(fluencyMetrics.fluencyScore * 0.5);
-    const bonusXP = Math.min(
-      Math.floor(finalInGameXP * 0.25),
-      computedBonusXP
-    );
-    const finalSessionXP = finalInGameXP + bonusXP;
+    const bonusXP = xpResult.bonusXP;
+    const finalSessionXP = xpResult.finalSessionXP;
     
     console.log("QUICKFIRE_SUMMARY", 
       `score=${finalScore}`,
@@ -266,9 +265,9 @@ export default function QuickFire() {
       variabilityMs: fluencyMetrics.variabilityMs,
       fluencyScore: fluencyMetrics.fluencyScore,
       baseSessionXP: finalInGameXP,
-      modeMultiplier: 1.0,
-      excellenceMultiplierApplied: 1.0,
-      eliteMultiplierApplied: 1.0,
+      modeMultiplier: xpResult.modeMultiplier,
+      excellenceMultiplierApplied: xpResult.meetsExcellence ? 1.0 : 0,
+      eliteMultiplierApplied: xpResult.meetsElite ? 1.0 : 0,
       finalSessionXP,
       responseTimes: [...responseTimesRef.current],
     };
@@ -329,7 +328,13 @@ export default function QuickFire() {
     if (isCorrect) {
       correctCountRef.current += 1;
       scoreRef.current += 1;
-      inGameXPRef.current += 2;
+      const streak = scoreRef.current;
+      const tier = question.tier || 'core';
+      const tierMultiplier = getTierXpMultiplier(tier);
+      const modeMultiplier = MODE_MULTIPLIERS['quick_fire'] ?? 0.5;
+      const baseXp = calculateXP(true, responseTime, streak);
+      const xp = Math.round(baseXp * tierMultiplier * modeMultiplier);
+      inGameXPRef.current += xp;
       
       remainingTimeRef.current = remainingTimeRef.current + 5.0;
       

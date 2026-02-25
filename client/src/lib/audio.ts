@@ -194,6 +194,80 @@ export class AudioManager {
     setTimeout(() => this.playSynth(1200, 'sine', 0.08, 0.15), 50);
   }
 
+  static playMilestoneFanfare(tier: number) {
+    if (!this.context) return;
+    if (this.context.state === 'suspended') this.context.resume();
+
+    const volume = Math.min(0.3 + tier * 0.04, 0.5);
+    const noteDelay = Math.max(55 - tier * 5, 35);
+
+    if (tier >= 5) {
+      const notes = [130.81, 196.00, 261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.2, volume), i * noteDelay);
+      });
+      const chordDelay = notes.length * noteDelay + 80;
+      setTimeout(() => {
+        this.playSynth(261.63, 'sine', 0.7, 0.35);
+        this.playSynth(523.25, 'sine', 0.65, 0.35);
+        this.playSynth(659.25, 'sine', 0.6, 0.32);
+        this.playSynth(783.99, 'sine', 0.55, 0.3);
+        this.playSynth(1046.50, 'sine', 0.5, 0.28);
+        this.playSynth(1318.51, 'sine', 0.45, 0.25);
+      }, chordDelay);
+      setTimeout(() => {
+        this.playSynth(2093.00, 'sine', 0.25, 0.15, true, 2637.02);
+        this.playSynth(3135.96, 'sine', 0.2, 0.1, true, 3951.07);
+      }, chordDelay + 150);
+    } else if (tier >= 4) {
+      const notes = [196.00, 261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50, 1318.51];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.18, volume), i * noteDelay);
+      });
+      const chordDelay = notes.length * noteDelay + 60;
+      setTimeout(() => {
+        this.playSynth(523.25, 'sine', 0.6, 0.32);
+        this.playSynth(659.25, 'sine', 0.55, 0.3);
+        this.playSynth(783.99, 'sine', 0.5, 0.28);
+        this.playSynth(1046.50, 'sine', 0.45, 0.25);
+      }, chordDelay);
+      setTimeout(() => {
+        this.playSynth(2093.00, 'sine', 0.2, 0.12, true, 2637.02);
+      }, chordDelay + 120);
+    } else if (tier >= 3) {
+      const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.16, volume), i * noteDelay);
+      });
+      const chordDelay = notes.length * noteDelay + 50;
+      setTimeout(() => {
+        this.playSynth(523.25, 'sine', 0.5, 0.3);
+        this.playSynth(659.25, 'sine', 0.45, 0.28);
+        this.playSynth(783.99, 'sine', 0.4, 0.25);
+      }, chordDelay);
+    } else if (tier >= 2) {
+      const notes = [329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.15, volume), i * noteDelay);
+      });
+      const chordDelay = notes.length * noteDelay + 50;
+      setTimeout(() => {
+        this.playSynth(523.25, 'sine', 0.4, 0.28);
+        this.playSynth(659.25, 'sine', 0.35, 0.25);
+      }, chordDelay);
+    } else {
+      const notes = [392.00, 523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((freq, i) => {
+        setTimeout(() => this.playSynth(freq, 'sine', 0.14, volume), i * 55);
+      });
+      const chordDelay = notes.length * 55 + 50;
+      setTimeout(() => {
+        this.playSynth(523.25, 'sine', 0.35, 0.25);
+        this.playSynth(659.25, 'sine', 0.3, 0.22);
+      }, chordDelay);
+    }
+  }
+
   // Enhanced level-up with intensity scaling - MORE JUBILANT AND DECISIVE
   static playLevelUpEnhanced(levelsGained: number = 1) {
     if (!this.context) return;
