@@ -46,8 +46,18 @@ Preferred communication style: Simple, everyday language.
 
 **Coaching System**: Detects weaknesses from session results and delivers animated strategy lessons (e.g., Place Value Split, Make Tens) after sessions, shown once per user.
 
+### Quick Fire Mode
+- Survival-style speed training with built-in difficulty ramp
+- Starts with 5 seconds; each correct answer adds +5 seconds
+- One wrong answer or timeout ends the run
+- Difficulty increases every 3 correct answers by 3 levels (e.g., starting at L2: questions 1-3 at L2, 4-6 at L5, 7-9 at L8, etc.)
+- In-game "Level X" pill indicator shows current effective difficulty
+- Results screen shows highest level reached with scaled encouragement messages
+- Uses standard XP system with 0.55x Quick Fire mode multiplier
+- Key file: `QuickFire.tsx`
+
 ### Application Flow
-The application guides users from a welcome screen through an assessment to daily training sessions, which include timed practice, session summaries, potential strategy lessons, and level-up celebrations. Skill Drills (Rounding, Doubling, Halving) are also available.
+The application guides users from a welcome screen through an assessment to daily training sessions, which include timed practice, session summaries, potential strategy lessons, and level-up celebrations. Skill Drills (Rounding, Doubling, Halving) and Quick Fire mode are also available.
 
 ### Skill Drill Game Modes
 Rounding, Doubling, and Halving practice modes offer 3-minute timed sessions with tier-based difficulty scaling. They contribute to total XP and level-ups but do not affect global progress metrics.

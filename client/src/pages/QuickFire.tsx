@@ -33,6 +33,8 @@ interface QuickFireResult {
   inGameXP: number;
   bonusXP: number;
   finalSessionXP: number;
+  highestLevelReached: number;
+  startingLevel: number;
 }
 
 type GameStep = 'intro' | 'countdown' | 'active' | 'results';
@@ -119,6 +121,15 @@ function FullScreenFlash({ type }: { type: 'correct' | 'wrong' }) {
   );
 }
 
+function getQuickFireEncouragement(levelsAboveStart: number): string {
+  if (levelsAboveStart >= 30) return "Elite performance. Very few get this far.";
+  if (levelsAboveStart >= 20) return "Exceptional. That's serious mental agility.";
+  if (levelsAboveStart >= 12) return "Impressive range. You're sharper than you think.";
+  if (levelsAboveStart >= 6) return "Nice push! You handled the pressure well.";
+  if (levelsAboveStart >= 3) return "Solid warm-up. You're just getting started.";
+  return "Every run builds speed. Keep going.";
+}
+
 export default function QuickFire() {
   const [step, setStep] = useState<GameStep>('intro');
   const [countdownNumber, setCountdownNumber] = useState(3);
@@ -142,6 +153,8 @@ export default function QuickFire() {
     hasCompletedAssessment 
   } = useStore();
 
+  const [currentEffectiveLevel, setCurrentEffectiveLevel] = useState(level);
+  
   const scoreRef = useRef(0);
   const inGameXPRef = useRef(0);
   const correctCountRef = useRef(0);
@@ -156,6 +169,8 @@ export default function QuickFire() {
   const isSubmittingRef = useRef(false);
   const gameActiveRef = useRef(false);
   const hasEndedRef = useRef(false);
+  const highestLevelRef = useRef(level);
+  const effectiveLevelRef = useRef(level);
 
   useEffect(() => {
     AudioManager.init();
@@ -167,9 +182,18 @@ export default function QuickFire() {
   const questionCountRef = useRef(0);
   
   const generateNextQuestion = useCallback(() => {
+    const correctSoFar = correctCountRef.current;
+    const rampSteps = Math.floor(correctSoFar / 3);
+    const effectiveLevel = Math.max(1, level + rampSteps * 3);
+    effectiveLevelRef.current = effectiveLevel;
+    if (effectiveLevel > highestLevelRef.current) {
+      highestLevelRef.current = effectiveLevel;
+    }
+    setCurrentEffectiveLevel(effectiveLevel);
+    
     const tier = selectQuestionTier(questionCountRef.current);
     questionCountRef.current++;
-    const result = generateQuestionForLevel(level, [], tier);
+    const result = generateQuestionForLevel(effectiveLevel, [], tier);
     const newQuestion: Question = {
       id: Math.random().toString(36).substr(2, 9),
       text: result.text,
@@ -246,7 +270,9 @@ export default function QuickFire() {
       remainingTimeAtEnd,
       inGameXP: finalInGameXP,
       bonusXP,
-      finalSessionXP
+      finalSessionXP,
+      highestLevelReached: highestLevelRef.current,
+      startingLevel: level,
     };
 
     const sessionStats: SessionStats = {
@@ -409,10 +435,13 @@ export default function QuickFire() {
       totalCountRef.current = 0;
       responseTimesRef.current = [];
       remainingTimeRef.current = 5.0;
+      highestLevelRef.current = level;
+      effectiveLevelRef.current = level;
       
       setScore(0);
       setInGameXP(0);
       setRemainingTime(5.0);
+      setCurrentEffectiveLevel(level);
       setShowFlash(null);
       generateNextQuestion();
       startTimerLoop();
@@ -461,11 +490,12 @@ export default function QuickFire() {
                 Each correct answer adds 5 more seconds.
               </p>
               <p className="flex items-center justify-center gap-2">
-                <AlertTriangle size={16} className="text-red-500" />
-                One mistake or running out of time ends the run.
+                <Flame size={16} className="text-orange-500" />
+                Difficulty increases every 3 questions.
               </p>
-              <p className="text-slate-500 text-sm pt-2">
-                This is speed training for Daily challenges.
+              <p className="flex items-center justify-center gap-2">
+                <AlertTriangle size={16} className="text-red-500" />
+                One mistake or timeout ends the run.
               </p>
             </div>
             
@@ -558,10 +588,26 @@ export default function QuickFire() {
             )}
           </motion.div>
 
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-3xl p-6 text-center space-y-2"
+            data-testid="card-quickfire-level-reached"
+          >
+            <span className="text-xs font-bold text-primary/60 uppercase tracking-widest">You Reached</span>
+            <div className="text-5xl font-black text-primary" data-testid="text-quickfire-level-reached">
+              Level {results.highestLevelReached}
+            </div>
+            <p className="text-sm text-slate-500 pt-1" data-testid="text-quickfire-encouragement">
+              {getQuickFireEncouragement(results.highestLevelReached - results.startingLevel)}
+            </p>
+          </motion.div>
+
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
+            transition={{ delay: 0.5 }}
             className="bg-slate-50 border-none rounded-3xl p-6 text-center"
           >
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">XP Earned</span>
@@ -569,7 +615,7 @@ export default function QuickFire() {
               <CountUp 
                 value={results.finalSessionXP} 
                 duration={0.6} 
-                delay={0.5} 
+                delay={0.6} 
                 onTick={() => settings.soundOn && AudioManager.playTallyTick()} 
               /> XP
             </div>
@@ -662,6 +708,23 @@ export default function QuickFire() {
           <div className="text-sm font-bold text-primary w-11 text-right" data-testid="text-quickfire-ingame-xp">
             +{inGameXP}
           </div>
+        </div>
+        
+        <div className="px-4 flex justify-center">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentEffectiveLevel}
+              initial={{ opacity: 0, y: -4, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 4, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-100"
+              data-testid="text-quickfire-effective-level"
+            >
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Level</span>
+              <span className="text-sm font-bold text-slate-700 tabular-nums">{currentEffectiveLevel}</span>
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         <div 
