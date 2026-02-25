@@ -58,6 +58,14 @@ Preferred communication style: Simple, everyday language.
 - Uses standard XP system with 0.55x Quick Fire mode multiplier
 - Key file: `QuickFire.tsx`
 
+### Daily Recap System
+- Shows a compact recap card on the Train page before the user starts their session
+- Only visible when user has completed at least one past daily session and hasn't trained today yet
+- Displays up to 4 lines: yesterday's stats (accuracy + speed), trend (7-day accuracy/speed change), streak/activity count, weakest operation focus, and estimated sessions to next level
+- Uses local date boundaries for accurate day detection
+- Disappears once the user completes a daily session that day
+- Key file: `client/src/components/train/DailyRecap.tsx`
+
 ### Application Flow
 The application guides users from a welcome screen through an assessment to daily training sessions, which include timed practice, session summaries, potential strategy lessons, and level-up celebrations. Skill Drills (Rounding, Doubling, Halving) and Quick Fire mode are also available.
 

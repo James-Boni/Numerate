@@ -11,6 +11,7 @@ import { xpRequiredToAdvance } from '@/lib/logic/xp-system';
 import { useAccountStore, isPremiumActive } from '@/lib/services/account-store';
 import { PaywallScreen } from '@/components/game/PaywallScreen';
 import { DailyFocus } from '@/components/train/DailyFocus';
+import { DailyRecap, shouldShowDailyRecap } from '@/components/train/DailyRecap';
 
 export default function Train() {
   const { level, lifetimeXP, streakCount, hasCompletedAssessment, quickFireHighScore, sessions, xpIntoLevel, hasUsedFreeDaily } = useStore();
@@ -102,6 +103,18 @@ export default function Train() {
             </div>
           </div>
         </div>
+
+        {/* Daily Recap */}
+        {hasCompletedAssessment && shouldShowDailyRecap(sessions) && (
+          <div className="px-6 pb-3">
+            <DailyRecap
+              sessions={sessions}
+              streakCount={streakCount}
+              currentLevel={level}
+              xpIntoLevel={xpIntoLevel}
+            />
+          </div>
+        )}
 
         {/* Hero Card - Daily */}
         <div className="px-6 pb-4">
