@@ -1,3 +1,4 @@
+/.local/
 # =========================
 # Dependencies
 # =========================
@@ -58,4 +59,4 @@ vite.config.ts.timestamp-*
 .replit
 .replit.nix
 .upm/
-/.local/
+
