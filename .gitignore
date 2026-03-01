@@ -13,7 +13,7 @@ dist/
 .DS_Store
 
 # Local development folders
-.local/
+/.local/
 
 # Vite generated files
 vite.config.ts.*
