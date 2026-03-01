@@ -1,6 +1,22 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS files
 .DS_Store
-server/public
+
+# Local development folders
+.local/
+
+# Vite generated files
 vite.config.ts.*
+
+# Archives
 *.tar.gz
