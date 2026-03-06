@@ -1,9 +1,11 @@
+import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { useStore } from '@/lib/store';
 import { Lock } from 'lucide-react';
 
 export default function PaywallScreen() {
+  const [, setLocation] = useLocation();
   const startingLevel = useStore(s => s.startingLevel);
 
   return (
@@ -43,6 +45,17 @@ export default function PaywallScreen() {
           <p className="text-xs text-muted-foreground">
             Payment not connected yet.
           </p>
+
+          {import.meta.env.DEV && (
+            <button
+              type="button"
+              onClick={() => setLocation('/game')}
+              className="w-full max-w-sm min-h-[44px] rounded-xl border-2 border-dashed border-orange-300 text-orange-500 text-sm font-mono font-medium active:opacity-60 transition-opacity"
+              data-testid="button-dev-skip-paywall"
+            >
+              Skip Paywall (Dev Only)
+            </button>
+          )}
         </motion.div>
       </div>
     </MobileLayout>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
+  const [, setLocation] = useLocation();
   const startingLevel = useStore(s => s.startingLevel);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -136,6 +138,17 @@ export default function AuthScreen() {
             <p className="text-xs text-muted-foreground text-center pt-2">
               Your progress is saved to your account.
             </p>
+
+            {import.meta.env.DEV && (
+              <button
+                type="button"
+                onClick={() => setLocation('/paywall')}
+                className="w-full min-h-[44px] rounded-xl border-2 border-dashed border-orange-300 text-orange-500 text-sm font-mono font-medium active:opacity-60 transition-opacity"
+                data-testid="button-dev-skip-auth"
+              >
+                Skip Auth (Dev Only)
+              </button>
+            )}
           </div>
         </motion.div>
       </div>
