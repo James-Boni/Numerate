@@ -1,22 +1,20 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useStore } from '@/lib/store';
 
-interface AuthScreenProps {
-  onAuthenticated: () => void;
-}
-
-export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+export default function AuthScreen() {
+  const [mode, setMode] = useState<'signin' | 'signup'>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
+  const startingLevel = useStore(s => s.startingLevel);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log(`[AuthScreen] ${mode} attempted — authentication not connected yet`);
+    console.log(`[AuthScreen] ${mode} attempted with ${email} — authentication not connected yet`);
     setStatusMessage('Authentication not connected yet');
   };
 
@@ -39,18 +37,34 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           transition={{ duration: 0.5, ease: 'easeOut' }}
           className="w-full max-w-sm flex flex-col items-center"
         >
-          <h1 className="text-4xl font-bold text-foreground tracking-tight">
+          <h1
+            className="text-4xl font-bold text-foreground tracking-tight"
+            data-testid="text-app-title"
+          >
             Numerate
           </h1>
           <p className="mt-2 text-base text-muted-foreground">
             Train daily. Track progress.
           </p>
 
-          <div className="w-full mt-10 space-y-5">
+          <div className="mt-8 w-full text-center space-y-1">
+            <p
+              className="text-lg font-semibold text-foreground"
+              data-testid="text-level-placement"
+            >
+              You've been placed at Level {startingLevel}.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Create an account to save your progress and continue training.
+            </p>
+          </div>
+
+          <div className="w-full mt-8 space-y-5">
             <button
               type="button"
               onClick={handleAppleSignIn}
               className="w-full flex items-center justify-center gap-3 bg-black text-white rounded-xl min-h-[52px] px-6 text-base font-medium active:opacity-80 transition-opacity"
+              data-testid="button-apple-signin"
             >
               <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" aria-hidden="true">
                 <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
@@ -73,6 +87,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                 required
                 autoComplete="email"
                 className="h-[52px] rounded-xl text-base px-4"
+                data-testid="input-email"
               />
               <Input
                 type="password"
@@ -82,6 +97,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                 required
                 autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                 className="h-[52px] rounded-xl text-base px-4"
+                data-testid="input-password"
               />
 
               {statusMessage && (
@@ -89,6 +105,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="text-sm text-muted-foreground text-center py-1"
+                  data-testid="text-status-message"
                 >
                   {statusMessage}
                 </motion.p>
@@ -97,6 +114,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               <Button
                 type="submit"
                 className="w-full min-h-[52px] rounded-xl text-base font-medium"
+                data-testid="button-auth-submit"
               >
                 {mode === 'signin' ? 'Sign In' : 'Create Account'}
               </Button>
@@ -107,6 +125,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                 type="button"
                 onClick={toggleMode}
                 className="text-sm text-muted-foreground active:opacity-60 transition-opacity"
+                data-testid="button-toggle-mode"
               >
                 {mode === 'signin'
                   ? "Don't have an account? Create one"

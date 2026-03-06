@@ -355,10 +355,10 @@ export default function Assessment() {
             <Button 
               size="lg" 
               className="w-full h-14 text-lg font-semibold rounded-xl shadow-lg shadow-primary/20"
-              onClick={() => setLocation('/game')}
+              onClick={() => setLocation('/auth')}
               data-testid="button-start-training"
             >
-              Start Daily Training
+              Continue
             </Button>
           ) : (
             <div className="space-y-3">
@@ -378,7 +378,7 @@ export default function Assessment() {
                   if (placement) {
                     completeAssessment(placement.competenceGroup, placement.startingLevel, results!);
                   }
-                  setLocation('/game');
+                  setLocation('/auth');
                 }}
                 data-testid="button-continue-anyway"
               >

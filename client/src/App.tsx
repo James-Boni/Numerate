@@ -16,7 +16,8 @@ import HalvingGame from "@/pages/HalvingGame";
 import Progress from "@/pages/Progress";
 import Settings from "@/pages/Settings";
 import DevMenu from "@/pages/DevMenu";
-import { AuthGate } from "@/components/auth/AuthGate";
+import AuthScreen from "@/pages/AuthScreen";
+import PaywallScreen from "@/pages/PaywallScreen";
 import { motion, AnimatePresence } from 'framer-motion';
 
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
@@ -57,6 +58,8 @@ function Router() {
       <Route path="/progress" component={Progress} />
       <Route path="/settings" component={Settings} />
       <Route path="/dev" component={DevMenu} />
+      <Route path="/auth" component={AuthScreen} />
+      <Route path="/paywall" component={PaywallScreen} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -80,9 +83,7 @@ function App() {
               transition={{ duration: 0.3 }}
               className="w-full h-full"
             >
-              <AuthGate>
-                <Router />
-              </AuthGate>
+              <Router />
             </motion.div>
           )}
         </AnimatePresence>
