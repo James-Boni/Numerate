@@ -16,6 +16,7 @@ import HalvingGame from "@/pages/HalvingGame";
 import Progress from "@/pages/Progress";
 import Settings from "@/pages/Settings";
 import DevMenu from "@/pages/DevMenu";
+import { AuthGate } from "@/components/auth/AuthGate";
 import { motion, AnimatePresence } from 'framer-motion';
 
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
@@ -79,7 +80,9 @@ function App() {
               transition={{ duration: 0.3 }}
               className="w-full h-full"
             >
-              <Router />
+              <AuthGate>
+                <Router />
+              </AuthGate>
             </motion.div>
           )}
         </AnimatePresence>

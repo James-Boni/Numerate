@@ -68,8 +68,14 @@ Preferred communication style: Simple, everyday language.
 - Disappears once the user completes a daily session that day
 - Key file: `client/src/components/train/DailyRecap.tsx`
 
+### Authentication UI (Transitional)
+- **Auth Gate**: `client/src/components/auth/AuthGate.tsx` — wraps the Router in `App.tsx`, holds `isAuthenticated` state (defaults `false`). Shows `AuthScreen` until real auth is connected.
+- **Auth Screen**: `client/src/pages/AuthScreen.tsx` — iOS-first sign-in/sign-up form with Apple Sign-In placeholder, email/password fields, mode toggle. Currently a hard gate: form submission shows "Authentication not connected yet" and does NOT allow bypass. `onAuthenticated` prop exists but is never called until Supabase is wired in.
+- **Next step**: Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, then wire `AuthScreen` submit handlers to Supabase Auth (`supabase.auth.signInWithPassword` / `signUp`), calling `onAuthenticated()` on success.
+- **Legacy auth**: Express/Passport backend (`server/routes.ts`, `auth-service.ts`) is fully intact but NOT used by the new auth UI.
+
 ### Application Flow
-The application guides users from a welcome screen through an assessment to daily training sessions, which include timed practice, session summaries, potential strategy lessons, and level-up celebrations. Skill Drills (Rounding, Doubling, Halving) and Quick Fire mode are also available.
+The application guides users from a splash screen through the auth gate to a welcome screen, then through an assessment to daily training sessions, which include timed practice, session summaries, potential strategy lessons, and level-up celebrations. Skill Drills (Rounding, Doubling, Halving) and Quick Fire mode are also available.
 
 ### Skill Drill Game Modes
 Rounding, Doubling, and Halving practice modes offer 3-minute timed sessions with tier-based difficulty scaling. They contribute to total XP and level-ups but do not affect global progress metrics.
