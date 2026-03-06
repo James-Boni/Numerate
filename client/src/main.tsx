@@ -5,6 +5,8 @@ import { AudioManager } from "./lib/audio";
 import { HapticsManager } from "./lib/haptics";
 import { authService, syncService } from "./lib/services";
 
+import "@/lib/supabase"
+
 AudioManager.init();
 
 const syncHapticsSetting = () => {
