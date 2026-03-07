@@ -50,6 +50,43 @@ function CountUp({ value, duration = 1, delay = 0, onTick, prefix = '', suffix =
 
 const MIN_QUESTIONS_FOR_VALID_ASSESSMENT = 12;
 
+const DEV_SKIP_COMPETENCE_GROUP = 3;
+const DEV_SKIP_STARTING_LEVEL = 5;
+const DEV_SKIP_MOCK_STATS: SessionStats = {
+  id: 'dev-skip',
+  date: new Date().toISOString(),
+  sessionType: 'assessment',
+  durationMode: 180 as const,
+  durationSecondsActual: 180,
+  totalQuestions: 20,
+  correctQuestions: 16,
+  accuracy: 0.8,
+  xpEarned: 0,
+  bestStreak: 5,
+  avgResponseTimeMs: 2200,
+  medianMs: 2000,
+  variabilityMs: 400,
+  throughputQps: 0.11,
+  speedScore: 0.5,
+  consistencyScore: 0.7,
+  throughputScore: 0.4,
+  fluencyScore: 55,
+  baseSessionXP: 0,
+  modeMultiplier: 0,
+  excellenceMultiplierApplied: 0,
+  eliteMultiplierApplied: 0,
+  finalSessionXP: 0,
+  levelBefore: 1,
+  levelAfter: 1,
+  levelUpCount: 0,
+  xpIntoLevelBefore: 0,
+  xpIntoLevelAfter: 0,
+  metBonus: false,
+  valid: true,
+  responseTimes: [2000, 2100, 1800, 2400, 2200],
+  questionResults: [],
+};
+
 export default function Assessment() {
   const [step, setStep] = useState<'intro' | 'active' | 'results'>('intro');
   const [results, setResults] = useState<SessionStats | null>(null);
@@ -183,6 +220,20 @@ export default function Assessment() {
           >
             Begin Assessment
           </Button>
+
+          {import.meta.env.DEV && (
+            <button
+              type="button"
+              onClick={() => {
+                completeAssessment(DEV_SKIP_COMPETENCE_GROUP, DEV_SKIP_STARTING_LEVEL, DEV_SKIP_MOCK_STATS);
+                setLocation('/auth');
+              }}
+              className="w-full min-h-[44px] rounded-xl border-2 border-dashed border-orange-300 text-orange-500 text-sm font-mono font-medium active:opacity-60 transition-opacity"
+              data-testid="button-dev-skip-assessment"
+            >
+              Skip Assessment (Dev Only)
+            </button>
+          )}
         </div>
       </MobileLayout>
     );
