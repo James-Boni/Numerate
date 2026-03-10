@@ -17,8 +17,33 @@ import Progress from "@/pages/Progress";
 import Settings from "@/pages/Settings";
 import DevMenu from "@/pages/DevMenu";
 import AuthScreen from "@/pages/AuthScreen";
-import PaywallScreen from "@/pages/PaywallScreen";
+import { PaywallScreen } from "@/components/game/PaywallScreen";
+import { useLocation } from "wouter";
 import { motion, AnimatePresence } from 'framer-motion';
+
+function PaywallRoute() {
+  const [, setLocation] = useLocation();
+  return (
+    <>
+      <PaywallScreen
+        onSubscribed={() => setLocation('/game')}
+        onRestore={() => setLocation('/game')}
+      />
+      {import.meta.env.DEV && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <button
+            type="button"
+            onClick={() => setLocation('/game')}
+            className="min-h-[44px] px-6 rounded-xl border-2 border-dashed border-orange-300 text-orange-500 text-sm font-mono font-medium bg-black/80 active:opacity-60 transition-opacity"
+            data-testid="button-dev-skip-paywall"
+          >
+            Skip Paywall (Dev Only)
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
 
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
   useEffect(() => {
@@ -59,7 +84,7 @@ function Router() {
       <Route path="/settings" component={Settings} />
       <Route path="/dev" component={DevMenu} />
       <Route path="/auth" component={AuthScreen} />
-      <Route path="/paywall" component={PaywallScreen} />
+      <Route path="/paywall" component={PaywallRoute} />
       <Route component={NotFound} />
     </Switch>
   );

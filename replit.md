@@ -70,7 +70,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Authentication UI (Transitional)
 - **Auth Screen**: `client/src/pages/AuthScreen.tsx` — route-based (`/auth`) iOS-first sign-in/sign-up page. Reads `startingLevel` from Zustand store and displays "You've been placed at Level X" context. Apple Sign-In placeholder, email/password fields, mode toggle. Submit actions show "Authentication not connected yet" placeholder feedback — no navigation occurs until real Supabase auth is wired in.
-- **Paywall Screen**: `client/src/pages/PaywallScreen.tsx` — route-based (`/paywall`) placeholder for Apple IAP. Displays the user's starting level and a message that pricing is not connected yet.
+- **Paywall Screen**: `/paywall` route renders the existing `PaywallScreen` component from `client/src/components/game/PaywallScreen.tsx` (dark-themed, with pricing plans, subscribe/restore buttons, IAP integration via billing service). Wrapped by `PaywallRoute` in `App.tsx` which provides navigation callbacks and a dev-only skip button.
 - **Intended future navigation**: Assessment Results → `/auth` → (Supabase auth success) → `/paywall` → (Apple IAP success) → main training app.
 - **Next step**: Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, then wire `AuthScreen` submit handlers to Supabase Auth (`supabase.auth.signInWithPassword` / `signUp`), navigating to `/paywall` on success.
 - **Legacy auth**: Express/Passport backend (`server/routes.ts`, `auth-service.ts`) is fully intact but NOT used by the new auth UI.
