@@ -68,15 +68,19 @@ Preferred communication style: Simple, everyday language.
 - Disappears once the user completes a daily session that day
 - Key file: `client/src/components/train/DailyRecap.tsx`
 
-### Authentication UI (Transitional)
-- **Auth Screen**: `client/src/pages/AuthScreen.tsx` — route-based (`/auth`) iOS-first sign-in/sign-up page. Reads `startingLevel` from Zustand store and displays "You've been placed at Level X" context. Apple Sign-In placeholder, email/password fields, mode toggle. Submit actions show "Authentication not connected yet" placeholder feedback — no navigation occurs until real Supabase auth is wired in.
+### Authentication & Supabase Auth
+- **Supabase Client**: `client/src/lib/supabase.ts` — creates a typed `SupabaseClient | null` from `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` env vars. Exports `isSupabaseConfigured()` helper.
+- **Auth Helper**: `client/src/lib/supabase-auth.ts` — `signUpWithEmail`, `signInWithEmail`, `ensureProfile`, `signOut`. All functions guard against null Supabase client. Returns `{ user, error }` or `{ success, error }`.
+- **ensureProfile**: Uses `supabase.from('profiles').upsert({ uuid, levels, xp, streak }, { onConflict: 'uuid', ignoreDuplicates: true })`. Safe to call after both sign-up and sign-in — never overwrites an existing user's real progress.
+- **Auth Screen**: `client/src/pages/AuthScreen.tsx` — route-based (`/auth`) iOS-first sign-in/sign-up page. Reads `startingLevel` from Zustand. On submit: calls Supabase auth → `ensureProfile` → navigates to `/paywall`. Shows loading state and error messages. Apple Sign-In placeholder kept for future.
 - **Paywall Screen**: `/paywall` route renders the existing `PaywallScreen` component from `client/src/components/game/PaywallScreen.tsx` (dark-themed, with pricing plans, subscribe/restore buttons, IAP integration via billing service). Wrapped by `PaywallRoute` in `App.tsx` which provides navigation callbacks and a dev-only skip button.
-- **Intended future navigation**: Assessment Results → `/auth` → (Supabase auth success) → `/paywall` → (Apple IAP success) → main training app.
-- **Next step**: Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, then wire `AuthScreen` submit handlers to Supabase Auth (`supabase.auth.signInWithPassword` / `signUp`), navigating to `/paywall` on success.
+- **Supabase `profiles` table**: `uuid` (PK, refs `auth.users(id)`), `created_at`, `xp`, `levels`, `streak`. RLS enabled — all policies compare `auth.uid() = uuid`.
+- **Required env vars**: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (Vite-prefixed, available in frontend bundle).
 - **Legacy auth**: Express/Passport backend (`server/routes.ts`, `auth-service.ts`) is fully intact but NOT used by the new auth UI.
+- **Next step**: Load user profile on app start (check Supabase session, fetch profile row, hydrate Zustand store).
 
 ### Application Flow
-Splash → Welcome → Assessment → Assessment Results (level reveal) → Auth Screen (`/auth`, blocks until Supabase wired) → Paywall (`/paywall`, blocks until IAP wired) → Main Training App. The user experiences the product value (assessment + level) before creating an account. The starting level is preserved in Zustand throughout the flow. Skill Drills (Rounding, Doubling, Halving) and Quick Fire mode are available from the main training app.
+Splash → Welcome → Assessment → Assessment Results (level reveal) → Auth Screen (`/auth`, Supabase email auth) → Paywall (`/paywall`, blocks until IAP wired) → Main Training App. The user experiences the product value (assessment + level) before creating an account. The starting level is preserved in Zustand throughout the flow. Skill Drills (Rounding, Doubling, Halving) and Quick Fire mode are available from the main training app.
 
 ### Skill Drill Game Modes
 Rounding, Doubling, and Halving practice modes offer 3-minute timed sessions with tier-based difficulty scaling. They contribute to total XP and level-ups but do not affect global progress metrics.

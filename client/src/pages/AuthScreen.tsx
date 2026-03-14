@@ -5,29 +5,58 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useStore } from '@/lib/store';
+import { signUpWithEmail, signInWithEmail, ensureProfile } from '@/lib/supabase-auth';
 
 export default function AuthScreen() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [statusMessage, setStatusMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [, setLocation] = useLocation();
   const startingLevel = useStore(s => s.startingLevel);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log(`[AuthScreen] ${mode} attempted with ${email} — authentication not connected yet`);
-    setStatusMessage('Authentication not connected yet');
+    setErrorMessage('');
+    setLoading(true);
+
+    try {
+      if (mode === 'signup') {
+        const { user, error } = await signUpWithEmail(email, password);
+        if (error || !user) {
+          setErrorMessage(error || 'Sign-up failed');
+          setLoading(false);
+          return;
+        }
+        const profileResult = await ensureProfile(user.id, startingLevel);
+        if (profileResult.error) {
+          console.warn('[AuthScreen] Profile creation warning:', profileResult.error);
+        }
+        setLocation('/paywall');
+      } else {
+        const { user, error } = await signInWithEmail(email, password);
+        if (error || !user) {
+          setErrorMessage(error || 'Sign-in failed');
+          setLoading(false);
+          return;
+        }
+        await ensureProfile(user.id, startingLevel);
+        setLocation('/paywall');
+      }
+    } catch (err) {
+      setErrorMessage('An unexpected error occurred');
+      setLoading(false);
+    }
   };
 
   const handleAppleSignIn = () => {
-    console.log('[AuthScreen] Apple sign-in attempted — authentication not connected yet');
-    setStatusMessage('Authentication not connected yet');
+    setErrorMessage('Sign in with Apple coming soon');
   };
 
   const toggleMode = () => {
     setMode(mode === 'signin' ? 'signup' : 'signin');
-    setStatusMessage('');
+    setErrorMessage('');
   };
 
   return (
@@ -65,7 +94,8 @@ export default function AuthScreen() {
             <button
               type="button"
               onClick={handleAppleSignIn}
-              className="w-full flex items-center justify-center gap-3 bg-black text-white rounded-xl min-h-[52px] px-6 text-base font-medium active:opacity-80 transition-opacity"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 bg-black text-white rounded-xl min-h-[52px] px-6 text-base font-medium active:opacity-80 transition-opacity disabled:opacity-50"
               data-testid="button-apple-signin"
             >
               <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" aria-hidden="true">
@@ -87,6 +117,7 @@ export default function AuthScreen() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={loading}
                 autoComplete="email"
                 className="h-[52px] rounded-xl text-base px-4"
                 data-testid="input-email"
@@ -97,28 +128,34 @@ export default function AuthScreen() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={loading}
                 autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                 className="h-[52px] rounded-xl text-base px-4"
                 data-testid="input-password"
               />
 
-              {statusMessage && (
+              {errorMessage && (
                 <motion.p
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="text-sm text-muted-foreground text-center py-1"
-                  data-testid="text-status-message"
+                  className="text-sm text-destructive text-center py-1"
+                  data-testid="text-error-message"
                 >
-                  {statusMessage}
+                  {errorMessage}
                 </motion.p>
               )}
 
               <Button
                 type="submit"
+                disabled={loading}
                 className="w-full min-h-[52px] rounded-xl text-base font-medium"
                 data-testid="button-auth-submit"
               >
-                {mode === 'signin' ? 'Sign In' : 'Create Account'}
+                {loading
+                  ? 'Please wait...'
+                  : mode === 'signin'
+                    ? 'Sign In'
+                    : 'Create Account'}
               </Button>
             </form>
 
@@ -126,7 +163,8 @@ export default function AuthScreen() {
               <button
                 type="button"
                 onClick={toggleMode}
-                className="text-sm text-muted-foreground active:opacity-60 transition-opacity"
+                disabled={loading}
+                className="text-sm text-muted-foreground active:opacity-60 transition-opacity disabled:opacity-50"
                 data-testid="button-toggle-mode"
               >
                 {mode === 'signin'
