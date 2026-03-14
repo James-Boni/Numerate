@@ -43,3 +43,9 @@ waitForPort = 5000
 mockupState = "FULLSTACK"
 integrations = ["javascript_database:1.0.0"]
 expertMode = true
+
+[userenv]
+
+[userenv.shared]
+VITE_SUPABASE_URL = "https://elbsylawglmuufpduwnk.supabase.co"
+VITE_SUPABASE_ANON_KEY = "sb_publishable_I0LG29KpnrKXY9dorkSyEQ_uD88ML7X"
