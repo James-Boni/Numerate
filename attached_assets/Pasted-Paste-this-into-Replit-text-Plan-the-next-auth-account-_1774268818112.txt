@@ -1,0 +1,73 @@
+Paste this into Replit:
+
+```text
+Plan the next auth/account UX improvements for Numerate.
+
+Context:
+- Supabase auth is being used
+- mandatory email confirmation is being disabled to reduce signup friction
+- current auth flow is:
+  Assessment → Results → Auth → Paywall → Main App
+- profiles are tied to the Supabase auth user via uuid
+- the goal is to keep signup low-friction while reducing mistakes and keeping account management safe
+
+I want a plan only, not an implementation yet.
+
+Requirements:
+
+1. Improve sign-up form safety without adding major friction
+In create-account mode, plan to add:
+- Email
+- Confirm Email
+- Password
+- Confirm Password
+
+Validation requirements:
+- email and confirm email must match
+- password and confirm password must match
+- clear inline error messaging
+- keep loading/error states clean
+- sign-in mode should remain simpler:
+  - Email
+  - Password
+
+2. Password UX
+Plan to add a show/hide password toggle for password entry fields while typing
+This should apply to signup and signin where appropriate
+However:
+- do NOT plan to display the user’s existing stored password anywhere later in the app
+- password visibility should only be temporary while entering/changing it
+
+3. Account settings section
+Plan an account/settings area where the signed-in user can:
+- view their current email address
+- change their email address
+- change their password
+
+Important:
+- changing email or password must not affect their progress
+- their uuid/profile relationship must remain intact
+- do NOT plan to show the current stored password in settings
+- use safe account-management UX instead of exposing sensitive credentials
+
+4. Security and UX constraints
+The plan should preserve:
+- low signup friction
+- safe handling of credentials
+- compatibility with Supabase auth
+- compatibility with future Sign in with Apple
+- existing product flow
+- existing dev-only bypass tools for development
+
+5. What I want back
+Return a structured implementation plan covering:
+- files likely to be modified
+- signup form changes
+- settings/account page changes
+- validation approach
+- Supabase account update methods likely needed
+- any UX caveats or security considerations
+
+Do not build yet.
+Only return the plan.
+```
