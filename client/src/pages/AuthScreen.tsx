@@ -1,24 +1,71 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
+import { Eye, EyeOff } from 'lucide-react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useStore } from '@/lib/store';
 import { signUpWithEmail, signInWithEmail, ensureProfile } from '@/lib/supabase-auth';
 
+interface FieldErrors {
+  confirmEmail?: string;
+  confirmPassword?: string;
+}
+
 export default function AuthScreen() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signup');
   const [email, setEmail] = useState('');
+  const [confirmEmail, setConfirmEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [, setLocation] = useLocation();
   const startingLevel = useStore(s => s.startingLevel);
+
+  useEffect(() => {
+    if (fieldErrors.confirmEmail && email && confirmEmail && email === confirmEmail) {
+      setFieldErrors(prev => ({ ...prev, confirmEmail: undefined }));
+    }
+  }, [email, confirmEmail, fieldErrors.confirmEmail]);
+
+  useEffect(() => {
+    if (fieldErrors.confirmPassword && password && confirmPassword && password === confirmPassword) {
+      setFieldErrors(prev => ({ ...prev, confirmPassword: undefined }));
+    }
+  }, [password, confirmPassword, fieldErrors.confirmPassword]);
+
+  const validateSignup = (): boolean => {
+    const errors: FieldErrors = {};
+
+    if (email !== confirmEmail) {
+      errors.confirmEmail = "Email addresses don't match";
+    }
+    if (password !== confirmPassword) {
+      errors.confirmPassword = "Passwords don't match";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return false;
+    }
+
+    setFieldErrors({});
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+
+    if (mode === 'signup' && !validateSignup()) {
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -57,6 +104,11 @@ export default function AuthScreen() {
   const toggleMode = () => {
     setMode(mode === 'signin' ? 'signup' : 'signin');
     setErrorMessage('');
+    setFieldErrors({});
+    setConfirmEmail('');
+    setConfirmPassword('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
   };
 
   return (
@@ -122,17 +174,94 @@ export default function AuthScreen() {
                 className="h-[52px] rounded-xl text-base px-4"
                 data-testid="input-email"
               />
-              <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                className="h-[52px] rounded-xl text-base px-4"
-                data-testid="input-password"
-              />
+
+              {mode === 'signup' && (
+                <div className="space-y-1">
+                  <Input
+                    type="email"
+                    placeholder="Confirm Email"
+                    value={confirmEmail}
+                    onChange={(e) => setConfirmEmail(e.target.value)}
+                    required
+                    disabled={loading}
+                    autoComplete="email"
+                    className={`h-[52px] rounded-xl text-base px-4 ${fieldErrors.confirmEmail ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    data-testid="input-confirm-email"
+                  />
+                  {fieldErrors.confirmEmail && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-xs text-destructive pl-1"
+                      data-testid="text-error-confirm-email"
+                    >
+                      {fieldErrors.confirmEmail}
+                    </motion.p>
+                  )}
+                </div>
+              )}
+
+              <div className="relative">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                  className="h-[52px] rounded-xl text-base px-4 pr-12"
+                  data-testid="input-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  disabled={loading}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  data-testid="button-toggle-password-visibility"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+
+              {mode === 'signup' && (
+                <div className="space-y-1">
+                  <div className="relative">
+                    <Input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      placeholder="Confirm Password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      disabled={loading}
+                      autoComplete="new-password"
+                      className={`h-[52px] rounded-xl text-base px-4 pr-12 ${fieldErrors.confirmPassword ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                      data-testid="input-confirm-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(v => !v)}
+                      disabled={loading}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+                      aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                      data-testid="button-toggle-confirm-password-visibility"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  {fieldErrors.confirmPassword && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-xs text-destructive pl-1"
+                      data-testid="text-error-confirm-password"
+                    >
+                      {fieldErrors.confirmPassword}
+                    </motion.p>
+                  )}
+                </div>
+              )}
 
               {errorMessage && (
                 <motion.p
