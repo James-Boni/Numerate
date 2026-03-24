@@ -1,0 +1,69 @@
+Here's the structured plan:
+
+Plan: Auth & Account UX Improvements
+Files likely to be modified
+client/src/pages/AuthScreen.tsx — signup form expansion, show/hide password toggles, validation
+client/src/lib/supabase-auth.ts — add updateEmail, updatePassword helpers
+client/src/pages/Settings.tsx (or wherever the settings page lives) — add Account section
+Possibly a new client/src/components/settings/AccountSettings.tsx if the settings page is large
+1. Sign-up form changes
+Sign-up mode gets four fields:
+
+Email
+Confirm Email
+Password
+Confirm Password
+Sign-in mode stays as two fields:
+
+Email
+Password
+Validation approach (client-side, before calling Supabase):
+
+Check email === confirmEmail — if not, show inline error beneath Confirm Email: "Email addresses don't match"
+Check password === confirmPassword — if not, show inline error beneath Confirm Password: "Passwords don't match"
+Validation fires on submit (not on every keystroke — avoids premature errors while typing)
+Existing loading and Supabase error states remain unchanged
+The extra confirm fields are rendered conditionally based on mode === 'signup' — no restructuring of the sign-in path needed
+2. Password show/hide toggles
+Add a small eye icon button (lucide-react: Eye / EyeOff) inside each password field
+Toggling switches the <Input type> between "password" and "text" for that field only
+Each field gets its own independent toggle state
+Applied to: Password and Confirm Password in signup mode; Password in signin mode
+Never used anywhere else in the app (settings, profile, etc.) — the stored password is never displayed
+3. Account settings section
+Add a new Account section to the existing settings page (or a dedicated sub-page if settings is already large). It contains:
+
+Current email
+
+Display the signed-in user's email address (read from supabase.auth.getUser())
+Read-only label, not an editable input by default
+Change email
+
+"Change email" button or expandable form
+Fields: New Email, Confirm New Email
+On submit: calls supabase.auth.updateUser({ email: newEmail })
+Supabase will send a confirmation link to the new address before the change takes effect — surface this clearly: "A confirmation link has been sent to your new email address"
+No effect on profiles table or uuid — the profile relationship is unchanged
+Change password
+
+"Change password" button or expandable form
+Fields: New Password, Confirm New Password (each with show/hide toggle)
+Does not ask for the current password (Supabase sessions are already authenticated)
+On submit: calls supabase.auth.updateUser({ password: newPassword })
+Show/hide toggle applies while entering; hidden by default
+No current password is ever displayed
+4. Supabase methods needed
+Action	Method
+Get current user/email	supabase.auth.getUser()
+Change email	supabase.auth.updateUser({ email })
+Change password	supabase.auth.updateUser({ password })
+Both update methods require an active session, which Supabase manages automatically. No custom backend routes needed.
+
+5. UX caveats and security considerations
+Email change confirmation: Supabase sends a verification link to the new address before swapping it. The UI should tell the user to check their inbox — don't assume the change is instant.
+No current password display: The settings page should never show a stored or masked password. The change-password form only takes a new password.
+Apple Sign-In compatibility: The account settings should gracefully hide the "Change password" form for users who signed in with Apple (they have no email/password credential). This will need a check on the user's app_metadata.provider field when Apple Sign-In is added.
+Profile integrity: uuid is the primary key and is set at creation — supabase.auth.updateUser only changes auth credentials, never the uuid. Progress is fully safe.
+Dev bypass tools: No changes needed — bypasses skip auth entirely and aren't affected by form field additions.
+Friction balance: The two extra confirm fields in signup add one extra step but prevent a common mistake (typo in email or password). Sign-in remains as simple as it is today.
+Ready to implement any or all of this when you give the go-ahead.
