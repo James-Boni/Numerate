@@ -6,7 +6,8 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useStore } from '@/lib/store';
-import { signUpWithEmail, signInWithEmail, ensureProfile } from '@/lib/supabase-auth';
+import { signUpWithEmail, signInWithEmail, ensureProfile, ensureProfileExists } from '@/lib/supabase-auth';
+import { loadProfileFromSupabase } from '@/lib/supabase-sync';
 
 interface FieldErrors {
   confirmEmail?: string;
@@ -30,6 +31,7 @@ export default function AuthScreen() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [, setLocation] = useLocation();
   const startingLevel = useStore(s => s.startingLevel);
+  const competenceGroup = useStore(s => s.competenceGroup);
 
   const hasAssessmentContext = mode === 'signup' && startingLevel > 0;
 
@@ -83,7 +85,7 @@ export default function AuthScreen() {
           setLoading(false);
           return;
         }
-        const profileResult = await ensureProfile(user.id, startingLevel);
+        const profileResult = await ensureProfile(user.id, startingLevel, competenceGroup);
         if (profileResult.error) {
           console.warn('[AuthScreen] Profile creation warning:', profileResult.error);
         }
@@ -95,7 +97,11 @@ export default function AuthScreen() {
           setLoading(false);
           return;
         }
-        await ensureProfile(user.id, startingLevel);
+        await ensureProfileExists(user.id);
+        const profile = await loadProfileFromSupabase(user.id);
+        if (profile) {
+          useStore.setState(profile);
+        }
         setLocation('/train');
       }
     } catch (err) {

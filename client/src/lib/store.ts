@@ -11,6 +11,7 @@ import {
   getBandFromLevel
 } from './logic/difficulty';
 import { api } from './api';
+import { saveSessionToSupabase } from './supabase-sync';
 
 // --- Types ---
 
@@ -388,6 +389,50 @@ export const useStore = create<UserState>()(
             console.error('Failed to save session to backend:', error);
             set({ lastSyncError: 'Failed to save session' });
           }
+
+          // Supabase persistence — fire-and-forget, safe to fail before migration is run
+          const { progression } = state;
+          saveSessionToSupabase(
+            state.uid,
+            {
+              session_type:            session.sessionType ?? 'daily',
+              started_at:              session.date,
+              ended_at:                new Date().toISOString(),
+              duration_mode:           session.durationMode === 'unlimited' ? null : session.durationMode,
+              duration_actual_seconds: session.durationSecondsActual,
+              total_questions:         session.totalQuestions,
+              correct_questions:       session.correctQuestions,
+              accuracy:                session.accuracy,
+              median_response_ms:      session.medianMs          ?? null,
+              variability_ms:          session.variabilityMs     ?? null,
+              questions_per_second:    session.throughputQps     ?? null,
+              speed_score:             session.speedScore        ?? null,
+              consistency_score:       session.consistencyScore  ?? null,
+              throughput_score:        session.throughputScore   ?? null,
+              fluency_score:           session.fluencyScore      ?? null,
+              xp_earned:               session.xpEarned,
+              xp_base:                 session.baseSessionXP    ?? null,
+              xp_multiplier:           session.modeMultiplier   ?? null,
+              level_before:            session.levelBefore       ?? null,
+              level_after:             levelResult.levelAfter,
+              level_ups:               session.levelUpCount      ?? 0,
+              best_streak_in_session:  session.bestStreak,
+            },
+            {
+              level:             levelResult.levelAfter,
+              xp_into_level:     levelResult.xpIntoLevelAfter,
+              lifetime_xp:       newLifetimeXP,
+              streak:            newStreak,
+              last_streak_date:  newLastStreakDate ? newLastStreakDate.split('T')[0] : today,
+              lifetime_questions: newLifetimeQuestions,
+              personal_bests:    state.personalBests,
+              sr_global:         progression.srGlobal,
+              difficulty_step:   progression.difficultyStep,
+              good_streak_count: progression.goodStreak,
+              poor_streak_count: progression.poorStreak,
+              recent_history:    progression.history,
+            }
+          ).catch(err => console.error('[saveSession] Supabase sync failed:', err));
         }
       },
       

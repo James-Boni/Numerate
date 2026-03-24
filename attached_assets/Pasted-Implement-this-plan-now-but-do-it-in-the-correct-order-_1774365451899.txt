@@ -1,0 +1,193 @@
+Implement this plan now, but do it in the correct order and do not skip validation.
+
+Objective:
+Migrate Numerate from the old minimal Supabase profile schema to the new profile + sessions persistence model, and update the app code to use it safely.
+
+Critical execution rule:
+Do NOT run or ask me to run the Supabase SQL migration until the app code changes are fully implemented and ready.
+We must avoid a column-name mismatch window.
+
+Implementation order:
+
+PHASE 1 — App code changes first
+
+1. Update client/src/lib/supabase-auth.ts
+- Replace the old ensureProfile logic with two separate functions:
+
+A) ensureProfile(userId, startingLevel, competenceGroup)
+- onboarding path only
+- used after sign-up succeeds and assessment context exists
+- writes the new schema fields:
+  - uuid
+  - level
+  - xp_into_level
+  - lifetime_xp
+  - streak
+  - lifetime_questions
+  - has_completed_assessment
+  - starting_level
+  - competence_group
+  - sr_global
+  - difficulty_step
+  - good_streak_count
+  - poor_streak_count
+- use upsert with onConflict: 'uuid' and ignoreDuplicates: true
+
+B) ensureProfileExists(userId)
+- sign-in safety path only
+- does not depend on onboarding context
+- upserts only { uuid: userId } with ignoreDuplicates: true
+
+- Remove old column usage:
+  - levels
+  - xp
+- Replace with:
+  - level
+  - lifetime_xp
+  - xp_into_level
+
+2. Update client/src/pages/AuthScreen.tsx
+- Sign-up path must call:
+  ensureProfile(user.id, startingLevel, competenceGroup)
+- Sign-in path must call:
+  ensureProfileExists(user.id)
+- Use competenceGroup from Zustand
+- Preserve the existing routing logic we already established:
+  - returning sign-in -> /train
+  - signup without assessment context -> /assessment
+  - signup with assessment context -> normal onboarding flow
+
+3. Add Supabase sync layer for profile hydration + session persistence
+Either in:
+- client/src/lib/store.ts
+or
+- a new client/src/lib/supabase-sync.ts
+
+Implement:
+
+A) loadProfileFromSupabase(userId)
+- fetch the full profiles row
+- map Supabase fields into Zustand state
+- include:
+  - level
+  - xpIntoLevel
+  - lifetimeXP
+  - streakCount
+  - lastStreakDate
+  - lifetimeQuestionsAnswered
+  - hasCompletedAssessment
+  - startingLevel
+  - competenceGroup
+  - personalBests
+  - seenStrategies
+  - quickFireIntroSeen
+  - quickFireHighScore
+  - skillDrillBests
+  - hasUsedFreeDaily
+  - progression:
+    - level
+    - band = Math.floor(level / 10)
+    - srGlobal
+    - difficultyStep
+    - goodStreak
+    - poorStreak
+    - history
+
+B) saveSessionToSupabase(...)
+At session completion do exactly two writes:
+
+First:
+- insert one row into sessions with:
+  - user_uuid
+  - session_type
+  - started_at
+  - ended_at
+  - duration_mode
+  - duration_actual_seconds
+  - total_questions
+  - correct_questions
+  - accuracy
+  - median_response_ms
+  - variability_ms
+  - questions_per_second
+  - speed_score
+  - consistency_score
+  - throughput_score
+  - fluency_score
+  - xp_earned
+  - xp_base
+  - xp_multiplier
+  - level_before
+  - level_after
+  - level_ups
+  - best_streak_in_session
+
+Second:
+- update the user’s profiles row with:
+  - level
+  - xp_into_level
+  - lifetime_xp
+  - streak
+  - last_streak_date
+  - lifetime_questions
+  - personal_bests
+  - sr_global
+  - difficulty_step
+  - good_streak_count
+  - poor_streak_count
+  - recent_history
+
+- updated_at is handled by the DB trigger, so do not write it manually
+
+4. Wire profile hydration into sign-in flow
+After successful sign-in:
+- call ensureProfileExists(user.id)
+- call loadProfileFromSupabase(user.id)
+- hydrate Zustand before routing to the main app if possible
+
+5. Wire session completion persistence into the end-of-session flow
+Find the correct place where session results are finalized and persisted.
+Replace or augment the old persistence path so completed sessions now write to Supabase using the new sessions + profiles model.
+
+6. Update all old schema references across the app
+Search the codebase for old Supabase field names and update them:
+- levels -> level
+- xp -> lifetime_xp or xp_into_level depending on meaning
+
+Be careful:
+- do not blindly rename local state fields if they already use the new naming internally
+- only update the Supabase read/write mapping layer and any direct DB field references
+
+PHASE 2 — Show me the implementation summary before migration
+
+After the code changes are complete, do NOT continue automatically into database execution.
+
+Instead, return a concise implementation report with:
+
+1. Files changed
+2. What was changed in each file
+3. Any assumptions made
+4. Any unresolved risks
+5. Confirmation that the code is now ready for the SQL migration
+6. The exact SQL migration block I should run in Supabase next
+
+PHASE 3 — No autonomous schema improvisation
+Do not redesign the schema.
+Use the agreed final migration exactly.
+
+Important constraints:
+- sessions are append-only in v1
+- adaptive engine state is written at session end, not per question
+- do not add per-question persistence
+- do not add billing/entitlements work
+- do not remove existing auth flow behaviour that we already corrected
+- do not break dev-only bypass flows
+
+Quality bar:
+- preserve current UX
+- preserve onboarding logic
+- preserve sign-out/sign-in routing logic
+- keep the implementation minimal but correct
+- avoid placeholder/mock logic
+
+Begin implementation now with PHASE 1 only.
