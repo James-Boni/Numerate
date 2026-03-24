@@ -157,7 +157,30 @@ create trigger profiles_updated_at
   for each row execute function handle_updated_at();
 
 
--- Step 8: Create sessions table
+-- Step 8: Explicit RLS on profiles
+-- The profiles table was created before this migration with RLS enabled.
+-- These statements make the exact policies authoritative and idempotent.
+-- Only SELECT, INSERT, UPDATE are allowed from the client.
+-- No DELETE policy — profiles are not deletable from the client in v1.
+alter table profiles enable row level security;
+
+drop policy if exists "Users can read own profile"   on profiles;
+drop policy if exists "Users can insert own profile" on profiles;
+drop policy if exists "Users can update own profile" on profiles;
+
+create policy "Users can read own profile"
+  on profiles for select using (auth.uid() = uuid);
+
+create policy "Users can insert own profile"
+  on profiles for insert with check (auth.uid() = uuid);
+
+create policy "Users can update own profile"
+  on profiles for update
+  using     (auth.uid() = uuid)
+  with check (auth.uid() = uuid);
+
+
+-- Step 9: Create sessions table
 create table if not exists sessions (
   id                      uuid        primary key default gen_random_uuid(),
   user_uuid               uuid        not null references profiles(uuid) on delete cascade,

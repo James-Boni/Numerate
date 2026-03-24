@@ -1,0 +1,75 @@
+I need a security review and hardening pass focused specifically on Supabase Row Level Security (RLS) and client-specific data isolation for Numerate.
+
+Objective:
+Ensure that when the app talks to Supabase from the client using the anon key, each authenticated user can only access their own data and cannot read, write, or tamper with other users’ data.
+
+Please do the following:
+
+1. Audit the current Supabase usage in the app
+Review all places where the frontend reads from or writes to Supabase, including:
+- profiles
+- sessions
+- any other public tables that may now or later be exposed to the client
+
+2. Verify the intended access model
+For Numerate, the intended rules are:
+
+profiles:
+- users can read their own profile only
+- users can insert their own profile only
+- users can update their own profile only
+- users must not be able to read, insert, update, or delete other users’ profiles
+
+sessions:
+- users can read their own sessions only
+- users can insert their own sessions only
+- users must not be able to read, insert, update, or delete other users’ sessions
+- sessions should remain append-only in v1 (no update/delete from client)
+
+3. Review the actual RLS policies in Supabase
+Check that the existing policies truly enforce the above.
+Be precise:
+- identify the exact current policies
+- identify any gaps, weaknesses, or over-broad access
+- identify whether any table is missing RLS
+- identify whether any policy allows more than intended
+
+4. Confirm auth.uid() alignment
+Verify that all client writes use the authenticated user correctly and that any row ownership field matches auth.uid() as expected.
+Specifically confirm:
+- profiles.uuid aligns with auth.uid()
+- sessions.user_uuid aligns with auth.uid()
+- the app never writes arbitrary user IDs from insecure client state without proper Supabase auth context
+
+5. Check for dangerous client patterns
+Audit for any frontend code that could weaken data isolation, including:
+- selecting broad data unnecessarily
+- missing .eq(...) filters where needed
+- allowing arbitrary UUIDs to be passed into reads/writes
+- any use of admin-like logic from the frontend
+- any accidental assumption that frontend state alone is trustworthy
+
+6. Produce a hardening plan
+Return:
+A) current security status
+B) exact RLS policies that should exist for each relevant table
+C) any SQL changes needed in Supabase
+D) any frontend code changes needed
+E) any remaining risks that RLS does not solve (for example client-side score tampering)
+
+7. Important constraints
+- do not redesign the architecture
+- do not introduce service role keys into the client
+- do not weaken current access restrictions
+- preserve the current working auth/profile/session flow
+- sessions must remain immutable from the client in v1
+
+8. Output format
+Please structure the answer as:
+- Security audit summary
+- Table-by-table RLS review
+- Required fixes
+- Exact SQL to apply if needed
+- Exact files to change if needed
+
+This is a security hardening review, not a feature build. Focus on correctness and least-privilege access.
