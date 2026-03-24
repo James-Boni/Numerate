@@ -46,12 +46,13 @@ export interface SupabaseProfileUpdate {
 
 // ---------------------------------------------------------------------------
 // loadProfileFromSupabase
-// Fetches the full profiles row and returns a plain object for Zustand setState.
-// Returns null if Supabase is not configured or the row is not found.
 // ---------------------------------------------------------------------------
 
 export async function loadProfileFromSupabase(userId: string) {
-  if (!supabase) return null
+  if (!supabase) {
+    console.warn('[loadProfileFromSupabase] Supabase not configured')
+    return null
+  }
 
   const { data, error } = await supabase
     .from('profiles')
@@ -120,25 +121,53 @@ export async function saveSessionToSupabase(
   sessionRow: SupabaseSessionRow,
   profileUpdate: SupabaseProfileUpdate
 ): Promise<void> {
-  if (!supabase) return
+  console.log('[saveSessionToSupabase] ENTRY — userId:', userId)
+
+  if (!supabase) {
+    console.error('[saveSessionToSupabase] Supabase not configured — aborting')
+    return
+  }
+
+  // Verify auth session
+  const { data: { user } } = await supabase.auth.getUser()
+  console.log('[saveSessionToSupabase] Supabase auth user:', user?.id ?? 'NONE — not authenticated')
+
+  if (!user) {
+    console.error('[saveSessionToSupabase] No authenticated Supabase user — RLS will block insert')
+    return
+  }
+
+  if (user.id !== userId) {
+    console.error('[saveSessionToSupabase] uid mismatch — store uid:', userId, '| auth uid:', user.id)
+  }
 
   // Write 1 — insert session row
-  const { error: sessionError } = await supabase
+  const sessionPayload = { user_uuid: userId, ...sessionRow }
+  console.log('[saveSessionToSupabase] Inserting session row:', sessionPayload)
+
+  const { data: sessionData, error: sessionError } = await supabase
     .from('sessions')
-    .insert({ user_uuid: userId, ...sessionRow })
+    .insert(sessionPayload)
+    .select()
 
   if (sessionError) {
-    console.error('[saveSessionToSupabase] session insert failed:', sessionError.message)
-    // Continue to profile update regardless
+    console.error('[saveSessionToSupabase] SESSION INSERT FAILED:', sessionError)
+  } else {
+    console.log('[saveSessionToSupabase] Session insert OK:', sessionData)
   }
 
   // Write 2 — update profile snapshot
-  const { error: profileError } = await supabase
+  console.log('[saveSessionToSupabase] Updating profile row for uuid:', userId, profileUpdate)
+
+  const { data: profileData, error: profileError } = await supabase
     .from('profiles')
     .update(profileUpdate)
     .eq('uuid', userId)
+    .select()
 
   if (profileError) {
-    console.error('[saveSessionToSupabase] profile update failed:', profileError.message)
+    console.error('[saveSessionToSupabase] PROFILE UPDATE FAILED:', profileError)
+  } else {
+    console.log('[saveSessionToSupabase] Profile update OK:', profileData)
   }
 }
