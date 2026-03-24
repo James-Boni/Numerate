@@ -1,160 +1,21 @@
-# Numerate — Supabase Data Model Design
+# Numerate — Supabase Data Model (Revised)
 
 ## Context
 
-Numerate is a mobile-first arithmetic training app. Users complete a placement assessment, then do daily timed training sessions. The app tracks performance metrics, XP, levels, streaks, and personal records. This document defines the full data model for migrating user metrics to Supabase.
+Numerate is a mobile-first arithmetic training app using Supabase Auth. Users complete a placement assessment, then do daily timed training sessions. The app tracks performance metrics, XP, levels, streaks, and personal records.
 
-The app currently uses:
-- Supabase Auth (email/password, Apple Sign-In planned)
-- A `profiles` table already exists in Supabase with: `uuid`, `xp`, `levels`, `streak`
-- A legacy Express/PostgreSQL backend (to be replaced by Supabase)
-- Zustand (client-side state, persisted to localStorage)
+**Current state of Supabase:**
+- `profiles` table already exists with columns: `uuid`, `created_at`, `xp`, `levels`, `streak`
+- RLS policies already created
+- No `sessions` table yet in Supabase
 
----
-
-## Section 1 — All Data Points, Grouped by Category
-
-### A. Core Profile (persistent account state)
-
-| Field | Type | Stored/Derived | Updates | Notes |
-|---|---|---|---|---|
-| `levels` | integer | Stored | Per session (on level-up) | Current level (1–100+) |
-| `xp_into_level` | integer | Stored | Per session | XP progress within current level |
-| `lifetime_xp` | integer | Stored | Per session | Cumulative XP across all time |
-| `streak` | integer | Stored | Per day | Daily training streak count |
-| `last_streak_date` | date | Stored | Per session | Date of last completed session, used to decide if streak continues |
-| `lifetime_questions` | integer | Stored | Per session | Total questions answered across all session types |
-| `starting_level` | integer | Stored | Once (assessment) | Level placed at on initial assessment |
-| `competence_group` | integer | Stored | Once (assessment) | Placement group 1–10 from assessment |
-| `has_completed_assessment` | boolean | Stored | Once | Onboarding gate |
-| `created_at` | timestamptz | Stored | Once | Account creation timestamp |
-| `updated_at` | timestamptz | Stored | Per write | Row freshness |
+This document defines the migration plan and final schema. The existing `profiles` table is migrated safely — it is NOT dropped.
 
 ---
 
-### B. Adaptive Engine State (runtime, persisted for session continuity)
+## Part A — Revised Final Schema
 
-The app uses a real-time difficulty adaptation system. These fields are required to resume adaptation correctly after a user closes and reopens the app.
-
-| Field | Type | Stored/Derived | Updates | Notes |
-|---|---|---|---|---|
-| `sr_global` | float | Stored | Per question | Skill rating 0–100. Drives difficulty adaptation |
-| `difficulty_step` | integer | Stored | Per question | Fine-tuning within a level plateau (0–4) |
-| `good_streak_count` | integer | Stored | Per question | Consecutive good-performance answers (anti-whiplash) |
-| `poor_streak_count` | integer | Stored | Per question | Consecutive poor-performance answers (anti-whiplash) |
-| `recent_history` | jsonb | Stored | Per question | Rolling window of last 20 answers. Each entry: `{ correct, timeMs, templateId, ps }`. Required for skill rating computation |
-| `band` | integer | **Derived** | — | Always `floor(level / 10)`. Never stored; computed from `levels` |
-
----
-
-### C. Session-Level Data (one row per completed session)
-
-| Field | Type | Stored/Derived | Notes |
-|---|---|---|---|
-| `session_type` | text | Stored | `daily`, `rounding`, `doubling`, `halving`, `quickfire` |
-| `started_at` | timestamptz | Stored | Session start time |
-| `duration_mode` | integer | Stored | Requested duration: 60, 120, 180, or null (unlimited) |
-| `duration_actual_seconds` | integer | Stored | Wall-clock seconds elapsed |
-| `total_questions` | integer | Stored | Questions presented |
-| `correct_questions` | integer | Stored | Correct answers |
-| `accuracy` | float | Stored | `correct / total`. Stored to avoid division at query time |
-| `median_response_ms` | integer | Stored | Median answer latency. Not re-derivable without raw per-question times |
-| `variability_ms` | float | Stored | IQR of response times — measures consistency |
-| `questions_per_second` | float | Stored | Throughput rate |
-| `speed_score` | float | Stored | Normalised speed metric (0–1) |
-| `consistency_score` | float | Stored | Normalised consistency metric (0–1) |
-| `throughput_score` | float | Stored | Normalised throughput metric (0–1) |
-| `fluency_score` | float | Stored | Composite fluency (weighted combination of above). Expensive to recompute; stored |
-| `xp_earned` | integer | Stored | Total XP awarded this session |
-| `xp_base` | integer | Stored | Pre-multiplier XP |
-| `xp_multiplier` | float | Stored | Combined multipliers applied |
-| `level_before` | integer | Stored | Level at session start |
-| `level_after` | integer | Stored | Level at session end |
-| `level_ups` | integer | Stored | How many level-ups occurred |
-| `best_streak_in_session` | integer | Stored | Longest correct streak within this session |
-
-**Not stored in v1 (deferred):**
-- Individual answer latencies per question (would require a `question_attempts` table — see v2 section)
-- Per-question operation type breakdown
-
----
-
-### D. Personal Records / Lifetime Bests
-
-| Field | Type | Notes |
-|---|---|---|
-| `best_streak` | integer | Lifetime longest correct streak |
-| `best_streak_date` | date | When it was set |
-| `fastest_median_ms` | integer | Lowest ever median response time |
-| `fastest_median_date` | date | When it was set |
-| `highest_accuracy` | float | Best single-session accuracy |
-| `highest_accuracy_date` | date | When it was set |
-| `highest_throughput` | float | Best QPS in a single session |
-| `highest_throughput_date` | date | When it was set |
-| `highest_fluency_score` | float | Best composite fluency score |
-| `highest_fluency_date` | date | When it was set |
-
-Stored as a single JSONB block (`personal_bests`) in `profiles` for v1. A separate table only becomes necessary when cross-user queries (leaderboards) are needed — v2.
-
----
-
-### E. Game Mode Bests (skill drills + Quick Fire)
-
-| Field | Type | Notes |
-|---|---|---|
-| `quickfire_high_score` | integer | Highest level reached in Quick Fire mode |
-| `skill_drill_bests` | jsonb | Per-mode record for rounding, doubling, halving. Each: `{ bestScore, bestStreak, gamesPlayed, totalCorrect }` |
-
-Stored as JSONB in `profiles` for v1. In v2, a `game_mode_bests` table with `(user_uuid, game_type)` primary key would be cleaner.
-
----
-
-### F. Coaching & Onboarding State
-
-| Field | Type | Notes |
-|---|---|---|
-| `seen_strategies` | text[] | Array of coaching strategy IDs already shown to user (prevents repeats) |
-| `quickfire_intro_seen` | boolean | Whether the Quick Fire tutorial modal has been shown |
-
----
-
-### G. Paywall / Entitlement State
-
-| Field | Type | Notes |
-|---|---|---|
-| `has_used_free_daily` | boolean | Whether the free daily trial session has been consumed |
-| Entitlement columns | various | **Defer to v2** — belongs in a separate `entitlements` table once billing is live |
-
----
-
-### H. Settings (device-local — NOT Supabase in v1)
-
-`sound_on`, `haptics_on`, `difficulty_preference`, `notifications_enabled`, `notification_time`, `show_debug_overlay`
-
-These are device preferences. Storing them in Supabase creates sync conflicts across devices. Keep in Zustand/localStorage for v1. Revisit in v2 if multi-device sync is needed.
-
----
-
-## Section 2 — Derived vs Stored Summary
-
-| Data Point | Decision | Reason |
-|---|---|---|
-| `accuracy` | Store | Queried constantly; trivial to store at write time |
-| `band` | Derive | Always `floor(level / 10)` — never out of sync |
-| `fluency_score` | Store | Composite of 4 sub-scores; expensive to recompute |
-| `median_response_ms` | Store | Requires raw latencies to recompute, which are not stored |
-| `questions_per_second` | Store | Useful for Progress page without recompute overhead |
-| 7-day rolling averages | Derive at query time | `AVG(accuracy) WHERE started_at > now() - interval '7 days'` |
-| 30-day rolling averages | Derive at query time | Same pattern |
-| Total session count | Derive at query time | `COUNT(*)` on sessions table |
-
----
-
-## Section 3 — Proposed Supabase Schema
-
-### `profiles` table
-
-This is the current-state snapshot for each user. It does NOT store history. All analytical/historical queries go through the `sessions` table.
+### `profiles` table (final state after migration)
 
 ```sql
 create table profiles (
@@ -163,7 +24,7 @@ create table profiles (
   updated_at               timestamptz not null default now(),
 
   -- Core progress
-  levels                   integer not null default 1,
+  level                    integer not null default 1,
   xp_into_level            integer not null default 0,
   lifetime_xp              integer not null default 0,
   streak                   integer not null default 0,
@@ -175,7 +36,7 @@ create table profiles (
   starting_level           integer not null default 1,
   competence_group         integer not null default 1,
 
-  -- Adaptive engine state
+  -- Adaptive engine state (written at session completion, not per question)
   sr_global                real not null default 50,
   difficulty_step          integer not null default 0,
   good_streak_count        integer not null default 0,
@@ -194,28 +55,37 @@ create table profiles (
   quickfire_intro_seen     boolean not null default false,
 
   -- Paywall
-  has_used_free_daily      boolean not null default false
-);
+  has_used_free_daily      boolean not null default false,
 
--- RLS
-alter table profiles enable row level security;
-create policy "Users can read own profile"   on profiles for select using (auth.uid() = uuid);
-create policy "Users can insert own profile" on profiles for insert with check (auth.uid() = uuid);
-create policy "Users can update own profile" on profiles for update using (auth.uid() = uuid);
+  -- Check constraints
+  constraint profiles_level_positive      check (level >= 1),
+  constraint profiles_xp_into_level_nn   check (xp_into_level >= 0),
+  constraint profiles_lifetime_xp_nn     check (lifetime_xp >= 0),
+  constraint profiles_streak_nn          check (streak >= 0),
+  constraint profiles_lifetime_q_nn      check (lifetime_questions >= 0),
+  constraint profiles_sr_global_range    check (sr_global >= 0 and sr_global <= 100),
+  constraint profiles_difficulty_step_range check (difficulty_step >= 0 and difficulty_step <= 4)
+);
 ```
+
+**Technical debt note:** The column is renamed from `levels` → `level` in the migration. If the rename is blocked for any reason, keep `levels` temporarily and add `level` as an alias — but document this as debt to clean up.
 
 ---
 
-### `sessions` table
+### `sessions` table (new)
 
-One row per completed training session. This IS the analytics table. All trend queries, Progress page data, and historical charts come from here.
+One row per completed training session. This is the primary analytics table.
 
 ```sql
 create table sessions (
   id                      uuid primary key default gen_random_uuid(),
   user_uuid               uuid not null references profiles(uuid) on delete cascade,
-  session_type            text not null,        -- daily | rounding | doubling | halving | quickfire
+  session_type            text not null
+                            check (session_type in ('daily', 'rounding', 'doubling', 'halving', 'quickfire')),
+
+  -- Timing
   started_at              timestamptz not null default now(),
+  ended_at                timestamptz,
 
   -- Duration
   duration_mode           integer,              -- 60 | 120 | 180 | null (unlimited)
@@ -248,75 +118,374 @@ create table sessions (
   level_ups               integer not null default 0,
 
   -- In-session record
-  best_streak_in_session  integer not null default 0
+  best_streak_in_session  integer not null default 0,
+
+  -- Check constraints
+  constraint sessions_total_q_nn         check (total_questions >= 0),
+  constraint sessions_correct_q_nn       check (correct_questions >= 0),
+  constraint sessions_correct_lte_total  check (correct_questions <= total_questions),
+  constraint sessions_accuracy_range     check (accuracy >= 0 and accuracy <= 1),
+  constraint sessions_duration_positive  check (duration_actual_seconds > 0),
+  constraint sessions_xp_nn              check (xp_earned >= 0),
+  constraint sessions_ended_after_start  check (ended_at is null or ended_at >= started_at)
 );
+```
 
--- RLS
+---
+
+## Part B — SQL Migration Plan
+
+Run these statements in order in the Supabase SQL Editor. Each step is safe to run independently.
+
+### Step 1 — Rename `levels` → `level`
+
+```sql
+alter table profiles rename column levels to level;
+```
+
+### Step 2 — Rename `xp` → `lifetime_xp`
+
+```sql
+alter table profiles rename column xp to lifetime_xp;
+```
+
+### Step 3 — Add `xp_into_level`
+
+```sql
+alter table profiles add column if not exists xp_into_level integer default 0;
+```
+
+### Step 4 — Add `updated_at` column
+
+```sql
+alter table profiles add column if not exists updated_at timestamptz default now();
+```
+
+### Step 5 — Add remaining missing columns (all with safe defaults)
+
+```sql
+alter table profiles
+  add column if not exists last_streak_date         date,
+  add column if not exists lifetime_questions       integer default 0,
+  add column if not exists has_completed_assessment boolean default false,
+  add column if not exists starting_level           integer default 1,
+  add column if not exists competence_group         integer default 1,
+  add column if not exists sr_global                real default 50,
+  add column if not exists difficulty_step          integer default 0,
+  add column if not exists good_streak_count        integer default 0,
+  add column if not exists poor_streak_count        integer default 0,
+  add column if not exists recent_history           jsonb default '[]',
+  add column if not exists personal_bests           jsonb default '{}',
+  add column if not exists quickfire_high_score     integer default 0,
+  add column if not exists skill_drill_bests        jsonb default '{}',
+  add column if not exists seen_strategies          text[] default '{}',
+  add column if not exists quickfire_intro_seen     boolean default false,
+  add column if not exists has_used_free_daily      boolean default false;
+```
+
+### Step 6 — Backfill null values before adding NOT NULL constraints
+
+```sql
+update profiles set
+  xp_into_level            = coalesce(xp_into_level, 0),
+  lifetime_xp              = coalesce(lifetime_xp, 0),
+  level                    = coalesce(level, 1),
+  streak                   = coalesce(streak, 0),
+  lifetime_questions       = coalesce(lifetime_questions, 0),
+  has_completed_assessment = coalesce(has_completed_assessment, false),
+  starting_level           = coalesce(starting_level, 1),
+  competence_group         = coalesce(competence_group, 1),
+  sr_global                = coalesce(sr_global, 50),
+  difficulty_step          = coalesce(difficulty_step, 0),
+  good_streak_count        = coalesce(good_streak_count, 0),
+  poor_streak_count        = coalesce(poor_streak_count, 0),
+  recent_history           = coalesce(recent_history, '[]'),
+  personal_bests           = coalesce(personal_bests, '{}'),
+  quickfire_high_score     = coalesce(quickfire_high_score, 0),
+  skill_drill_bests        = coalesce(skill_drill_bests, '{}'),
+  seen_strategies          = coalesce(seen_strategies, '{}'),
+  quickfire_intro_seen     = coalesce(quickfire_intro_seen, false),
+  has_used_free_daily      = coalesce(has_used_free_daily, false),
+  updated_at               = coalesce(updated_at, created_at);
+```
+
+### Step 7 — Apply NOT NULL constraints
+
+```sql
+alter table profiles
+  alter column xp_into_level            set not null,
+  alter column lifetime_xp              set not null,
+  alter column level                    set not null,
+  alter column streak                   set not null,
+  alter column lifetime_questions       set not null,
+  alter column has_completed_assessment set not null,
+  alter column starting_level           set not null,
+  alter column competence_group         set not null,
+  alter column sr_global                set not null,
+  alter column difficulty_step          set not null,
+  alter column good_streak_count        set not null,
+  alter column poor_streak_count        set not null,
+  alter column recent_history           set not null,
+  alter column personal_bests           set not null,
+  alter column quickfire_high_score     set not null,
+  alter column skill_drill_bests        set not null,
+  alter column seen_strategies          set not null,
+  alter column quickfire_intro_seen     set not null,
+  alter column has_used_free_daily      set not null,
+  alter column updated_at               set not null;
+```
+
+### Step 8 — Add check constraints
+
+```sql
+alter table profiles
+  add constraint profiles_level_positive        check (level >= 1),
+  add constraint profiles_xp_into_level_nn      check (xp_into_level >= 0),
+  add constraint profiles_lifetime_xp_nn        check (lifetime_xp >= 0),
+  add constraint profiles_streak_nn             check (streak >= 0),
+  add constraint profiles_lifetime_q_nn         check (lifetime_questions >= 0),
+  add constraint profiles_sr_global_range       check (sr_global >= 0 and sr_global <= 100),
+  add constraint profiles_difficulty_step_range check (difficulty_step >= 0 and difficulty_step <= 4);
+```
+
+### Step 9 — Auto-update `updated_at` via trigger
+
+```sql
+create or replace function handle_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger profiles_updated_at
+  before update on profiles
+  for each row execute function handle_updated_at();
+```
+
+### Step 10 — Create `sessions` table (new)
+
+```sql
+create table sessions (
+  id                      uuid primary key default gen_random_uuid(),
+  user_uuid               uuid not null references profiles(uuid) on delete cascade,
+  session_type            text not null
+                            check (session_type in ('daily', 'rounding', 'doubling', 'halving', 'quickfire')),
+  started_at              timestamptz not null default now(),
+  ended_at                timestamptz,
+  duration_mode           integer,
+  duration_actual_seconds integer not null,
+  total_questions         integer not null,
+  correct_questions       integer not null,
+  accuracy                real not null,
+  median_response_ms      integer,
+  variability_ms          real,
+  questions_per_second    real,
+  speed_score             real,
+  consistency_score       real,
+  throughput_score        real,
+  fluency_score           real,
+  xp_earned               integer not null,
+  xp_base                 integer,
+  xp_multiplier           real,
+  level_before            integer,
+  level_after             integer,
+  level_ups               integer not null default 0,
+  best_streak_in_session  integer not null default 0,
+
+  constraint sessions_total_q_nn         check (total_questions >= 0),
+  constraint sessions_correct_q_nn       check (correct_questions >= 0),
+  constraint sessions_correct_lte_total  check (correct_questions <= total_questions),
+  constraint sessions_accuracy_range     check (accuracy >= 0 and accuracy <= 1),
+  constraint sessions_duration_positive  check (duration_actual_seconds > 0),
+  constraint sessions_xp_nn              check (xp_earned >= 0),
+  constraint sessions_ended_after_start  check (ended_at is null or ended_at >= started_at)
+);
+```
+
+### Step 11 — Add RLS to sessions
+
+```sql
 alter table sessions enable row level security;
-create policy "Users can read own sessions"   on sessions for select using (auth.uid() = user_uuid);
-create policy "Users can insert own sessions" on sessions for insert with check (auth.uid() = user_uuid);
+
+create policy "Users can read own sessions"
+  on sessions for select using (auth.uid() = user_uuid);
+
+create policy "Users can insert own sessions"
+  on sessions for insert with check (auth.uid() = user_uuid);
+```
+
+### Step 12 — Add indexes on sessions
+
+```sql
+-- Primary query: user's sessions ordered by time (Progress page, recap)
+create index sessions_user_started
+  on sessions (user_uuid, started_at desc);
+
+-- Filtered by session type (daily-only analytics)
+create index sessions_user_type_started
+  on sessions (user_uuid, session_type, started_at desc);
+
+-- Time-range queries without user filter (admin / aggregate use)
+create index sessions_started_at
+  on sessions (started_at desc);
 ```
 
 ---
 
-## Section 4 — V1 Required vs Deferred
+## Part C — App Read / Write Flow
 
-### Required for v1
+### Profile Creation (sign-up, after assessment)
 
-- Full `profiles` table as above
-- Full `sessions` table as above
-- RLS policies on both tables
+Called once after Supabase sign-up succeeds and the assessment is complete. Uses `ignoreDuplicates: true` so it is safe to call on every sign-in without overwriting existing data.
 
-### Defer to v2
+```typescript
+// Called after signUpWithEmail() succeeds
+await supabase.from('profiles').upsert({
+  uuid:                     user.id,
+  level:                    startingLevel,
+  xp_into_level:            0,
+  lifetime_xp:              0,
+  streak:                   0,
+  lifetime_questions:       0,
+  has_completed_assessment: true,
+  starting_level:           startingLevel,
+  competence_group:         competenceGroup,
+  sr_global:                50,
+  difficulty_step:          0,
+  good_streak_count:        0,
+  poor_streak_count:        0,
+}, { onConflict: 'uuid', ignoreDuplicates: true });
+```
 
-| What | Why defer |
+---
+
+### Profile Hydration (sign-in)
+
+Called after `signInWithEmail()` succeeds. Fetches the full profile and hydrates the Zustand store.
+
+```typescript
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('*')
+  .eq('uuid', user.id)
+  .single();
+
+// Hydrate Zustand store:
+useStore.setState({
+  level:                    profile.level,
+  xpIntoLevel:              profile.xp_into_level,
+  lifetimeXP:               profile.lifetime_xp,
+  streakCount:              profile.streak,
+  lastStreakDate:            profile.last_streak_date,
+  lifetimeQuestionsAnswered: profile.lifetime_questions,
+  hasCompletedAssessment:   profile.has_completed_assessment,
+  startingLevel:            profile.starting_level,
+  competenceGroup:          profile.competence_group,
+  personalBests:            profile.personal_bests,
+  seenStrategies:           profile.seen_strategies,
+  quickFireIntroSeen:       profile.quickfire_intro_seen,
+  quickFireHighScore:       profile.quickfire_high_score,
+  skillDrillBests:          profile.skill_drill_bests,
+  hasUsedFreeDaily:         profile.has_used_free_daily,
+  // Adaptive engine state
+  progression: {
+    level:         profile.level,
+    band:          Math.floor(profile.level / 10),
+    srGlobal:      profile.sr_global,
+    difficultyStep: profile.difficulty_step,
+    goodStreak:    profile.good_streak_count,
+    poorStreak:    profile.poor_streak_count,
+    history:       profile.recent_history,
+  }
+});
+```
+
+---
+
+### Session Completion Write Path
+
+Called once when a training session ends. Two writes happen in sequence:
+
+#### 1. Insert session row
+
+```typescript
+await supabase.from('sessions').insert({
+  user_uuid:               user.id,
+  session_type:            session.sessionType,       // 'daily' | 'rounding' etc.
+  started_at:              session.startedAt,
+  ended_at:                new Date().toISOString(),
+  duration_mode:           session.durationMode,
+  duration_actual_seconds: session.durationSecondsActual,
+  total_questions:         session.totalQuestions,
+  correct_questions:       session.correctQuestions,
+  accuracy:                session.accuracy,
+  median_response_ms:      session.medianMs,
+  variability_ms:          session.variabilityMs,
+  questions_per_second:    session.throughputQps,
+  speed_score:             session.speedScore,
+  consistency_score:       session.consistencyScore,
+  throughput_score:        session.throughputScore,
+  fluency_score:           session.fluencyScore,
+  xp_earned:               session.xpEarned,
+  xp_base:                 session.baseSessionXP,
+  xp_multiplier:           session.modeMultiplier,
+  level_before:            session.levelBefore,
+  level_after:             session.levelAfter,
+  level_ups:               session.levelUpCount ?? 0,
+  best_streak_in_session:  session.bestStreak,
+});
+```
+
+#### 2. Update profile snapshot (including adaptive engine state)
+
+Adaptive engine state is written here — at session completion — not per question. This keeps write volume low in v1.
+
+```typescript
+const { progression } = useStore.getState();
+
+await supabase.from('profiles').update({
+  level:              session.levelAfter,
+  xp_into_level:      currentXpIntoLevel,
+  lifetime_xp:        newLifetimeXp,
+  streak:             newStreak,
+  last_streak_date:   today,
+  lifetime_questions: newLifetimeQuestions,
+  personal_bests:     updatedPersonalBests,
+  // Adaptive engine state — written once at session end
+  sr_global:          progression.srGlobal,
+  difficulty_step:    progression.difficultyStep,
+  good_streak_count:  progression.goodStreak,
+  poor_streak_count:  progression.poorStreak,
+  recent_history:     progression.history,
+  // updated_at is handled automatically by the trigger
+}).eq('uuid', user.id);
+```
+
+---
+
+## Key Design Decisions Summary
+
+| Decision | Rationale |
 |---|---|
-| `question_attempts` table (per-question raw data: latency, operation type, answer given) | High write volume, requires careful indexing. Adds depth but not needed for MVP analytics |
-| `entitlements` table | Billing not live yet |
-| `personal_bests` as its own table | JSONB in `profiles` is sufficient until cross-user leaderboard queries are needed |
-| `game_mode_bests` as its own table | JSONB is fine until game mode variety increases |
-| `seen_strategies` as its own table | `text[]` is fine until the strategy library is large and queryable independently |
-| Settings sync to Supabase | Device-local is correct for v1; multi-device sync is a v2 concern |
-| Notification preferences | Device-local only |
+| Migrate, don't recreate profiles | Safe — existing rows and policies are preserved |
+| `levels` renamed to `level` | Naming clarity; feasible as a simple column rename |
+| `xp` split into `xp_into_level` + `lifetime_xp` | These are distinct concepts that serve different queries |
+| Adaptive state written at session end only | Low write volume for v1; state is consistent at session boundaries |
+| `ended_at` stored in sessions | More accurate than deriving from `started_at + duration`. Useful for admin queries |
+| JSONB for personal bests / skill drill bests | Read/written atomically; no need to query individual fields. Revisit in v2 for leaderboards |
+| `updated_at` via trigger | Eliminates application-level responsibility; always accurate |
+| Sessions indexed on `(user_uuid, started_at desc)` | Matches the primary query pattern for the Progress page |
+| Settings remain device-local | Prevents cross-device sync conflicts in v1 |
 
 ---
 
-## Section 5 — Key Example Queries
+## V2 Additions (Do Not Build Now)
 
-**7-day accuracy trend (Progress page):**
-```sql
-select date_trunc('day', started_at) as day, avg(accuracy)
-from sessions
-where user_uuid = $1
-  and session_type = 'daily'
-  and started_at > now() - interval '7 days'
-group by day
-order by day;
-```
-
-**Level journey (all-time):**
-```sql
-select started_at, level_before, level_after, level_ups
-from sessions
-where user_uuid = $1
-order by started_at asc;
-```
-
-**Personal best check after a session:**
-```sql
-select max(fluency_score), max(accuracy), min(median_response_ms)
-from sessions
-where user_uuid = $1
-  and session_type = 'daily';
-```
-
----
-
-## Implementation Notes for the Developer
-
-1. The existing `profiles` table in Supabase needs to be **dropped and recreated** with the full schema above (the current one only has `uuid`, `xp`, `levels`, `streak`).
-2. The `sessions` table needs to be created fresh in Supabase. It does not exist there yet.
-3. The app currently writes sessions to a legacy Express/PostgreSQL backend. That write path needs to be redirected to call `supabase.from('sessions').insert(...)` after a session completes.
-4. After successful Supabase auth sign-in, the app should call `supabase.from('profiles').select('*').eq('uuid', user.id).single()` and hydrate the Zustand store with the returned values.
-5. After each session, the app should write to both `sessions` (new row) and `profiles` (update current state fields: `levels`, `lifetime_xp`, `streak`, `lifetime_questions`, etc.).
-6. `ensureProfile` (already implemented) uses `ignoreDuplicates: true` — this must be updated to insert the full profile row shape, not just the 4 fields currently used.
+- `question_attempts` table (per-question raw latency + operation type)
+- `entitlements` table (billing tier, expiry, transaction ID)
+- `personal_bests` as a separate queryable table (for leaderboards)
+- `game_mode_bests` table with `(user_uuid, game_type)` PK
+- Settings sync to Supabase (multi-device)
+- Per-question adaptive state writes (if real-time analysis is needed)
