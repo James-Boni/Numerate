@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "7BJun3SE1r5F3w7UuB-k4"
+uri = "file://numerate-supabase-data-model.md"
+type = "text"
+title = "Numerate — Supabase Data Model Design"
