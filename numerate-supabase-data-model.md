@@ -129,24 +129,50 @@ alter table profiles
 
 ---
 
-### Step 6 — Add check constraints (idempotent)
+### Step 6 — Add check constraints (idempotent via pg_constraint guard)
 
 ```sql
-alter table profiles
-  add constraint if not exists profiles_level_positive
-    check (level >= 1),
-  add constraint if not exists profiles_xp_into_level_nn
-    check (xp_into_level >= 0),
-  add constraint if not exists profiles_lifetime_xp_nn
-    check (lifetime_xp >= 0),
-  add constraint if not exists profiles_streak_nn
-    check (streak >= 0),
-  add constraint if not exists profiles_lifetime_q_nn
-    check (lifetime_questions >= 0),
-  add constraint if not exists profiles_sr_global_range
-    check (sr_global >= 0 and sr_global <= 100),
-  add constraint if not exists profiles_difficulty_step_range
-    check (difficulty_step >= 0 and difficulty_step <= 4);
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_level_positive' and conrelid = 'profiles'::regclass) then
+    alter table profiles add constraint profiles_level_positive check (level >= 1);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_xp_into_level_nn' and conrelid = 'profiles'::regclass) then
+    alter table profiles add constraint profiles_xp_into_level_nn check (xp_into_level >= 0);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_lifetime_xp_nn' and conrelid = 'profiles'::regclass) then
+    alter table profiles add constraint profiles_lifetime_xp_nn check (lifetime_xp >= 0);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_streak_nn' and conrelid = 'profiles'::regclass) then
+    alter table profiles add constraint profiles_streak_nn check (streak >= 0);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_lifetime_q_nn' and conrelid = 'profiles'::regclass) then
+    alter table profiles add constraint profiles_lifetime_q_nn check (lifetime_questions >= 0);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_sr_global_range' and conrelid = 'profiles'::regclass) then
+    alter table profiles add constraint profiles_sr_global_range check (sr_global >= 0 and sr_global <= 100);
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_difficulty_step_range' and conrelid = 'profiles'::regclass) then
+    alter table profiles add constraint profiles_difficulty_step_range check (difficulty_step >= 0 and difficulty_step <= 4);
+  end if;
+end $$;
 ```
 
 ---
@@ -162,7 +188,8 @@ begin
 end;
 $$;
 
-create or replace trigger profiles_updated_at
+drop trigger if exists profiles_updated_at on profiles;
+create trigger profiles_updated_at
   before update on profiles
   for each row execute function handle_updated_at();
 ```
@@ -478,5 +505,5 @@ await supabase.from('profiles').update({
 | `ensureProfile` vs `ensureProfileExists` split | Onboarding requires placement context; sign-in safety does not |
 | App code updated before migration runs | Prevents column-name mismatch during the transition window |
 | `create index if not exists` | Safe to rerun without error |
-| `add constraint if not exists` | Safe to rerun without error (PostgreSQL 12+, Supabase uses 15) |
-| `create or replace trigger` | Idempotent trigger definition |
+| Check constraints via `pg_constraint` guard | PostgreSQL does not support `ADD CONSTRAINT IF NOT EXISTS`; DO block checking `pg_constraint` is the correct idempotent pattern |
+| `drop trigger if exists` + `create trigger` | PostgreSQL does not support `CREATE OR REPLACE TRIGGER`; explicit drop-then-create is the correct pattern |
