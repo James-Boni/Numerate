@@ -352,7 +352,6 @@ export const useStore = create<UserState>()(
           }
         });
         
-        console.log('[saveSession] uid check — state.uid:', state.uid)
         if (state.uid) {
           try {
             await api.createSession(state.uid, {
@@ -391,8 +390,7 @@ export const useStore = create<UserState>()(
             set({ lastSyncError: 'Failed to save session' });
           }
 
-          // Supabase persistence — fire-and-forget, safe to fail before migration is run
-          console.log('[saveSession] Calling saveSessionToSupabase — uid:', state.uid)
+          // Supabase persistence — fire-and-forget
           const { progression } = state;
           saveSessionToSupabase(
             state.uid,

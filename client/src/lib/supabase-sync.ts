@@ -50,7 +50,7 @@ export interface SupabaseProfileUpdate {
 
 export async function loadProfileFromSupabase(userId: string) {
   if (!supabase) {
-    console.warn('[loadProfileFromSupabase] Supabase not configured')
+    console.error('[loadProfileFromSupabase] Supabase not configured')
     return null
   }
 
@@ -61,7 +61,7 @@ export async function loadProfileFromSupabase(userId: string) {
     .single()
 
   if (error || !data) {
-    console.error('[loadProfileFromSupabase]', error?.message ?? 'Profile not found')
+    console.error('[loadProfileFromSupabase] Failed to load profile:', error?.message ?? 'No data returned')
     return null
   }
 
@@ -114,6 +114,8 @@ export async function loadProfileFromSupabase(userId: string) {
 //   1. Insert one row into sessions
 //   2. Update the profiles row (adaptive state + progress snapshot)
 // updated_at is intentionally omitted — handled by the DB trigger.
+// Both writes are attempted independently; a session insert failure does
+// not block the profile update.
 // ---------------------------------------------------------------------------
 
 export async function saveSessionToSupabase(
@@ -121,53 +123,50 @@ export async function saveSessionToSupabase(
   sessionRow: SupabaseSessionRow,
   profileUpdate: SupabaseProfileUpdate
 ): Promise<void> {
-  console.log('[saveSessionToSupabase] ENTRY — userId:', userId)
-
   if (!supabase) {
-    console.error('[saveSessionToSupabase] Supabase not configured — aborting')
+    console.error('[saveSessionToSupabase] Supabase not configured')
     return
   }
 
-  // Verify auth session
+  // Verify the Supabase auth session is still valid before writing.
   const { data: { user } } = await supabase.auth.getUser()
-  console.log('[saveSessionToSupabase] Supabase auth user:', user?.id ?? 'NONE — not authenticated')
 
   if (!user) {
-    console.error('[saveSessionToSupabase] No authenticated Supabase user — RLS will block insert')
+    console.error('[saveSessionToSupabase] No active Supabase auth session — skipping writes')
     return
   }
 
   if (user.id !== userId) {
-    console.error('[saveSessionToSupabase] uid mismatch — store uid:', userId, '| auth uid:', user.id)
+    console.error('[saveSessionToSupabase] Auth/store uid mismatch — store:', userId, '| auth:', user.id, '— aborting')
+    return
   }
 
   // Write 1 — insert session row
-  const sessionPayload = { user_uuid: userId, ...sessionRow }
-  console.log('[saveSessionToSupabase] Inserting session row:', sessionPayload)
-
-  const { data: sessionData, error: sessionError } = await supabase
+  const { error: sessionError } = await supabase
     .from('sessions')
-    .insert(sessionPayload)
-    .select()
+    .insert({ user_uuid: userId, ...sessionRow })
 
   if (sessionError) {
-    console.error('[saveSessionToSupabase] SESSION INSERT FAILED:', sessionError)
-  } else {
-    console.log('[saveSessionToSupabase] Session insert OK:', sessionData)
+    console.error('[saveSessionToSupabase] Session insert failed:', {
+      message: sessionError.message,
+      code:    sessionError.code,
+      details: sessionError.details,
+      hint:    sessionError.hint,
+    })
   }
 
-  // Write 2 — update profile snapshot
-  console.log('[saveSessionToSupabase] Updating profile row for uuid:', userId, profileUpdate)
-
-  const { data: profileData, error: profileError } = await supabase
+  // Write 2 — update profile snapshot (runs regardless of session insert result)
+  const { error: profileError } = await supabase
     .from('profiles')
     .update(profileUpdate)
     .eq('uuid', userId)
-    .select()
 
   if (profileError) {
-    console.error('[saveSessionToSupabase] PROFILE UPDATE FAILED:', profileError)
-  } else {
-    console.log('[saveSessionToSupabase] Profile update OK:', profileData)
+    console.error('[saveSessionToSupabase] Profile update failed:', {
+      message: profileError.message,
+      code:    profileError.code,
+      details: profileError.details,
+      hint:    profileError.hint,
+    })
   }
 }

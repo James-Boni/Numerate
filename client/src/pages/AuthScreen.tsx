@@ -90,7 +90,6 @@ export default function AuthScreen() {
           console.warn('[AuthScreen] Profile creation warning:', profileResult.error);
         }
         useStore.setState({ uid: user.id, isAuthenticated: true, email: user.email ?? null });
-        console.log('[AuthScreen] Sign-up complete, uid set:', user.id);
         setLocation('/paywall');
       } else {
         const { user, error } = await signInWithEmail(email, password);
@@ -106,7 +105,6 @@ export default function AuthScreen() {
         } else {
           useStore.setState({ uid: user.id, isAuthenticated: true, email: user.email ?? null });
         }
-        console.log('[AuthScreen] Sign-in complete, uid set:', user.id);
         setLocation('/train');
       }
     } catch (err) {
