@@ -1,38 +1,19 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { MobileLayout } from '@/components/layout/MobileLayout';
-import { useStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 
 export default function Welcome() {
-  const [_, setLocation] = useLocation();
-  const login = useStore(s => s.login);
-  const isAuthenticated = useStore(s => s.isAuthenticated);
-  const uid = useStore(s => s.uid);
-  const loadFromBackend = useStore(s => s.loadFromBackend);
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     AudioManager.init();
-    
-    if (isAuthenticated && uid) {
-      loadFromBackend();
-    }
-  }, [isAuthenticated, uid, loadFromBackend]);
+  }, []);
 
   const handleStart = () => {
-    if (!isAuthenticated) {
-        login("user@example.com"); // Auto-login for MVP
-    }
-    // Check if assessment needed
-    const { hasCompletedAssessment } = useStore.getState();
-    if (!hasCompletedAssessment) {
-        setLocation('/assessment');
-    } else {
-        setLocation('/train');
-    }
+    setLocation('/assessment');
   };
 
   return (
@@ -64,6 +45,7 @@ export default function Welcome() {
             <button 
                 onClick={handleStart}
                 className="w-full h-14 bg-primary text-white rounded-2xl font-semibold text-lg hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-primary/10 flex items-center justify-center gap-2"
+                data-testid="button-get-started"
             >
                 Get Started
                 <ArrowRight size={20} />

@@ -77,10 +77,16 @@ Preferred communication style: Simple, everyday language.
 - **Supabase `profiles` table**: `uuid` (PK, refs `auth.users(id)`), `created_at`, `xp`, `levels`, `streak`. RLS enabled — all policies compare `auth.uid() = uuid`.
 - **Required env vars**: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (Vite-prefixed, available in frontend bundle).
 - **Legacy auth**: Express/Passport backend (`server/routes.ts`, `auth-service.ts`) is fully intact but NOT used by the new auth UI.
+- **Sign-out routing**: Sign-out in Settings navigates to `/auth?mode=signin` (full page reload to clear state).
+- **Sign-in routing**: Successful sign-in navigates to `/train` (not `/paywall` — paywall is new-user onboarding only).
+- **Signup without assessment context**: If a user switches to sign-up mode on `/auth?mode=signin` and has no `startingLevel`, the form is replaced with a "Start Assessment" button that routes to `/assessment`. Creating an account always requires completing the assessment first.
 - **Next step**: Load user profile on app start (check Supabase session, fetch profile row, hydrate Zustand store).
 
 ### Application Flow
-Splash → Welcome → Assessment → Assessment Results (level reveal) → Auth Screen (`/auth`, Supabase email auth) → Paywall (`/paywall`, blocks until IAP wired) → Main Training App. The user experiences the product value (assessment + level) before creating an account. The starting level is preserved in Zustand throughout the flow. Skill Drills (Rounding, Doubling, Halving) and Quick Fire mode are available from the main training app.
+**New user onboarding**: Splash → Welcome → Assessment → Assessment Results (level reveal) → `/auth` (signup with level context) → `/paywall` → Main Training App.
+**Returning user**: Sign out → `/auth?mode=signin` → sign in → `/train`.
+**Returning user creating new account**: `/auth?mode=signin` → toggle to sign-up (no assessment context) → "Start Assessment" button → `/assessment` → (full onboarding flow).
+Welcome.tsx always routes Get Started → `/assessment`. No fake MVP login. Skill Drills (Rounding, Doubling, Halving) and Quick Fire mode are available from the main training app.
 
 ### Skill Drill Game Modes
 Rounding, Doubling, and Halving practice modes offer 3-minute timed sessions with tier-based difficulty scaling. They contribute to total XP and level-ups but do not affect global progress metrics.

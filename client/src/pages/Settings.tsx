@@ -280,7 +280,7 @@ export default function Settings() {
               <ChevronRight size={16} className="text-rose-300" />
             </button>
             <button 
-              onClick={() => { logout(); window.location.href = '/'; }}
+              onClick={() => { logout(); window.location.href = '/auth?mode=signin'; }}
               className="w-full p-4 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors"
             >
               <div className="flex items-center gap-3 text-slate-600">
