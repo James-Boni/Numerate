@@ -19,6 +19,7 @@ export default function Settings() {
   const { settings, updateSettings, logout, resetProgress, email, hasCompletedAssessment, startingLevel } = useStore();
   const { entitlement, authState, restorePurchases, linkApple, initAppSession } = useAccountStore();
   const [showResetModal, setShowResetModal] = useState(false);
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
   const [isRestoring, setIsRestoring] = useState(false);
 
@@ -280,8 +281,9 @@ export default function Settings() {
               <ChevronRight size={16} className="text-rose-300" />
             </button>
             <button 
-              onClick={() => { logout(); window.location.href = '/auth?mode=signin'; }}
+              onClick={() => setShowSignOutModal(true)}
               className="w-full p-4 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors"
+              data-testid="button-signout"
             >
               <div className="flex items-center gap-3 text-slate-600">
                 <LogOut size={20} />
@@ -323,6 +325,57 @@ export default function Settings() {
         </div>
       </div>
       
+      <AnimatePresence>
+        {showSignOutModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowSignOutModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl"
+              data-testid="modal-signout-confirm"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                  <LogOut size={24} className="text-slate-600" />
+                </div>
+                <h2 className="text-xl font-bold text-slate-900">Sign out?</h2>
+              </div>
+
+              <p className="text-slate-600 text-sm mb-6">
+                You can sign back in at any time. Your progress is saved to your account.
+              </p>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowSignOutModal(false)}
+                  data-testid="button-signout-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 border-slate-300 text-slate-700 hover:bg-slate-100"
+                  onClick={() => { logout(); window.location.href = '/auth?mode=signin'; }}
+                  data-testid="button-signout-confirm"
+                >
+                  Sign Out
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showResetModal && (
           <motion.div
