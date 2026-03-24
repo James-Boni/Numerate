@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -18,8 +18,8 @@ import Settings from "@/pages/Settings";
 import DevMenu from "@/pages/DevMenu";
 import AuthScreen from "@/pages/AuthScreen";
 import { PaywallScreen } from "@/components/game/PaywallScreen";
-import { useLocation } from "wouter";
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuthBoot } from '@/lib/useAuthBoot';
 
 function PaywallRoute() {
   const [, setLocation] = useLocation();
@@ -59,10 +59,10 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="w-56 h-56"
       >
-        <img 
-          src="/numerate-logo.png" 
-          alt="Numerate Logo" 
-          className="w-full h-full object-contain" 
+        <img
+          src="/numerate-logo.png"
+          alt="Numerate Logo"
+          className="w-full h-full object-contain"
         />
       </motion.div>
     </div>
@@ -91,7 +91,21 @@ function Router() {
 }
 
 function App() {
-  const [loading, setLoading] = useState(true);
+  const [splashDone, setSplashDone] = useState(false);
+  const { ready: authReady, destination } = useAuthBoot();
+  const [, setLocation] = useLocation();
+
+  // Show splash until BOTH the timer has elapsed AND the auth check is done.
+  // This prevents any visible flash of the wrong route.
+  const loading = !splashDone || !authReady;
+
+  // Once loading completes, redirect authenticated users to their destination.
+  // Unauthenticated users remain at '/' and see Welcome as normal.
+  useEffect(() => {
+    if (!loading && destination) {
+      setLocation(destination);
+    }
+  }, [loading, destination]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -99,9 +113,9 @@ function App() {
         <Toaster />
         <AnimatePresence>
           {loading ? (
-            <SplashScreen key="splash" onFinish={() => setLoading(false)} />
+            <SplashScreen key="splash" onFinish={() => setSplashDone(true)} />
           ) : (
-            <motion.div 
+            <motion.div
               key="content"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

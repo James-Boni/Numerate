@@ -12,6 +12,7 @@ import {
 } from './logic/difficulty';
 import { api } from './api';
 import { saveSessionToSupabase } from './supabase-sync';
+import { supabase } from './supabase';
 
 // --- Types ---
 
@@ -289,7 +290,58 @@ export const useStore = create<UserState>()(
         }
       },
       
-      logout: () => set({ isAuthenticated: false, email: null, uid: null }),
+      logout: () => {
+        // Invalidate the Supabase JWT — fire-and-forget since we immediately
+        // redirect away. On next boot, getSession() will correctly return null.
+        if (supabase) {
+          supabase.auth.signOut().catch(err =>
+            console.error('[logout] Supabase signOut failed:', err)
+          );
+        }
+        // Clear auth identity and all profile data so stale state from this
+        // user is not visible to the next person to open the app on this device.
+        // Device settings (sound, haptics, etc.) are intentionally preserved.
+        set({
+          isAuthenticated: false,
+          email: null,
+          uid: null,
+          createdAt: null,
+          hasCompletedAssessment: false,
+          startingLevel: 1,
+          competenceGroup: 1,
+          currentTier: 0,
+          level: 1,
+          xpIntoLevel: 0,
+          lifetimeXP: 0,
+          streakCount: 0,
+          lastStreakDate: null,
+          lifetimeQuestionsAnswered: 0,
+          quickFireIntroSeen: false,
+          quickFireHighScore: 0,
+          hasUsedFreeDaily: false,
+          seenStrategies: [],
+          personalBests: {
+            bestStreak: 0,
+            bestStreakDate: null,
+            fastestMedianMs: null,
+            fastestMedianDate: null,
+            highestAccuracy: null,
+            highestAccuracyDate: null,
+            highestThroughput: null,
+            highestThroughputDate: null,
+            highestFluencyScore: null,
+            highestFluencyDate: null,
+          },
+          skillDrillBests: {
+            rounding: { bestScore: 0, bestStreak: 0, gamesPlayed: 0, totalCorrect: 0 },
+            doubling: { bestScore: 0, bestStreak: 0, gamesPlayed: 0, totalCorrect: 0 },
+            halving:  { bestScore: 0, bestStreak: 0, gamesPlayed: 0, totalCorrect: 0 },
+          },
+          sessions: [],
+          progression: { ...INITIAL_PROGRESSION_STATE },
+          lastSyncError: null,
+        });
+      },
       
       completeAssessment: (competenceGroup, startingLevel, initialStats) => set((state) => ({
         hasCompletedAssessment: true,

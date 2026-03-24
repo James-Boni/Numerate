@@ -1,0 +1,55 @@
+We have now completed and verified:
+- Supabase auth flow
+- profile persistence
+- sessions persistence
+- RLS on profiles and sessions
+
+The next task is to harden app-start session and profile loading so the app behaves correctly every time it opens.
+
+Objective:
+When the app launches, it should reliably detect whether the user is authenticated, load their profile from Supabase, hydrate the Zustand store, and route them to the correct place without stale onboarding state or incorrect redirects.
+
+Please do the following:
+
+1. Audit the app start / boot flow
+- find the exact code path that runs on app load
+- identify how Supabase session state is checked
+- identify how profile hydration currently happens
+- identify any gaps, race conditions, or stale Zustand/localStorage issues
+
+2. Implement a clean startup auth/profile flow
+Requirements:
+- if no authenticated Supabase session exists:
+  - user should go through the normal non-auth onboarding path
+- if an authenticated session exists:
+  - fetch the user via Supabase
+  - load the matching profile from Supabase
+  - hydrate Zustand with profile data
+  - ensure uid, email, and isAuthenticated are set correctly
+  - route the user to the correct logged-in destination
+- do not rely on stale persisted client state alone
+
+3. Prevent stale onboarding state issues
+- make sure old assessment/signup context does not incorrectly persist across logout/login cycles
+- preserve real persisted profile progress
+- clear only transient onboarding state when appropriate
+
+4. Preserve current routing rules
+- returning signed-in users should not be pushed back into assessment
+- signed-out users should go to /auth?mode=signin when appropriate
+- signup without assessment context should still route to /assessment
+- dev bypass flows must continue to work
+
+5. Improve robustness
+- avoid race conditions between auth detection and route rendering
+- add concise error handling for failed profile loads
+- do not leave the app in a half-authenticated state
+
+6. Return:
+- files changed
+- startup flow summary
+- any assumptions made
+- any remaining risks
+- how I should test the final behaviour
+
+Do not work on IAP yet. This is a startup/session hydration hardening task only.
