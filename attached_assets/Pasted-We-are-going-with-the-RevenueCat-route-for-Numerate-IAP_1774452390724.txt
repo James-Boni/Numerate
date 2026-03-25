@@ -1,0 +1,71 @@
+We are going with the RevenueCat route for Numerate IAP.
+
+Do not implement yet. I want a clean integration plan first.
+
+Objective:
+Turn the existing Numerate paywall into a real Apple subscription gate using RevenueCat as the entitlement layer.
+
+Context:
+- Auth, profiles, sessions, startup hydration, and logout flow are already working
+- The paywall already exists in the correct place in the app flow
+- Monthly and annual subscription options already exist in the UI, but currently have no billing function
+- We want Apple App Store auto-renewable subscriptions for iOS-first launch
+- RevenueCat will be used to manage purchases and entitlements
+- Supabase should not be the source of truth for billing status
+
+Plan requirements:
+
+1. Define the v1 billing architecture
+- Apple subscriptions + RevenueCat
+- one entitlement only, e.g. premium
+- explain exactly how RevenueCat fits into the current Numerate architecture
+
+2. Define the purchase products needed
+- monthly subscription
+- annual subscription
+- explain how these map to RevenueCat offerings / packages / entitlement
+
+3. Define app behaviour for all core states
+- new user reaches paywall and is not subscribed
+- user purchases monthly
+- user purchases annual
+- purchase fails or is cancelled
+- returning subscribed user opens app
+- user taps restore purchases
+- subscription expires
+
+4. Define gating logic
+- where entitlement should be checked
+- how the paywall should unlock access
+- how returning subscribed users should skip the paywall
+- how dev-only bypass remains isolated to development only
+
+5. Define implementation phases
+- RevenueCat account setup
+- App Store Connect setup
+- code integration steps
+- testing order
+- final production readiness checks
+
+6. Define files likely to change
+- existing paywall screen
+- app startup/auth boot flow if needed
+- route gating
+- any billing service abstraction layer
+
+7. Define whether Supabase should store any mirrored subscription fields
+- if yes, what fields
+- if no, explain why
+- be explicit about source of truth
+
+8. Output format
+Return:
+- recommended architecture
+- exact implementation phases
+- files likely to change
+- App Store Connect setup required
+- RevenueCat setup required
+- testing plan
+- risks / edge cases
+
+This is a planning task only. Make no code changes yet.
