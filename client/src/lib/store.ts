@@ -136,7 +136,7 @@ export interface UserState {
   
   // Actions
   login: (email: string) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   completeAssessment: (competenceGroup: number, startingLevel: number, initialStats: any) => void;
   saveSession: (session: SessionStats) => void;
   updateSettings: (settings: Partial<UserSettings>) => void;
@@ -290,13 +290,16 @@ export const useStore = create<UserState>()(
         }
       },
       
-      logout: () => {
-        // Invalidate the Supabase JWT — fire-and-forget since we immediately
-        // redirect away. On next boot, getSession() will correctly return null.
+      logout: async () => {
+        // Await signOut so the local session token is cleared from localStorage
+        // before control returns to the caller. The caller navigates only after
+        // this resolves, so a page reload (if any) will see no session.
         if (supabase) {
-          supabase.auth.signOut().catch(err =>
-            console.error('[logout] Supabase signOut failed:', err)
-          );
+          try {
+            await supabase.auth.signOut();
+          } catch (err) {
+            console.error('[logout] Supabase signOut failed:', err);
+          }
         }
         // Clear auth identity and all profile data so stale state from this
         // user is not visible to the next person to open the app on this device.

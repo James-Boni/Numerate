@@ -365,7 +365,7 @@ export default function Settings() {
                 <Button
                   variant="outline"
                   className="flex-1 border-slate-300 text-slate-700 hover:bg-slate-100"
-                  onClick={() => { logout(); window.location.href = '/auth?mode=signin'; }}
+                  onClick={async () => { await logout(); navigate('/auth?mode=signin'); }}
                   data-testid="button-signout-confirm"
                 >
                   Sign Out
