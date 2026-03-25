@@ -32,8 +32,9 @@ export default function AuthScreen() {
   const [, setLocation] = useLocation();
   const startingLevel = useStore(s => s.startingLevel);
   const competenceGroup = useStore(s => s.competenceGroup);
+  const hasCompletedAssessment = useStore(s => s.hasCompletedAssessment);
 
-  const hasAssessmentContext = mode === 'signup' && startingLevel > 0;
+  const hasAssessmentContext = mode === 'signup' && hasCompletedAssessment && startingLevel > 0;
 
   useEffect(() => {
     if (fieldErrors.confirmEmail && email && confirmEmail && email === confirmEmail) {
