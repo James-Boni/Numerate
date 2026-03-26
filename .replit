@@ -49,3 +49,4 @@ expertMode = true
 [userenv.shared]
 VITE_SUPABASE_URL = "https://elbsylawglmuufpduwnk.supabase.co"
 VITE_SUPABASE_ANON_KEY = "sb_publishable_I0LG29KpnrKXY9dorkSyEQ_uD88ML7X"
+VITE_REVENUECAT_TEST_API_KEY = "test_YtRcygLGQeAQprMCylGXAHTBIqs"
