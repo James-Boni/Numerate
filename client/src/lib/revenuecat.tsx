@@ -4,15 +4,16 @@
  * The ONLY runtime layer for subscription state in Numerate.
  * Components never call billingService or RevenueCat SDK directly.
  *
- * Stage 1 behaviour (browser / MockBillingService):
+ * Browser (MockBillingService):
  *   - isSubscribed reflects entitlement stored in localStorage
- *   - purchase() calls MockBillingService.purchasePremium() → grants a 30- or
- *     365-day simulated premium entitlement and updates isSubscribed
- *   - restore() returns the current stored entitlement (no-op in mock mode)
- *   - logIn / logOut are no-ops in mock mode (called automatically on auth change)
- *   - monthlyPriceString / annualPriceString are null (no real packages yet)
+ *   - purchase() calls MockBillingService.purchasePremium() → grants simulated premium
+ *   - restore() returns current stored entitlement (no-op in mock mode)
+ *   - monthlyPriceString / annualPriceString are null (no real packages)
  *
- * Stage 3: RevenueCatCapacitorService becomes active; the hook surface is identical.
+ * Native Capacitor (RevenueCatCapacitorService):
+ *   - initializeRevenueCat() configures the SDK with the API key at app boot
+ *   - All methods delegate to the real Purchases SDK
+ *   - Prices come from RevenueCat offerings (monthlyPriceString / annualPriceString populated)
  */
 
 import {
@@ -24,8 +25,19 @@ import {
   ReactNode,
 } from 'react';
 import { billingService } from '@/lib/services/billing-service';
+import { configureRevenueCat } from '@/lib/services/revenuecat-capacitor-service';
 import { IAPProductId } from '@/lib/services/types';
 import { useStore } from '@/lib/store';
+
+// Returns true when running inside a Capacitor native shell.
+// Safe to call even when @capacitor/core is not the active runtime.
+function isNativeCapacitor(): boolean {
+  try {
+    return !!(window as any)?.Capacitor?.isNativePlatform?.();
+  } catch {
+    return false;
+  }
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -51,10 +63,33 @@ interface SubscriptionContextValue {
 const SubscriptionContext = createContext<SubscriptionContextValue | null>(null);
 
 // ── initializeRevenueCat ──────────────────────────────────────────────────────
-// Stage 1: no-op. In Stage 3 this will call:
-//   Purchases.configureWith({ apiKey: import.meta.env.VITE_REVENUECAT_IOS_API_KEY })
+// Called once at app boot (App.tsx module level).
+// No-op in browser — MockBillingService needs no configuration.
+// On native Capacitor: reads the API key and configures the RevenueCat SDK.
+// Uses VITE_REVENUECAT_IOS_API_KEY for production and
+// VITE_REVENUECAT_TEST_API_KEY as a fallback for test-store device testing.
 export function initializeRevenueCat(): void {
-  // Stage 3 implementation goes here.
+  if (!isNativeCapacitor()) return;
+
+  const apiKey =
+    (import.meta.env.VITE_REVENUECAT_IOS_API_KEY as string | undefined) ||
+    (import.meta.env.VITE_REVENUECAT_TEST_API_KEY as string | undefined) ||
+    null;
+
+  if (!apiKey) {
+    console.error(
+      '[RevenueCat] No API key configured. ' +
+      'Set VITE_REVENUECAT_IOS_API_KEY (production) or ' +
+      'VITE_REVENUECAT_TEST_API_KEY (test store) in secrets.'
+    );
+    return;
+  }
+
+  // Fire-and-forget — configure() is fast; service methods are only called
+  // after SubscriptionProvider mounts, which is after this resolves.
+  configureRevenueCat(apiKey).catch(err => {
+    console.error('[RevenueCat] configure failed:', err);
+  });
 }
 
 // ── SubscriptionProvider ──────────────────────────────────────────────────────

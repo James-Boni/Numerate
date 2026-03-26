@@ -1,0 +1,54 @@
+Stage 2 is complete. Implement Stage 3 for Numerate.
+
+Context:
+Numerate already has a billing abstraction and provider pattern in place. Do not rewrite the architecture. Plug RevenueCat into the existing system.
+
+Existing architecture that must be preserved:
+- IBillingService contract already exists
+- MockBillingService remains active for browser/dev
+- RevenueCatCapacitorService currently exists as a stub
+- SubscriptionProvider and useSubscription() already power the paywall and gated screens
+- On login, billingService.logIn(uid) should be used
+- On logout, billingService.logOut() should be used
+- Single entitlement model: premium
+- Supabase is NOT a source of truth for billing
+- RevenueCat should only be used in native/Capacitor mode
+
+Goal of this stage:
+Replace the RevenueCatCapacitorService stub with a real implementation using the RevenueCat Capacitor SDK, while leaving browser/dev behavior untouched.
+
+Tasks:
+1. Install and wire the RevenueCat Capacitor SDK package.
+2. Add support for reading the RevenueCat public API key from environment variables.
+3. Implement RevenueCatCapacitorService methods:
+   - logIn(uid)
+   - logOut()
+   - syncEntitlement()
+   - purchasePremium()
+   - restorePurchases()
+4. syncEntitlement() should check whether the `premium` entitlement is active and return a boolean subscription state.
+5. purchasePremium() should fetch the current offering and purchase the correct package. Keep the implementation structured so monthly and annual can both be supported cleanly.
+6. restorePurchases() should call RevenueCat restore and then re-sync entitlement state.
+7. Preserve the current provider-based API used by the app:
+   - isSubscribed
+   - isLoading
+   - purchase()
+   - restore()
+8. Do not add Supabase billing fields.
+9. Do not paste generic RevenueCat quickstart UI snippets into screens.
+10. Keep all current mock/browser functionality intact.
+
+Implementation requirements:
+- TypeScript-safe
+- minimal and clean
+- robust error handling
+- clear logging comments only where useful
+- no architectural shortcuts
+- no duplication of billing logic in UI components
+
+Deliverables:
+- updated revenuecat-capacitor-service.ts
+- any necessary updates to the billing service factory
+- any necessary environment variable usage
+- minimal changes to provider wiring if required
+- short summary of what was changed and any manual follow-up steps required

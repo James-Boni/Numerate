@@ -1,18 +1,15 @@
 /**
- * RevenueCatCapacitorService — Stage 1 stub
+ * RevenueCatCapacitorService — Stage 3 real implementation
  *
- * Implements IBillingService for native Capacitor builds using
- * @revenuecat/purchases-capacitor (installed in Stage 3).
+ * Implements IBillingService using @revenuecat/purchases-capacitor.
+ * Only instantiated when isNativeCapacitor() is true (see billing-service.ts).
+ * Never imported or used by components — all access goes through useSubscription().
  *
- * Stage 1: all methods are stubs that log their intent and return safe defaults.
- * Stage 3: replace each stub body with the real @revenuecat/purchases-capacitor
- *          API call (Purchases.configureWith, Purchases.getOfferings,
- *          Purchases.purchasePackage, Purchases.restorePurchases, etc.).
- *
- * Components must NEVER import this class directly. All access goes through
- * useSubscription() → SubscriptionProvider → billingService singleton.
+ * Assumes Purchases.configure() has already been called via configureRevenueCat()
+ * from initializeRevenueCat() in revenuecat.tsx.
  */
 
+import { Purchases } from '@revenuecat/purchases-capacitor';
 import {
   Entitlement,
   EntitlementStatus,
@@ -21,57 +18,94 @@ import {
   IAPProductId,
 } from './types';
 
+const PREMIUM_ENTITLEMENT_ID = 'premium';
+
+// Derive the CustomerInfo type from the SDK's own return type so we don't
+// depend on the internal package's re-export path.
+type GetCustomerInfoResult = Awaited<ReturnType<typeof Purchases.getCustomerInfo>>;
+type RCCustomerInfo = GetCustomerInfoResult['customerInfo'];
+
+function mapCustomerInfo(customerInfo: RCCustomerInfo): Entitlement {
+  const active = customerInfo.entitlements.active[PREMIUM_ENTITLEMENT_ID];
+  if (!active || !active.isActive) {
+    return { ...DEFAULT_ENTITLEMENT };
+  }
+  return {
+    tier: 'premium',
+    source: 'apple_iap',
+    // RevenueCat's active map includes grace-period entries (isActive stays true).
+    // The willRenew flag identifies non-renewing (e.g. cancelled) subscriptions.
+    status: 'active',
+    productId: active.productIdentifier,
+    expiresAt: active.expirationDateMillis ?? undefined,
+    updatedAt: Date.now(),
+  };
+}
+
+// ── Module-level configure call ───────────────────────────────────────────────
+// Called once at app boot from initializeRevenueCat() in revenuecat.tsx.
+// Must complete before any service method is used.
+export async function configureRevenueCat(apiKey: string): Promise<void> {
+  await Purchases.configure({ apiKey });
+}
+
+// ── Service implementation ────────────────────────────────────────────────────
+
 export class RevenueCatCapacitorService implements IBillingService {
 
-  // ─── Identity ────────────────────────────────────────────────────────────
+  // ─── Identity ──────────────────────────────────────────────────────────────
 
   async logIn(userId: string): Promise<void> {
-    // Stage 3: await Purchases.logIn({ appUserID: userId })
-    console.log('[RevenueCat] logIn stub:', userId);
+    try {
+      await Purchases.logIn({ appUserID: userId });
+    } catch (err) {
+      // Non-fatal: SubscriptionProvider will still re-sync entitlement.
+      console.warn('[RevenueCat] logIn failed:', err);
+    }
   }
 
   async logOut(): Promise<void> {
-    // Stage 3: await Purchases.logOut()
-    console.log('[RevenueCat] logOut stub');
+    try {
+      await Purchases.logOut();
+    } catch (err) {
+      // Non-fatal: may throw if already anonymous.
+      console.warn('[RevenueCat] logOut failed:', err);
+    }
   }
 
-  // ─── Entitlement ─────────────────────────────────────────────────────────
+  // ─── Entitlement ───────────────────────────────────────────────────────────
 
   async getEntitlement(): Promise<Entitlement> {
-    // Stage 3: const info = await Purchases.getCustomerInfo()
-    //          return mapCustomerInfoToEntitlement(info)
-    console.log('[RevenueCat] getEntitlement stub — returning free default');
-    return { ...DEFAULT_ENTITLEMENT };
+    const { customerInfo } = await Purchases.getCustomerInfo();
+    return mapCustomerInfo(customerInfo);
   }
 
   async syncEntitlement(): Promise<Entitlement> {
-    // Stage 3: same as getEntitlement (forces a server-side refresh)
+    // getCustomerInfo() uses RevenueCat's cache with automatic server refresh.
     return this.getEntitlement();
   }
 
-  // ─── Purchases ────────────────────────────────────────────────────────────
+  // ─── Purchases ─────────────────────────────────────────────────────────────
 
   async purchasePremium(productId: IAPProductId): Promise<Entitlement> {
-    // Stage 3:
-    //   const offerings = await Purchases.getOfferings()
-    //   const pkg = offerings.current?.availablePackages.find(
-    //     p => p.product.identifier === productId
-    //   )
-    //   if (!pkg) throw new Error('Package not found: ' + productId)
-    //   await Purchases.purchasePackage({ aPackage: pkg })
-    //   return this.getEntitlement()
-    console.log('[RevenueCat] purchasePremium stub:', productId);
-    return { ...DEFAULT_ENTITLEMENT };
+    const offerings = await Purchases.getOfferings();
+    const pkg = offerings.current?.availablePackages.find(
+      p => p.product.identifier === productId
+    );
+    if (!pkg) {
+      throw new Error(`[RevenueCat] No package found for product: ${productId}`);
+    }
+    // Throws on user cancellation or payment failure — caller handles the error.
+    const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg });
+    return mapCustomerInfo(customerInfo);
   }
 
   async restorePurchases(): Promise<Entitlement> {
-    // Stage 3: await Purchases.restorePurchases()
-    //          return this.getEntitlement()
-    console.log('[RevenueCat] restorePurchases stub');
-    return { ...DEFAULT_ENTITLEMENT };
+    const { customerInfo } = await Purchases.restorePurchases();
+    return mapCustomerInfo(customerInfo);
   }
 
-  // ─── Dev helpers (no-ops in production native service) ───────────────────
+  // ─── Dev helpers — no-ops in production service ────────────────────────────
 
   async devSetEntitlement(_tier: 'free' | 'premium'): Promise<Entitlement> {
     console.warn('[RevenueCat] devSetEntitlement is a no-op in RevenueCatCapacitorService');
