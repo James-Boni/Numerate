@@ -13,6 +13,7 @@ import {
 import { api } from './api';
 import { saveSessionToSupabase } from './supabase-sync';
 import { supabase } from './supabase';
+import { billingService } from './services/billing-service';
 
 // --- Types ---
 
@@ -294,6 +295,13 @@ export const useStore = create<UserState>()(
         // Await signOut so the local session token is cleared from localStorage
         // before control returns to the caller. The caller navigates only after
         // this resolves, so a page reload (if any) will see no session.
+        // Log out of RevenueCat before clearing uid so the billing service
+        // forgets the user identity before SubscriptionProvider re-syncs.
+        try {
+          await billingService.logOut();
+        } catch (err) {
+          console.error('[logout] billingService.logOut failed (non-fatal):', err);
+        }
         if (supabase) {
           try {
             await supabase.auth.signOut();

@@ -20,6 +20,9 @@ import AuthScreen from "@/pages/AuthScreen";
 import { PaywallScreen } from "@/components/game/PaywallScreen";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthBoot } from '@/lib/useAuthBoot';
+import { initializeRevenueCat, SubscriptionProvider } from '@/lib/revenuecat';
+
+initializeRevenueCat();
 
 function PaywallRoute() {
   const [, setLocation] = useLocation();
@@ -122,7 +125,9 @@ function App() {
               transition={{ duration: 0.3 }}
               className="w-full h-full"
             >
-              <Router />
+              <SubscriptionProvider>
+                <Router />
+              </SubscriptionProvider>
             </motion.div>
           )}
         </AnimatePresence>

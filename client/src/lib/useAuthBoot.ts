@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { loadProfileFromSupabase } from '@/lib/supabase-sync'
 import { useStore } from '@/lib/store'
+import { billingService } from '@/lib/services/billing-service'
 
 export type BootDestination = '/train' | null
 
@@ -50,6 +51,16 @@ export function useAuthBoot(): AuthBootResult {
       const profile = await loadProfileFromSupabase(user.id)
 
       if (cancelled) return
+
+      // Identify user to the billing service before updating Zustand uid.
+      // SubscriptionProvider watches uid, so logIn must complete first so that
+      // the subsequent syncEntitlement() returns the correct state for this user.
+      try {
+        await billingService.logIn(user.id)
+      } catch (err) {
+        // Non-fatal — proceed even if billing service logIn fails.
+        console.warn('[useAuthBoot] billingService.logIn failed (non-fatal):', err)
+      }
 
       if (profile) {
         useStore.setState({

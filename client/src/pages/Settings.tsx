@@ -10,32 +10,31 @@ import { AudioManager } from '@/lib/audio';
 import { HapticsManager } from '@/lib/haptics';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'wouter';
-import { useAccountStore, isPremiumActive, authService } from '@/lib/services';
+import { useAccountStore, authService } from '@/lib/services';
+import { useSubscription } from '@/lib/revenuecat';
 
 const SHOW_DEV_MENU = import.meta.env.MODE !== 'production';
 
 export default function Settings() {
   const [, navigate] = useLocation();
   const { settings, updateSettings, logout, resetProgress, email, hasCompletedAssessment, startingLevel } = useStore();
-  const { entitlement, authState, restorePurchases, linkApple, initAppSession } = useAccountStore();
+  const { authState, linkApple, initAppSession } = useAccountStore();
+  const { isSubscribed: isPremium, isRestoring, restore } = useSubscription();
   const [showResetModal, setShowResetModal] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
-  const [isRestoring, setIsRestoring] = useState(false);
 
   useEffect(() => {
     initAppSession();
   }, [initAppSession]);
 
   const handleRestorePurchases = async () => {
-    setIsRestoring(true);
     try {
-      await restorePurchases();
+      await restore();
       setToast({ message: 'Purchases restored successfully.', visible: true });
     } catch (error) {
       setToast({ message: 'Failed to restore purchases.', visible: true });
     }
-    setIsRestoring(false);
     setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
   };
 
@@ -49,7 +48,6 @@ export default function Settings() {
     setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
   };
 
-  const isPremium = isPremiumActive(entitlement);
   const isAppleLinked = authState.provider === 'apple';
   const isAppleAvailable = authService.isAppleAuthAvailable();
 
@@ -117,12 +115,8 @@ export default function Settings() {
                 <Crown size={20} className={isPremium ? 'text-amber-500' : 'text-slate-300'} />
                 <div>
                   <span className="font-medium text-sm">{isPremium ? 'Premium Active' : 'Free Plan'}</span>
-                  {isPremium && entitlement.expiresAt && (
-                    <p className="text-xs text-slate-400">
-                      {entitlement.status === 'grace' ? 'Grace period' : 
-                       entitlement.status === 'expired' ? 'Expired' :
-                       `Renews ${new Date(entitlement.expiresAt).toLocaleDateString()}`}
-                    </p>
+                  {isPremium && (
+                    <p className="text-xs text-slate-400">Active</p>
                   )}
                 </div>
               </div>

@@ -4,8 +4,7 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { Button } from '@/components/ui/button';
 import { Crown, Zap, TrendingUp, Target, X } from 'lucide-react';
 import { clsx } from 'clsx';
-import { billingService } from '@/lib/services/billing-service';
-import { useAccountStore } from '@/lib/services/account-store';
+import { useSubscription } from '@/lib/revenuecat';
 import { IAP_PRODUCTS } from '@/lib/services/types';
 
 interface PaywallScreenProps {
@@ -18,36 +17,28 @@ type PlanType = 'monthly' | 'yearly';
 
 export function PaywallScreen({ onSubscribed, onRestore, onDismiss }: PaywallScreenProps) {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>('yearly');
-  const [isLoading, setIsLoading] = useState(false);
-  const refreshEntitlement = useAccountStore(s => s.refreshEntitlement);
+  const { purchase, restore, isPurchasing, isRestoring, monthlyPriceString, annualPriceString } = useSubscription();
+
+  const isLoading = isPurchasing || isRestoring;
 
   const handleSubscribe = async () => {
-    setIsLoading(true);
     try {
-      const productId = selectedPlan === 'monthly' 
-        ? IAP_PRODUCTS.PREMIUM_MONTHLY 
+      const productId = selectedPlan === 'monthly'
+        ? IAP_PRODUCTS.PREMIUM_MONTHLY
         : IAP_PRODUCTS.PREMIUM_YEARLY;
-      
-      await billingService.purchasePremium(productId);
-      await refreshEntitlement();
+      await purchase(productId);
       onSubscribed();
     } catch (error) {
       console.error('Purchase error:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handleRestore = async () => {
-    setIsLoading(true);
     try {
-      await billingService.restorePurchases();
-      await refreshEntitlement();
+      await restore();
       onRestore();
     } catch (error) {
       console.error('Restore error:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -144,7 +135,7 @@ export function PaywallScreen({ onSubscribed, onRestore, onDismiss }: PaywallScr
                   <div className="text-slate-400 text-sm">Save 17%</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold">£10</div>
+                  <div className="text-2xl font-bold">{annualPriceString ?? '£10'}</div>
                   <div className="text-slate-400 text-sm">/year</div>
                 </div>
               </div>
@@ -166,7 +157,7 @@ export function PaywallScreen({ onSubscribed, onRestore, onDismiss }: PaywallScr
                   <div className="text-slate-400 text-sm">Flexible</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold">£1</div>
+                  <div className="text-2xl font-bold">{monthlyPriceString ?? '£1'}</div>
                   <div className="text-slate-400 text-sm">/month</div>
                 </div>
               </div>

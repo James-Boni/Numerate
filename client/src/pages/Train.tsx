@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { BottomNav } from '@/components/ui/bottom-nav';
@@ -8,31 +8,21 @@ import { Zap, Play, Flame, Timer, Trophy, ChevronRight, Lock, CircleDot, Copy, S
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { xpRequiredToAdvance } from '@/lib/logic/xp-system';
-import { useAccountStore, isPremiumActive } from '@/lib/services/account-store';
+import { useSubscription } from '@/lib/revenuecat';
 import { PaywallScreen } from '@/components/game/PaywallScreen';
 import { DailyFocus } from '@/components/train/DailyFocus';
 import { DailyRecap, shouldShowDailyRecap } from '@/components/train/DailyRecap';
 
 export default function Train() {
   const { level, lifetimeXP, streakCount, hasCompletedAssessment, quickFireHighScore, sessions, xpIntoLevel, hasUsedFreeDaily } = useStore();
-  const { entitlement, refreshEntitlement } = useAccountStore();
+  const { isSubscribed, isLoading: subscriptionLoading } = useSubscription();
   const [showPaywall, setShowPaywall] = useState(false);
   const [_, setLocation] = useLocation();
-  
-  const [entitlementChecked, setEntitlementChecked] = useState(false);
-  
-  useEffect(() => {
-    const checkEntitlement = async () => {
-      await refreshEntitlement();
-      setEntitlementChecked(true);
-    };
-    checkEntitlement();
-  }, []);
-  
-  const isPremium = isPremiumActive(entitlement);
-  // Default to locked until entitlement is verified, then check actual status
-  const needsSubscription = entitlementChecked ? (hasUsedFreeDaily && !isPremium) : false;
-  const showLoadingButton = !entitlementChecked && hasUsedFreeDaily;
+
+  // While the subscription state is loading, show a loading button rather than
+  // incorrectly locking or unlocking the session.
+  const needsSubscription = subscriptionLoading ? false : (hasUsedFreeDaily && !isSubscribed);
+  const showLoadingButton = subscriptionLoading && hasUsedFreeDaily;
   
   const xpNeeded = xpRequiredToAdvance(level);
   const progressPercent = Math.min(100, (xpIntoLevel / xpNeeded) * 100);

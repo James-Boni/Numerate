@@ -97,3 +97,20 @@ export const IAP_PRODUCTS = {
 } as const;
 
 export type IAPProductId = typeof IAP_PRODUCTS[keyof typeof IAP_PRODUCTS];
+
+// Billing service contract — implemented by MockBillingService (browser/dev)
+// and RevenueCatCapacitorService (native iOS). Components never call this
+// directly; they go through SubscriptionProvider / useSubscription().
+export interface IBillingService {
+  getEntitlement(): Promise<Entitlement>;
+  purchasePremium(productId: IAPProductId): Promise<Entitlement>;
+  restorePurchases(): Promise<Entitlement>;
+  syncEntitlement(): Promise<Entitlement>;
+  logIn(userId: string): Promise<void>;
+  logOut(): Promise<void>;
+
+  // Dev-only helpers — no-ops in RevenueCatCapacitorService
+  devSetEntitlement(tier: 'free' | 'premium'): Promise<Entitlement>;
+  devSetStatus(status: EntitlementStatus): Promise<Entitlement>;
+  devSetExpiry(expiresAt: number | undefined): Promise<Entitlement>;
+}
