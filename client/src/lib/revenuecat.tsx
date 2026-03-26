@@ -63,30 +63,57 @@ interface SubscriptionContextValue {
 const SubscriptionContext = createContext<SubscriptionContextValue | null>(null);
 
 // ── initializeRevenueCat ──────────────────────────────────────────────────────
-// Called once at app boot (App.tsx module level).
-// No-op in browser — MockBillingService needs no configuration.
-// On native Capacitor: reads the API key and configures the RevenueCat SDK.
-// Uses VITE_REVENUECAT_IOS_API_KEY for production and
-// VITE_REVENUECAT_TEST_API_KEY as a fallback for test-store device testing.
+// Called once at module load in App.tsx. Two paths:
+//
+//   Browser / Replit preview → isNativeCapacitor() is false → returns immediately.
+//   MockBillingService is used; no RevenueCat SDK calls are ever made.
+//
+//   Native Capacitor (device / Simulator) → configures the RevenueCat SDK.
+//   Which API key is used:
+//
+//     VITE_REVENUECAT_TEST_API_KEY  — set this for RevenueCat Test Store builds.
+//       The RevenueCat Test Store is a RevenueCat-managed sandbox that lets you
+//       test purchase flows on a Simulator or device without real App Store accounts.
+//       Use the iOS public SDK key from the RevenueCat Test Store project.
+//       Priority: checked FIRST so it wins during active development.
+//
+//     VITE_REVENUECAT_IOS_API_KEY   — set this for TestFlight and App Store builds.
+//       This is the iOS public SDK key from your production RevenueCat app.
+//       Apple sandbox accounts (sandbox Apple IDs) work automatically with this
+//       key when running a debug or TestFlight build — RevenueCat detects them.
+//       Priority: fallback when the test-store key is absent.
+//
+//   In practice: set only VITE_REVENUECAT_TEST_API_KEY while developing,
+//   set only VITE_REVENUECAT_IOS_API_KEY when cutting a TestFlight or App Store build.
 export function initializeRevenueCat(): void {
   if (!isNativeCapacitor()) return;
 
+  // Test Store key takes priority so a dev environment never accidentally hits
+  // the production RevenueCat project.
   const apiKey =
-    (import.meta.env.VITE_REVENUECAT_IOS_API_KEY as string | undefined) ||
     (import.meta.env.VITE_REVENUECAT_TEST_API_KEY as string | undefined) ||
+    (import.meta.env.VITE_REVENUECAT_IOS_API_KEY as string | undefined) ||
     null;
 
   if (!apiKey) {
     console.error(
-      '[RevenueCat] No API key configured. ' +
-      'Set VITE_REVENUECAT_IOS_API_KEY (production) or ' +
-      'VITE_REVENUECAT_TEST_API_KEY (test store) in secrets.'
+      '[RevenueCat] No API key found. ' +
+      'Add VITE_REVENUECAT_TEST_API_KEY (RevenueCat Test Store, for Simulator/dev device) ' +
+      'or VITE_REVENUECAT_IOS_API_KEY (production/TestFlight) to Replit Secrets.'
     );
     return;
   }
 
-  // Fire-and-forget — configure() is fast; service methods are only called
-  // after SubscriptionProvider mounts, which is after this resolves.
+  if (import.meta.env.DEV) {
+    const usingTestKey = !!import.meta.env.VITE_REVENUECAT_TEST_API_KEY;
+    console.debug(
+      '[RevenueCat] initializeRevenueCat — using',
+      usingTestKey ? 'Test Store key (VITE_REVENUECAT_TEST_API_KEY)' : 'iOS key (VITE_REVENUECAT_IOS_API_KEY)'
+    );
+  }
+
+  // Fire-and-forget — Purchases.configure() completes well before
+  // SubscriptionProvider mounts and makes its first syncEntitlement() call.
   configureRevenueCat(apiKey).catch(err => {
     console.error('[RevenueCat] configure failed:', err);
   });
