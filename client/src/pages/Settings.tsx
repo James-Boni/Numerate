@@ -5,7 +5,7 @@ import { useStore } from '@/lib/store';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { Volume2, Zap, LogOut, Trash2, ChevronRight, User, AlertTriangle, X, Code, Crown, RotateCcw, Apple, Bell, Clock } from 'lucide-react';
+import { Volume2, Zap, LogOut, Trash2, ChevronRight, User, AlertTriangle, X, Code, Crown, RotateCcw, Apple, Bell, Clock, Mail } from 'lucide-react';
 import { AudioManager } from '@/lib/audio';
 import { HapticsManager } from '@/lib/haptics';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -316,11 +316,30 @@ export default function Settings() {
           </div>
         )}
 
-        <div className="pt-4 text-center space-y-1">
+        <div className="space-y-3">
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Support</h3>
+          <Card className="border-none shadow-sm overflow-hidden">
+            <button
+              onClick={() => window.open('mailto:numerateapp@gmail.com', '_blank')}
+              className="w-full p-4 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors"
+              data-testid="button-contact-support"
+            >
+              <div className="flex items-center gap-3 text-slate-600">
+                <Mail size={20} />
+                <div className="text-left">
+                  <span className="font-medium text-sm block">Contact Support</span>
+                  <span className="text-xs text-slate-400">numerateapp@gmail.com</span>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-slate-300" />
+            </button>
+          </Card>
+        </div>
+
+        <div className="pt-2 text-center space-y-1">
           <p className="text-[10px] text-slate-400 font-medium">Numerate v1.0.0</p>
           <div className="flex justify-center gap-4">
             <button className="text-[10px] text-primary font-bold uppercase tracking-widest">Privacy Policy</button>
-            <button className="text-[10px] text-primary font-bold uppercase tracking-widest">Support</button>
           </div>
         </div>
       </div>
